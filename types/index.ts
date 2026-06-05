@@ -9,10 +9,15 @@ export interface Profile {
 }
 
 // ── Users ────────────────────────────────────────────────────
+export type UserStatus = 'Active' | 'Inactive'
+
 export interface User {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   email_address: string
+  ota_client: boolean
+  status: UserStatus
   created_at: string
   updated_at: string
 }
@@ -28,10 +33,13 @@ export interface GDS {
 }
 
 // ── PCC List ─────────────────────────────────────────────────
+export type PCCStatus = 'Active' | 'Pending' | 'Vacant'
+
 export interface PCCList {
   id: number
   gds_id: number
   pcc: string
+  status: PCCStatus
   created_at: string
   updated_at: string
   gds?: GDS
