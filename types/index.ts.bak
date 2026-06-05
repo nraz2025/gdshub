@@ -46,27 +46,41 @@ export interface PCCList {
 }
 
 // ── GDS Functionality ─────────────────────────────────────────
-export interface GDSFeature {
-  id: number
-  key: string
-  label: string
-  created_at: string
-}
+export const FUNCTIONALITY_FIELDS = [
+  { key: 'booking',            label: 'Booking'            },
+  { key: 'ticketing',          label: 'Ticketing'          },
+  { key: 'fareview',           label: 'Fareview'           },
+  { key: 'auto_exchange',      label: 'Automated Exchange' },
+  { key: 'auto_refunds',       label: 'Automated Refunds'  },
+  { key: 'automation_hub',     label: 'Automation Hub'     },
+  { key: 'bargain_finder_max', label: 'Bargain Finder Max' },
+  { key: 'clipboard_app',      label: 'Clipboard App'      },
+  { key: 'data_suite',         label: 'Data Suite'         },
+  { key: 'eticket_reports',    label: 'E-Ticket Reports'   },
+  { key: 'web_service',        label: 'Web Service'        },
+  { key: 'productivity_suite', label: 'Productivity Suite' },
+  { key: 'ndc',                label: 'NDC' },
+] as const
 
-export interface GDSProfileFeature {
-  profile_id: number
-  feature_id: number
-  gds_features?: GDSFeature
-}
+export type FunctionalityKey = typeof FUNCTIONALITY_FIELDS[number]['key']
 
 export interface GDSFunctionality {
   id: number
-  gds_id: number
   name: string
+  booking: boolean
+  ticketing: boolean
+  fareview: boolean
+  auto_exchange: boolean
+  auto_refunds: boolean
+  automation_hub: boolean
+  bargain_finder_max: boolean
+  clipboard_app: boolean
+  data_suite: boolean
+  eticket_reports: boolean
+  web_service: boolean
+  productivity_suite: boolean
   created_at: string
   updated_at: string
-  gds?: GDS
-  gds_profile_features?: GDSProfileFeature[]
 }
 
 // ── GDS Information ───────────────────────────────────────────
