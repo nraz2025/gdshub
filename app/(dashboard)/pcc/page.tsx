@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
-import type { PCCList, GDS } from '@/types'
+import type { PCCList, GDS, Organisation } from '@/types'
 
-const EMPTY: Partial<PCCList> = { gds_id: undefined, pcc: '', status: 'Active' }
+const EMPTY: Partial<PCCList> = { gds_id: undefined, pcc: '', status: 'Active', org_id: null }
 
 type PCCStatus = 'Active' | 'Pending' | 'Vacant'
 const PCC_STATUSES: PCCStatus[] = ['Active', 'Pending', 'Vacant']
@@ -38,6 +38,7 @@ export default function PCCPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterGDS, setFilterGDS] = useState<string>('all')
+  const [orgList, setOrgList] = useState<Organisation[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
   // Add / Edit modal
@@ -65,12 +66,14 @@ export default function PCCPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const [{ data: pccData }, { data: gdsData }] = await Promise.all([
-      supabase.from('pcc_list').select('*, gds(id, name)').order('pcc'),
+    const [{ data: pccData }, { data: gdsData }, { data: orgData }] = await Promise.all([
+      supabase.from('pcc_list').select('*, gds(id, name), organisation:org_id(id, organisation, iata)').order('pcc'),
       supabase.from('gds').select('*').order('name'),
+      supabase.from('organisation').select('*').order('organisation'),
     ])
     setRecords(pccData ?? [])
     setGdsList(gdsData ?? [])
+    setOrgList(orgData ?? [])
     setLoading(false)
   }
 
@@ -84,7 +87,7 @@ export default function PCCPage() {
 
   function openEdit(row: PCCList) {
     setEditing(row)
-    setForm({ gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active' })
+    setForm({ gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active', org_id: row.org_id ?? null })
     setError('')
     setModalOpen(true)
   }
@@ -97,10 +100,10 @@ export default function PCCPage() {
     const pccUpper = form.pcc.trim().toUpperCase()
     setSaving(true); setError('')
     if (editing) {
-      const { error } = await supabase.from('pcc_list').update({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active' }).eq('id', editing.id)
+      const { error } = await supabase.from('pcc_list').update({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active', org_id: form.org_id ?? null }).eq('id', editing.id)
       if (error) { setError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('pcc_list').insert({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active' })
+      const { error } = await supabase.from('pcc_list').insert({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active', org_id: form.org_id ?? null })
       if (error) { setError(error.message); setSaving(false); return }
     }
     setSaving(false); setModalOpen(false); fetchAll()
@@ -293,6 +296,15 @@ export default function PCCPage() {
       }
     },
     {
+      key: 'organisation', label: 'Organisation',
+      render: (row: PCCList) => {
+        const org = row.organisation as Organisation
+        return org
+          ? <div><p className="text-sm text-slate-700 font-medium">{org.organisation}</p>{org.iata && <p className="text-xs text-slate-400 font-mono">{org.iata}</p>}</div>
+          : <span className="text-slate-300 text-xs">—</span>
+      }
+    },
+    {
       key: 'created_at', label: 'Created',
       render: (row: PCCList) => new Date(row.created_at).toLocaleDateString('en-MY')
     },
@@ -436,6 +448,19 @@ export default function PCCPage() {
             >
               {PCC_STATUSES.map(s => (
                 <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation</label>
+            <select
+              value={form.org_id ?? ''}
+              onChange={e => setForm(f => ({ ...f, org_id: e.target.value ? Number(e.target.value) : null }))}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
+            >
+              <option value="">— None —</option>
+              {orgList.map(o => (
+                <option key={o.id} value={o.id}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>
               ))}
             </select>
           </div>

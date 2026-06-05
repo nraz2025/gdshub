@@ -40,26 +40,19 @@ export interface PCCList {
   gds_id: number
   pcc: string
   status: PCCStatus
-  org_id: number | null
   created_at: string
   updated_at: string
   gds?: GDS
-  organisation?: Organisation
 }
 
 // ── GDS Functionality ─────────────────────────────────────────
-export type BillingCycle = 'monthly' | 'yearly' | 'per_user' | 'per_transaction' | 'one_time'
-
 export interface GDSFeature {
   id: number
-  gds_id: number | null
   key: string
   label: string
   cost: number
   currency: string
-  billing_cycle: BillingCycle
   created_at: string
-  gds?: GDS
 }
 
 export interface GDSProfileFeature {
@@ -87,7 +80,7 @@ export interface GDSInformation {
 }
 
 // ── GDS User types ────────────────────────────────────────────
-export type SabreStatus = 'Active' | 'Vacant'
+export type SabreStatus = 'Active' | 'Inactive' | 'Suspended'
 
 export interface SabreUser {
   id: number
@@ -96,14 +89,10 @@ export interface SabreUser {
   status: SabreStatus
   pcc: string | null
   user_id: string | null
-  ota_client_id: number | null
-  cta: string | null
-  pta: string | null
-  minicom: string | null
+  ota: boolean
   created_at: string
   updated_at: string
   users?: User
-  ota_client?: OTAClient
 }
 
 export interface AmadeusUser {
@@ -171,13 +160,4 @@ export interface OTAClient {
   updated_at: string
   users?: User
   midoffice_configuration?: MidOfficeConfiguration
-}
-
-// ── Organisation ──────────────────────────────────────────────
-export interface Organisation {
-  id: number
-  organisation: string
-  iata: string | null
-  created_at: string
-  updated_at: string
 }
