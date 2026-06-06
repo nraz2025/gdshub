@@ -7,6 +7,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
 import type { SabreUser, User, OTAClient } from '@/types'
+import { syncUserToTable, syncUserToOTAClient } from '@/lib/syncUser'
 
 type SabreStatus = 'Active' | 'Vacant'
 const STATUSES: SabreStatus[] = ['Active', 'Vacant']
@@ -19,6 +20,8 @@ const EMPTY = {
   epr: '', initial: '', status: 'Active' as SabreStatus,
   pcc: '', user_id: '', ota_client_id: '' as number | '',
   cta: '', pta: '', minicom: '',
+  newEmail: '', newFirstName: '', newLastName: '',
+  newEmail: '', newFirstName: '', newLastName: '',
 }
 
 interface ImportRow {
@@ -71,7 +74,7 @@ export default function SabreUsersPage() {
     setLoading(false)
   }
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
 
   function openEdit(row: SabreUser) {
     setEditing(row)
@@ -85,8 +88,9 @@ export default function SabreUsersPage() {
       cta: row.cta ?? '',
       pta: row.pta ?? '',
       minicom: row.minicom ?? '',
+      newEmail: '', newFirstName: '', newLastName: '',
     })
-    setError(''); setModalOpen(true)
+    setError(''); setSaving(false); setModalOpen(true)
   }
 
   function openDelete(row: SabreUser) { setEditing(row); setDeleteOpen(true) }
@@ -94,12 +98,26 @@ export default function SabreUsersPage() {
   async function handleSave() {
     if (!form.epr.trim()) { setError('EPR is required.'); return }
     setSaving(true); setError('')
+
+    // Auto-sync: if admin entered a new email, ensure user exists in users table
+    let resolvedUserId = form.user_id || null
+    if (form.newEmail?.trim()) {
+      const synced = await syncUserToTable({
+        email:     form.newEmail,
+        firstName: form.newFirstName ?? '',
+        lastName:  form.newLastName  ?? '',
+      })
+      if (synced) {
+        resolvedUserId = synced
+      }
+    }
+
     const payload = {
       epr:           form.epr.trim().toUpperCase(),
       initial:       form.initial.trim().toUpperCase() || null,
       status:        form.status,
       pcc:           form.pcc.trim().toUpperCase() || null,
-      user_id:       form.user_id || null,
+      user_id:       resolvedUserId,
       ota_client_id: form.ota_client_id || null,
       cta:           form.cta.trim() || null,
       pta:           form.pta.trim() || null,
@@ -109,6 +127,34 @@ export default function SabreUsersPage() {
       ? await supabase.from('sabre_user').update(payload).eq('id', editing.id)
       : await supabase.from('sabre_user').insert(payload)
     if (err) { setError(err.message); setSaving(false); return }
+
+    // Sync ota_client_users junction table
+    if (resolvedUserId) {
+      const prevOtaId = editing?.ota_client_id ?? null
+      const newOtaId  = form.ota_client_id ? Number(form.ota_client_id) : null
+
+      // OTA was removed or changed — remove the old link
+      if (prevOtaId && prevOtaId !== newOtaId) {
+        await supabase.from('ota_client_users')
+          .delete()
+          .eq('ota_client_id', prevOtaId)
+          .eq('user_id', resolvedUserId)
+      }
+
+      // OTA is set — add new link (if not already there)
+      if (newOtaId) {
+        await syncUserToOTAClient({ userId: resolvedUserId, otaClientId: newOtaId })
+      }
+    }
+
+    // If OTA was cleared and no user_id, still clean up old link
+    if (!resolvedUserId && editing?.user_id && editing?.ota_client_id) {
+      await supabase.from('ota_client_users')
+        .delete()
+        .eq('ota_client_id', editing.ota_client_id)
+        .eq('user_id', editing.user_id)
+    }
+
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
@@ -333,6 +379,28 @@ export default function SabreUsersPage() {
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} — {u.email_address}</option>)}
             </select>
           </div>
+
+          {/* Create & link new user inline */}
+          {!form.user_id && (
+            <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
+                <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
+                  <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
+                  <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* CTA, PTA, Minicom — freetext license */}
           <div>

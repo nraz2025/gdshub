@@ -6,9 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
-import type { AmadeusUser, User } from '@/types'
+import type { AmadeusUser, User, OTAClient } from '@/types'
+import { syncUserToTable, syncUserToOTAClient } from '@/lib/syncUser'
 
-const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false }
+const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '',
+}
 
 interface ImportRow {
   login: string; sign_on_id: string; initial: string; duty_code: string; oid: string; ota: boolean
@@ -20,6 +22,7 @@ export default function AmadeusUsersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<AmadeusUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
+  const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -44,31 +47,59 @@ export default function AmadeusUsersPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const [{ data: amData }, { data: usersData }] = await Promise.all([
-      supabase.from('amadeus_user').select('*, users:user_id(id, first_name, last_name, email_address)').order('login'),
+    const [{ data: amData }, { data: usersData }, { data: otaData }] = await Promise.all([
+      supabase.from('amadeus_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('login'),
       supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
+      supabase.from('ota_client').select('id, company_name').order('company_name'),
     ])
     setRecords(amData ?? [])
     setUsersList(usersData ?? [])
+    setOtaClients(otaData ?? [])
     setLoading(false)
   }
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
   function openEdit(row: AmadeusUser) {
     setEditing(row)
-    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota })
-    setError(''); setModalOpen(true)
+    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '' })
+    setError(''); setSaving(false); setModalOpen(true)
   }
   function openDelete(row: AmadeusUser) { setEditing(row); setDeleteOpen(true) }
 
   async function handleSave() {
     if (!form.login.trim()) { setError('Login is required.'); return }
     setSaving(true); setError('')
-    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: form.user_id || null, ota: form.ota }
+
+    // Resolve user_id — use selected user or auto-create from email
+    let resolvedUserId = form.user_id || null
+    if ((form as {newEmail?: string}).newEmail?.trim()) {
+      const synced = await syncUserToTable({
+        email:     (form as {newEmail: string}).newEmail,
+        firstName: (form as {newFirstName?: string}).newFirstName ?? '',
+        lastName:  (form as {newLastName?: string}).newLastName  ?? '',
+      })
+      if (synced) { resolvedUserId = synced }
+    }
+
+    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null }
     const { error: err } = editing
       ? await supabase.from('amadeus_user').update(payload).eq('id', editing.id)
       : await supabase.from('amadeus_user').insert(payload)
     if (err) { setError(err.message); setSaving(false); return }
+
+    // Sync ota_client_users junction table
+    if (resolvedUserId) {
+      const prevOtaId = editing?.ota_client_id ?? null
+      const newOtaId  = form.ota_client_id ? Number(form.ota_client_id) : null
+      if (prevOtaId && prevOtaId !== newOtaId) {
+        await supabase.from('ota_client_users').delete().eq('ota_client_id', prevOtaId).eq('user_id', resolvedUserId)
+      }
+      if (newOtaId) { await syncUserToOTAClient({ userId: resolvedUserId, otaClientId: newOtaId }) }
+    }
+    if (!resolvedUserId && editing?.user_id && editing?.ota_client_id) {
+      await supabase.from('ota_client_users').delete().eq('ota_client_id', editing.ota_client_id).eq('user_id', editing.user_id)
+    }
+
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
@@ -162,7 +193,8 @@ export default function AmadeusUsersPage() {
     { key: 'duty_code', label: 'Duty Code', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.duty_code ?? '—'}</span> },
     { key: 'oid', label: 'OID', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.oid ?? '—'}</span> },
     { key: 'ota', label: 'OTA', render: (row: AmadeusUser) => <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${row.ota ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.ota ? 'Yes' : 'No'}</span> },
-    { key: 'user_id', label: 'Linked User', render: (row: AmadeusUser) => { const u = row.users as User; return u ? <span className="text-sm text-slate-600">{u.first_name} {u.last_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
+    { key: 'ota_client_id', label: 'OTA Client', render: (row: AmadeusUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
+    { key: 'user_id', label: 'Linked User', render: (row: AmadeusUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">—</span> } },
     { key: 'created_at', label: 'Created', render: (row: AmadeusUser) => new Date(row.created_at).toLocaleDateString('en-MY') },
   ]
 
@@ -204,11 +236,37 @@ export default function AmadeusUsersPage() {
           </div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
             <input type="text" value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY255W" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">— None —</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">— None —</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}</select></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
+          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA
+          {/* Create & link new user inline */}
+          {!form.user_id && (
+            <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
+                <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
+                  <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
+                  <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                </div>
+              </div>
+            </div>
+          )}</label>
             <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div></div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">

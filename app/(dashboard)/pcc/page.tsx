@@ -6,42 +6,52 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
-import type { PCCList, GDS, Organisation } from '@/types'
-
-const EMPTY: Partial<PCCList> = { gds_id: undefined, pcc: '', status: 'Active', org_id: null }
+import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
 
 type PCCStatus = 'Active' | 'Pending' | 'Vacant'
 const PCC_STATUSES: PCCStatus[] = ['Active', 'Pending', 'Vacant']
 
+const GDS_COLORS: Record<string, string> = {
+  Sabre:      'bg-blue-50 text-blue-600 border-blue-200',
+  Amadeus:    'bg-purple-50 text-purple-600 border-purple-200',
+  Travelport: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+}
 const STATUS_COLORS: Record<string, string> = {
   Active:  'bg-blue-50 text-blue-600 border-blue-200',
   Pending: 'bg-amber-50 text-amber-600 border-amber-200',
   Vacant:  'bg-slate-100 text-slate-500 border-slate-200',
 }
 
-interface ImportRow {
-  gds_name: string
-  pcc: string
-  status: PCCStatus
-  _row: number
-  _errors: string[]
-  _gds_id?: number
+const EMPTY: Partial<PCCList> = {
+  gds_id: undefined, pcc: '', status: 'Active',
+  org_id: null, ota_client_id: null, functionality_id: null, remarks: null,
 }
 
-export default function PCCPage() {
+interface ImportRow {
+  gds_name: string; pcc: string; status: PCCStatus
+  _row: number; _errors: string[]; _gds_id?: number
+}
+
+export default function GDSInfoPage() {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [records, setRecords] = useState<PCCList[]>([])
   const [gdsList, setGdsList] = useState<GDS[]>([])
+  const [orgList, setOrgList] = useState<Organisation[]>([])
+  const [otaClients, setOtaClients] = useState<OTAClient[]>([])
+  const [funcList, setFuncList] = useState<GDSFunctionality[]>([])
+  const [allFeatures, setAllFeatures] = useState<GDSFeature[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterGDS, setFilterGDS] = useState<string>('all')
-  const [orgList, setOrgList] = useState<Organisation[]>([])
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterGDS, setFilterGDS] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterOrg, setFilterOrg] = useState('all')
+  const [filterPCC, setFilterPCC] = useState('all')
+  const [filterOTA, setFilterOTA] = useState('all')
 
-  // Add / Edit modal
+  // Add/Edit modal
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState<Partial<PCCList>>(EMPTY)
@@ -49,7 +59,13 @@ export default function PCCPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Import modal
+  // GDS Feature detail popup
+  const [featurePopup, setFeaturePopup] = useState<PCCList | null>(null)
+  const [featurePopupOpen, setFeaturePopupOpen] = useState(false)
+  const [profileFeatureIds, setProfileFeatureIds] = useState<Set<number>>(new Set())
+  const [featureToggling, setFeatureToggling] = useState(false)
+
+  // Import
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
   const [importFileName, setImportFileName] = useState('')
@@ -66,30 +82,51 @@ export default function PCCPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const [{ data: pccData }, { data: gdsData }, { data: orgData }] = await Promise.all([
-      supabase.from('pcc_list').select('*, gds(id, name), organisation:org_id(id, organisation, iata)').order('pcc'),
+    const [{ data: pccData }, { data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }] = await Promise.all([
+      supabase.from('pcc_list').select(`
+        *, gds:gds_id(id, name),
+        organisation:org_id(id, organisation, iata),
+        ota_client:ota_client_id(id, company_name),
+        gds_functionality:functionality_id(id, name, gds_id),
+        pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
+      `).order('pcc'),  // initial fetch order; client-side sort applied below
       supabase.from('gds').select('*').order('name'),
       supabase.from('organisation').select('*').order('organisation'),
+      supabase.from('ota_client').select('id, company_name').order('company_name'),
+      supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
+      supabase.from('gds_features').select('*').order('label'),
     ])
-    setRecords(pccData ?? [])
+    const sorted = (pccData ?? []).slice().sort((a, b) => {
+      const orgA = (a.organisation as { organisation: string } | undefined)?.organisation ?? ''
+      const orgB = (b.organisation as { organisation: string } | undefined)?.organisation ?? ''
+      const gdsA = (a.gds as { name: string } | undefined)?.name ?? ''
+      const gdsB = (b.gds as { name: string } | undefined)?.name ?? ''
+      return orgA.localeCompare(orgB) || gdsA.localeCompare(gdsB) || a.pcc.localeCompare(b.pcc)
+    })
+    setRecords(sorted)
     setGdsList(gdsData ?? [])
     setOrgList(orgData ?? [])
+    setOtaClients(otaData ?? [])
+    setFuncList(funcData ?? [])
+    setAllFeatures(featData ?? [])
     setLoading(false)
   }
 
   // ── CRUD ──────────────────────────────────────────────────────
   function openAdd() {
     setEditing(null)
-    setForm({ gds_id: gdsList[0]?.id, pcc: '' })
-    setError('')
-    setModalOpen(true)
+    setForm({ ...EMPTY, gds_id: gdsList[0]?.id })
+    setError(''); setModalOpen(true)
   }
 
   function openEdit(row: PCCList) {
     setEditing(row)
-    setForm({ gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active', org_id: row.org_id ?? null })
-    setError('')
-    setModalOpen(true)
+    setForm({
+      gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active',
+      org_id: row.org_id ?? null, ota_client_id: row.ota_client_id ?? null,
+      functionality_id: row.functionality_id ?? null, remarks: row.remarks ?? null,
+    })
+    setError(''); setModalOpen(true)
   }
 
   function openDelete(row: PCCList) { setEditing(row); setDeleteOpen(true) }
@@ -99,13 +136,15 @@ export default function PCCPage() {
     if (!form.pcc?.trim()) { setError('PCC code is required.'); return }
     const pccUpper = form.pcc.trim().toUpperCase()
     setSaving(true); setError('')
-    if (editing) {
-      const { error } = await supabase.from('pcc_list').update({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active', org_id: form.org_id ?? null }).eq('id', editing.id)
-      if (error) { setError(error.message); setSaving(false); return }
-    } else {
-      const { error } = await supabase.from('pcc_list').insert({ gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active', org_id: form.org_id ?? null })
-      if (error) { setError(error.message); setSaving(false); return }
+    const payload = {
+      gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active',
+      org_id: form.org_id ?? null, ota_client_id: form.ota_client_id ?? null,
+      functionality_id: form.functionality_id ?? null, remarks: form.remarks ?? null,
     }
+    const { error: err } = editing
+      ? await supabase.from('pcc_list').update(payload).eq('id', editing.id)
+      : await supabase.from('pcc_list').insert(payload)
+    if (err) { setError(err.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
@@ -116,185 +155,149 @@ export default function PCCPage() {
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
+  // ── GDS FEATURE POPUP ─────────────────────────────────────────
+  function openFeaturePopup(row: PCCList) {
+    setFeaturePopup(row)
+    // Use pcc_features (direct PCC assignments) — independent of any profile
+    const existing = new Set(((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).map(pf => pf.feature_id))
+    setProfileFeatureIds(existing)
+    setFeaturePopupOpen(true)
+  }
+
+  async function toggleProfileFeature(featureId: number) {
+    if (!featurePopup || !isAdmin) return
+    setFeatureToggling(true)
+    const has = profileFeatureIds.has(featureId)
+    if (has) {
+      await supabase.from('pcc_features').delete()
+        .eq('pcc_list_id', featurePopup.id).eq('feature_id', featureId)
+      setProfileFeatureIds(prev => { const s = new Set(prev); s.delete(featureId); return s })
+    } else {
+      await supabase.from('pcc_features').insert({ pcc_list_id: featurePopup.id, feature_id: featureId })
+      setProfileFeatureIds(prev => new Set([...prev, featureId]))
+    }
+    setFeatureToggling(false)
+    fetchAll()
+  }
+
   // ── EXPORT ────────────────────────────────────────────────────
   function handleExport() {
-    const exportData = filtered.map((r, i) => {
-      const gdsName = (r.gds as GDS)?.name ?? gdsList.find(g => g.id === r.gds_id)?.name ?? '—'
+    const data = filtered.map((r, i) => {
+      const gdsName = (r.gds as GDS)?.name ?? ''
+      const org = r.organisation as Organisation
+      const ota = r.ota_client as OTAClient
+      const func = r.gds_functionality as GDSFunctionality
       return {
-        'No.':      i + 1,
-        'GDS':      gdsName,
-        'PCC Code': r.pcc,
-        'Status':   r.status ?? 'Active',
-        'Created':  new Date(r.created_at).toLocaleDateString('en-MY'),
+        'No.': i + 1,
+        'Organisation': org?.organisation ?? '',
+        'IATA': org?.iata ?? '',
+        'GDS': gdsName,
+        'PCC': r.pcc,
+        'Status': r.status ?? '',
+        'PCC Assigned': ota?.company_name ?? '',
+        'GDS Feature': func?.name ?? '',
+        'Remarks': r.remarks ?? '',
+        'Created': new Date(r.created_at).toLocaleDateString('en-MY'),
       }
     })
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 15 }]
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'PCC List')
-    XLSX.writeFile(wb, `GDSHub_PCC_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, 'GDS Info')
+    XLSX.writeFile(wb, `GDSHub_GDS_Info_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
-  // ── TEMPLATE DOWNLOAD ─────────────────────────────────────────
   function handleDownloadTemplate() {
-    const templateData = [
-      { 'GDS': 'Sabre',      'PCC Code': 'KULMY217Z', 'Status': 'Active'  },
-      { 'GDS': 'Amadeus',    'PCC Code': 'KULMY255W', 'Status': 'Pending' },
-      { 'GDS': 'Travelport', 'PCC Code': 'K3MY',      'Status': 'Vacant'  },
-    ]
-    const ws = XLSX.utils.json_to_sheet(templateData)
-    ws['!cols'] = [{ wch: 15 }, { wch: 20 }, { wch: 12 }]
+    const ws = XLSX.utils.json_to_sheet([
+      { 'GDS': 'Sabre',   'PCC': 'KULMY217Z', 'Status': 'Active'  },
+      { 'GDS': 'Amadeus', 'PCC': 'KULMY255W', 'Status': 'Pending' },
+    ])
+    ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 12 }]
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'PCC List')
-    XLSX.writeFile(wb, 'GDSHub_PCC_Import_Template.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'GDS Info')
+    XLSX.writeFile(wb, 'GDSHub_GDS_Info_Template.xlsx')
   }
 
-  // ── IMPORT FILE PICK ──────────────────────────────────────────
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImportFileName(file.name)
-    setImportResult(null)
-
+    const file = e.target.files?.[0]; if (!file) return
+    setImportFileName(file.name); setImportResult(null)
     const reader = new FileReader()
     reader.onload = (evt) => {
-      const data = evt.target?.result
-      const wb = XLSX.read(data, { type: 'binary' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
-
-      // Flexible header resolver
-      function getField(row: Record<string, string>, ...candidates: string[]): string {
-        const normalize = (s: string) => s.toLowerCase().replace(/[\s_\-\.]/g, '')
-        const keys = Object.keys(row)
-        for (const candidate of candidates) {
-          const match = keys.find(k => normalize(k) === normalize(candidate))
-          if (match !== undefined) return (row[match] ?? '').toString().trim()
-        }
-        return ''
+      const wb = XLSX.read(evt.target?.result, { type: 'binary' })
+      const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
+      const getF = (row: Record<string, string>, ...keys: string[]) => {
+        const norm = (s: string) => s.toLowerCase().replace(/[\s_\-\.]/g, '')
+        const match = Object.keys(row).find(k => keys.some(c => norm(k) === norm(c)))
+        return match ? (row[match] ?? '').toString().trim() : ''
       }
-
       const parsed: ImportRow[] = raw.map((r, i) => {
-        const gds_name   = getField(r, 'GDS', 'gds', 'gds_name', 'gds name', 'platform')
-        const pcc        = getField(r, 'PCC Code', 'PCC', 'pcc', 'pcc_code', 'pcccode', 'office id', 'officeid').toUpperCase()
-        const status_raw = getField(r, 'Status', 'status', 'pcc_status')
+        const gds_name   = getF(r, 'GDS', 'gds', 'gds_name')
+        const pcc        = getF(r, 'PCC', 'pcc', 'PCC Code', 'pcc_code').toUpperCase()
+        const status_raw = getF(r, 'Status', 'status')
         const status: PCCStatus = (['Active','Pending','Vacant'].includes(status_raw) ? status_raw : 'Active') as PCCStatus
-
-        const errors: string[] = []
-
-        // Validate GDS name matches one we have
         const matched_gds = gdsList.find(g => g.name.toLowerCase() === gds_name.toLowerCase())
-        if (!gds_name) {
-          errors.push('GDS is required')
-        } else if (!matched_gds) {
-          errors.push(`GDS "${gds_name}" not found — use Sabre, Amadeus or Travelport`)
-        }
-        if (!pcc) errors.push('PCC Code is required')
-
-        return {
-          gds_name,
-          pcc,
-          status,
-          _row: i + 2,
-          _errors: errors,
-          _gds_id: matched_gds?.id,
-        }
+        const errors: string[] = []
+        if (!gds_name) errors.push('GDS is required')
+        else if (!matched_gds) errors.push(`GDS "${gds_name}" not found`)
+        if (!pcc) errors.push('PCC is required')
+        return { gds_name, pcc, status, _row: i + 2, _errors: errors, _gds_id: matched_gds?.id }
       })
-
-      const foundHeaders = raw.length > 0 ? Object.keys(raw[0]) : []
-      setDetectedHeaders(foundHeaders)
-      setImportRows(parsed)
-      setImportOpen(true)
+      setDetectedHeaders(raw.length > 0 ? Object.keys(raw[0]) : [])
+      setImportRows(parsed); setImportOpen(true)
     }
-    reader.readAsBinaryString(file)
-    e.target.value = ''
+    reader.readAsBinaryString(file); e.target.value = ''
   }
 
-  // ── IMPORT SUBMIT ─────────────────────────────────────────────
   async function handleImportConfirm() {
     const valid = importRows.filter(r => r._errors.length === 0)
-    if (valid.length === 0) return
-
+    if (!valid.length) return
     setImporting(true)
-    let success = 0
-    let failed = 0
-    const failedRows: string[] = []
-
+    let success = 0; let failed = 0; const failedRows: string[] = []
     for (const row of valid) {
-      const { error } = await supabase.from('pcc_list').insert({
-        gds_id: row._gds_id,
-        pcc:    row.pcc,
-        status: row.status,
-      })
-      if (error) {
-        failed++
-        failedRows.push(`${row.pcc} (${row.gds_name}) — ${error.message}`)
-      } else {
-        success++
-      }
+      const { error } = await supabase.from('pcc_list').insert({ gds_id: row._gds_id, pcc: row.pcc, status: row.status })
+      if (error) { failed++; failedRows.push(`${row.pcc} (${row.gds_name}) — ${error.message}`) } else { success++ }
     }
-
-    setImporting(false)
-    setImportResult({ success, failed, failedRows })
+    setImporting(false); setImportResult({ success, failed, failedRows })
     if (success > 0) fetchAll()
   }
 
-  function closeImport() {
-    setImportOpen(false)
-    setImportRows([])
-    setImportFileName('')
-    setImportResult(null)
-    setDetectedHeaders([])
-  }
+  function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null); setDetectedHeaders([]) }
 
-  // ── HELPERS ───────────────────────────────────────────────────
-  const GDS_COLORS: Record<string, string> = {
-    Sabre:      'bg-blue-50 text-blue-600 border-blue-200',
-    Amadeus:    'bg-purple-50 text-purple-600 border-purple-200',
-    Travelport: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  }
-
+  // ── FILTER ────────────────────────────────────────────────────
   const filtered = records.filter(r => {
     const matchSearch = r.pcc.toLowerCase().includes(search.toLowerCase())
-    const matchGDS    = filterGDS === 'all' || String(r.gds_id) === filterGDS
-    const matchStatus = filterStatus === 'all' || (r.status ?? 'Active') === filterStatus
-    return matchSearch && matchGDS && matchStatus
+    const matchGDS    = filterGDS    === 'all' || String(r.gds_id)        === filterGDS
+    const matchStatus = filterStatus === 'all' || (r.status ?? 'Active')  === filterStatus
+    const matchOrg    = filterOrg    === 'all' || String(r.org_id)        === filterOrg
+    const matchPCC    = filterPCC    === 'all' || r.pcc                   === filterPCC
+    const matchOTA    = filterOTA    === 'all' || String(r.ota_client_id) === filterOTA
+    return matchSearch && matchGDS && matchStatus && matchOrg && matchPCC && matchOTA
   })
+
+  const filteredFuncs = funcList.filter(f => !form.gds_id || f.gds_id === form.gds_id)
 
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
+  // Features for popup — only those matching the PCC's GDS
+  const popupGdsId = featurePopup ? featurePopup.gds_id : null
+  const availableFeatures = allFeatures.filter(f => f.gds_id === popupGdsId)
+
+  const popupFunc = featurePopup?.gds_functionality as GDSFunctionality | undefined
+  const popupGds = featurePopup?.gds as GDS | undefined
+  const popupOrg = featurePopup?.organisation as Organisation | undefined
+  const popupOta = featurePopup?.ota_client as OTAClient | undefined
+
+  function fmtCost(cost: number, currency: string, cycle: string) {
+    if (!cost) return null
+    const amt = new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
+    const suffixes: Record<string, string> = { monthly: '/mo', yearly: '/yr', per_user: '/user', per_transaction: '/txn', one_time: '' }
+    return `${amt}${suffixes[cycle] ?? ''}`
+  }
+
+  // ── COLUMNS ───────────────────────────────────────────────────
   const columns = [
-    {
-      key: 'status', label: 'Status',
-      render: (row: PCCList) => {
-        const s = row.status ?? 'Active'
-        return (
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-            {s}
-          </span>
-        )
-      }
-    },
-    {
-      key: 'pcc', label: 'PCC Code',
-      render: (row: PCCList) => (
-        <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">
-          {row.pcc}
-        </span>
-      )
-    },
-    {
-      key: 'gds', label: 'GDS',
-      render: (row: PCCList) => {
-        const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? '—'
-        return (
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`}>
-            {name}
-          </span>
-        )
-      }
-    },
+    // 1. Organisation
     {
       key: 'organisation', label: 'Organisation',
       render: (row: PCCList) => {
@@ -304,54 +307,94 @@ export default function PCCPage() {
           : <span className="text-slate-300 text-xs">—</span>
       }
     },
+    // 2. GDS
     {
-      key: 'created_at', label: 'Created',
-      render: (row: PCCList) => new Date(row.created_at).toLocaleDateString('en-MY')
+      key: 'gds', label: 'GDS',
+      render: (row: PCCList) => {
+        const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? '—'
+        return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`}>{name}</span>
+      }
+    },
+    // 3. PCC
+    {
+      key: 'pcc', label: 'PCC',
+      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.pcc}</span>
+    },
+    // 4. PCC Assigned
+    {
+      key: 'ota_client_id', label: 'PCC Assigned',
+      render: (row: PCCList) => {
+        const ota = row.ota_client as OTAClient
+        return ota
+          ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span>
+          : <span className="text-slate-300 text-xs">—</span>
+      }
+    },
+    // 5. GDS Feature — clickable badge that opens popup
+    {
+      key: 'functionality_id', label: 'GDS Feature',
+      render: (row: PCCList) => {
+        const func = row.gds_functionality as GDSFunctionality
+        const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
+        return (
+          <button
+            onClick={() => openFeaturePopup(row)}
+            className="group flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors"
+          >
+            {func ? <span>{func.name}</span> : <span className="text-slate-400">No profile</span>}
+            <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold leading-none ${directCount > 0 ? 'bg-blue-200 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>{directCount}</span>
+          </button>
+        )
+      }
+    },
+    // 6. Status
+    {
+      key: 'status', label: 'Status',
+      render: (row: PCCList) => {
+        const s = row.status ?? 'Active'
+        return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{s}</span>
+      }
+    },
+    // 7. Remarks
+    {
+      key: 'remarks', label: 'Remarks',
+      render: (row: PCCList) => {
+        if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
+        const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
+        return points.length > 1 ? (
+          <ul className="list-disc list-inside space-y-0.5">
+            {points.map((p, i) => <li key={i} className="text-sm text-slate-600">{p}</li>)}
+          </ul>
+        ) : (
+          <span className="text-sm text-slate-600">{row.remarks}</span>
+        )
+      }
     },
   ]
 
   return (
     <div>
       <PageHeader
-        title="PCC List"
-        description="Manage PCC codes by GDS platform"
+        title="GDS Info"
+        description="Manage GDS PCC codes, OTA clients and functionality profiles"
         action={
           <div className="flex items-center gap-2">
-            {/* Export */}
-            <button
-              onClick={handleExport}
-              disabled={filtered.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors"
-            >
+            <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Export xlsx
             </button>
-
-            {/* Import (admin only) */}
             {isAdmin && (
               <>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={gdsList.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors"
-                >
+                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   Import xlsx
                 </button>
+                <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add GDS Info
+                </button>
               </>
-            )}
-
-            {/* Add PCC (admin only) */}
-            {isAdmin && (
-              <button
-                onClick={openAdd}
-                disabled={gdsList.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add PCC
-              </button>
             )}
           </div>
         }
@@ -359,125 +402,115 @@ export default function PCCPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Search PCC code…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full sm:w-64 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-        />
-        <select
-          value={filterGDS}
-          onChange={e => setFilterGDS(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-        >
-          <option value="all">All GDS</option>
-          {gdsList.map(g => (
-            <option key={g.id} value={String(g.id)}>{g.name}</option>
-          ))}
+        {/* Organisation */}
+        <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All Organisation</option>
+          {orgList.map(o => <option key={o.id} value={String(o.id)}>{o.organisation}</option>)}
         </select>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-        >
+        {/* PCC */}
+        <select value={filterPCC} onChange={e => setFilterPCC(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All PCC</option>
+          {[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
+        </select>
+        {/* PCC Assigned (OTA Client) */}
+        <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All PCC Assigned</option>
+          {otaClients.map(o => <option key={o.id} value={String(o.id)}>{o.company_name}</option>)}
+        </select>
+        {/* GDS */}
+        <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All GDS</option>
+          {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+        </select>
+        {/* Status */}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
           <option value="all">All Status</option>
-          {PCC_STATUSES.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+          {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         {!loading && (
-          <span className="text-xs text-slate-400">
-            {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-            {search && ` matching "${search}"`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+            {(filterOrg !== 'all' || filterPCC !== 'all' || filterOTA !== 'all' || filterGDS !== 'all' || filterStatus !== 'all') && (
+              <button
+                onClick={() => { setFilterOrg('all'); setFilterPCC('all'); setFilterOTA('all'); setFilterGDS('all'); setFilterStatus('all') }}
+                className="text-xs text-blue-500 hover:text-blue-700 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {gdsList.length === 0 && !loading && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
-          ⚠️ No GDS found. Please add a GDS first before adding PCC records.
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-16 text-slate-400 text-sm">Loading…</div>
-      ) : (
+      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
         <DataTable
           columns={columns}
           data={filtered as unknown as Record<string, unknown>[]}
-          onEdit={isAdmin ? (row) => openEdit(row as unknown as PCCList) : undefined}
-          onDelete={isAdmin ? (row) => openDelete(row as unknown as PCCList) : undefined}
+          onEdit={isAdmin ? r => openEdit(r as unknown as PCCList) : undefined}
+          onDelete={isAdmin ? r => openDelete(r as unknown as PCCList) : undefined}
           isAdmin={isAdmin}
-          emptyMessage="No PCC records found."
+          emptyMessage="No GDS Info records found."
         />
       )}
 
       {/* ── Add / Edit Modal ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit PCC' : 'Add PCC'} size="sm">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS Info' : 'Add GDS Info'}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">GDS <span className="text-red-500">*</span></label>
-            <select
-              value={form.gds_id ?? ''}
-              onChange={e => setForm(f => ({ ...f, gds_id: Number(e.target.value) }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
-            >
-              <option value="">— Select GDS —</option>
-              {gdsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC Code <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={form.pcc ?? ''}
-              onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))}
-              placeholder="e.g. KULMY217Z"
-              maxLength={20}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 font-mono uppercase"
-            />
-            <p className="text-xs text-slate-400 mt-1">Saved in uppercase automatically</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">GDS <span className="text-red-500">*</span></label>
+              <select value={form.gds_id ?? ''} onChange={e => setForm(f => ({ ...f, gds_id: Number(e.target.value), functionality_id: null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+                <option value="">— Select GDS —</option>
+                {gdsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC <span className="text-red-500">*</span></label>
+              <input type="text" value={form.pcc ?? ''} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY217Z" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-            <select
-              value={form.status ?? 'Active'}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value as PCCStatus }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
-            >
-              {PCC_STATUSES.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+            <select value={form.status ?? 'Active'} onChange={e => setForm(f => ({ ...f, status: e.target.value as PCCStatus }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation</label>
-            <select
-              value={form.org_id ?? ''}
-              onChange={e => setForm(f => ({ ...f, org_id: e.target.value ? Number(e.target.value) : null }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
-            >
+            <select value={form.org_id ?? ''} onChange={e => setForm(f => ({ ...f, org_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">— None —</option>
-              {orgList.map(o => (
-                <option key={o.id} value={o.id}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>
-              ))}
+              {orgList.map(o => <option key={o.id} value={o.id}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id ?? ''} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">— None —</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Remarks</label>
+            <textarea
+              value={(form as Partial<PCCList>).remarks ?? ''}
+              onChange={e => setForm(f => ({ ...f, remarks: e.target.value || null }))}
+              placeholder="Additional notes or information…"
+              rows={3}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
+            />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add PCC'}</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add GDS Info'}</button>
           </div>
         </div>
       </Modal>
 
       {/* ── Delete Modal ── */}
-      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete PCC" size="sm">
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete GDS Info" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Are you sure you want to delete PCC <strong className="font-mono">{editing?.pcc}</strong>? This will also remove linked functionality configurations.
-          </p>
+          <p className="text-sm text-slate-600">Delete PCC <strong className="font-mono">{editing?.pcc}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
             <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
             <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting…' : 'Delete'}</button>
@@ -485,144 +518,153 @@ export default function PCCPage() {
         </div>
       </Modal>
 
-      {/* ── Import Preview Modal ── */}
-      <Modal open={importOpen} onClose={closeImport} title="Import PCC List" size="lg">
-        <div className="space-y-4">
+      {/* ── GDS Feature Detail Popup ── */}
+      <Modal
+        open={featurePopupOpen}
+        onClose={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }}
+        title="GDS Feature Details"
+        size="lg"
+      >
+        {featurePopup && (
+          <div className="space-y-5">
 
-          {/* Result banner */}
-          {importResult && (
-            <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-              {importResult.failed === 0 ? (
-                <p className="font-medium">✅ Successfully imported {importResult.success} PCC record{importResult.success !== 1 ? 's' : ''}.</p>
+            {/* PCC Details section */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">PCC Details</p>
+              <div className="grid grid-cols-2 gap-y-3 gap-x-6">
+                <div>
+                  <p className="text-xs text-slate-400">PCC Code</p>
+                  <p className="font-mono font-bold text-slate-800 bg-slate-200 px-2 py-0.5 rounded text-sm inline-block mt-0.5">{featurePopup.pcc}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">GDS</p>
+                  {popupGds && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border mt-0.5 inline-block ${GDS_COLORS[popupGds.name] ?? 'bg-slate-100 text-slate-600'}`}>{popupGds.name}</span>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Status</p>
+                  {featurePopup.status && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border mt-0.5 inline-block ${STATUS_COLORS[featurePopup.status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{featurePopup.status}</span>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Organisation</p>
+                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupOrg?.organisation ?? <span className="text-slate-300">—</span>}</p>
+                  {popupOrg?.iata && <p className="text-xs text-slate-400 font-mono">{popupOrg.iata}</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">OTA Client</p>
+                  {popupOta
+                    ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full mt-0.5 inline-block">{popupOta.company_name}</span>
+                    : <p className="text-sm text-slate-300 mt-0.5">—</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">GDS Feature Profile</p>
+                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupFunc?.name ?? <span className="text-slate-300">Not assigned</span>}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Features section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-slate-700">
+                  Features
+                  <span className="ml-2 text-xs font-normal text-slate-400">
+                    {profileFeatureIds.size} of {availableFeatures.length} enabled
+                  </span>
+                </p>
+
+              </div>
+
+              {availableFeatures.length === 0 ? (
+                <p className="text-sm text-slate-400 italic text-center py-4">
+                  No features defined for {popupGds?.name ?? 'this GDS'} yet. Add them in GDS Functionality.
+                </p>
               ) : (
-                <div className="space-y-2">
-                  <p className="font-medium">✅ {importResult.success} imported &nbsp;·&nbsp; ⚠️ {importResult.failed} skipped</p>
-                  {importResult.failedRows.length > 0 && (
-                    <div className="max-h-32 overflow-y-auto">
-                      <p className="text-xs font-medium mb-1 opacity-80">Skipped rows:</p>
-                      {importResult.failedRows.map((r, i) => (
-                        <p key={i} className="text-xs opacity-70 font-mono">{r}</p>
-                      ))}
-                    </div>
-                  )}
+                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                  {availableFeatures.map((f, i) => {
+                    const enabled = profileFeatureIds.has(f.id)
+                    const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
+                    return (
+                      <div key={f.id} className={`flex items-center justify-between px-4 py-3 ${i < availableFeatures.length - 1 ? 'border-b border-slate-100' : ''} ${enabled ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${enabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                            {enabled ? '✓' : '✕'}
+                          </span>
+                          <div>
+                            <p className={`text-sm ${enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{f.label}</p>
+                            {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
+                          </div>
+                        </div>
+                        {isAdmin && (
+                          <button
+                            onClick={() => toggleProfileFeature(f.id)}
+                            disabled={featureToggling}
+                            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                              enabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {enabled ? '− Remove' : '+ Add'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
-          )}
 
-          {!importResult && (
+            <div className="flex justify-end">
+              <button onClick={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Import Modal ── */}
+      <Modal open={importOpen} onClose={closeImport} title="Import GDS Info" size="lg">
+        <div className="space-y-4">
+          {importResult ? (
+            <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+              {importResult.failed === 0
+                ? <p className="font-medium">✅ Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p>
+                : <div className="space-y-1"><p className="font-medium">✅ {importResult.success} imported · ⚠️ {importResult.failed} skipped</p>
+                    {importResult.failedRows.map((r, i) => <p key={i} className="text-xs opacity-70 font-mono">{r}</p>)}</div>}
+            </div>
+          ) : (
             <>
-              {/* File + summary */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-600">File: <span className="font-medium text-slate-800">{importFileName}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {importRows.length} row{importRows.length !== 1 ? 's' : ''} found —{' '}
-                    <span className="text-emerald-600 font-medium">{validRows.length} valid</span>
-                    {invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} with errors</span></>}
-                  </p>
+                  <p className="text-sm text-slate-600">File: <span className="font-medium">{importFileName}</span></p>
+                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows — <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p>
                 </div>
-                <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">
-                  Download template
-                </button>
+                <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
-
-              {/* Column info */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500 space-y-1">
-                <div>
-                  Required columns:{' '}
-                  <span className="font-mono font-medium text-slate-700">GDS</span>,{' '}
-                  <span className="font-mono font-medium text-slate-700">PCC Code</span>
-                  {' '}· Optional: <span className="font-mono font-medium text-slate-700">Status</span>{' '}
-                  (Active / Pending / Vacant — defaults to Active)
-                </div>
-                <div>
-                  GDS values must be exactly:{' '}
-                  {gdsList.map((g, i) => (
-                    <span key={g.id}>
-                      <span className="font-mono font-medium text-slate-700">{g.name}</span>
-                      {i < gdsList.length - 1 ? ', ' : ''}
-                    </span>
-                  ))}
-                </div>
-                {detectedHeaders.length > 0 && (
-                  <div>
-                    Detected in your file:{' '}
-                    {detectedHeaders.map((h, i) => (
-                      <span key={i} className="font-mono font-medium text-slate-700 bg-slate-200 px-1 rounded mr-1">{h}</span>
-                    ))}
-                  </div>
-                )}
+                <div>Required: <span className="font-mono font-medium text-slate-700">GDS</span>, <span className="font-mono font-medium text-slate-700">PCC</span> · Optional: <span className="font-mono font-medium text-slate-700">Status</span></div>
+                {detectedHeaders.length > 0 && <div>Detected: {detectedHeaders.map((h, i) => <span key={i} className="font-mono font-medium text-slate-700 bg-slate-200 px-1 rounded mr-1">{h}</span>)}</div>}
               </div>
-
-              {/* Preview table */}
-              <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg">
+              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium text-slate-500">Row</th>
-                      <th className="text-left px-3 py-2 font-medium text-slate-500">GDS</th>
-                      <th className="text-left px-3 py-2 font-medium text-slate-500">PCC Code</th>
-                      <th className="text-left px-3 py-2 font-medium text-slate-500">Status</th>
-                      <th className="text-left px-3 py-2 font-medium text-slate-500">Validation</th>
-                    </tr>
+                    <tr>{['Row','GDS','PCC','Status','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {importRows.map((row, i) => (
                       <tr key={i} className={`border-b border-slate-50 ${row._errors.length > 0 ? 'bg-red-50/60' : ''}`}>
                         <td className="px-3 py-2 text-slate-400">{row._row}</td>
-                        <td className="px-3 py-2">
-                          {row.gds_name ? (
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${GDS_COLORS[row.gds_name] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                              {row.gds_name}
-                            </span>
-                          ) : <span className="text-red-400 italic">empty</span>}
-                        </td>
-                        <td className="px-3 py-2 font-mono font-semibold text-slate-700">
-                          {row.pcc || <span className="text-red-400 italic font-normal">empty</span>}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          {row._errors.length === 0 ? (
-                            <span className="text-emerald-600 font-medium">✓ OK</span>
-                          ) : (
-                            <span className="text-red-500" title={row._errors.join(', ')}>
-                              ✗ {row._errors[0]}{row._errors.length > 1 ? ` +${row._errors.length - 1}` : ''}
-                            </span>
-                          )}
-                        </td>
+                        <td className="px-3 py-2">{row.gds_name ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${GDS_COLORS[row.gds_name] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.gds_name}</span> : <span className="text-red-400 italic">empty</span>}</td>
+                        <td className="px-3 py-2 font-mono font-semibold">{row.pcc || <span className="text-red-400 italic font-normal">empty</span>}</td>
+                        <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.status}</span></td>
+                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium">✓ OK</span> : <span className="text-red-500">✗ {row._errors[0]}</span>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {invalidRows.length > 0 && (
-                <p className="text-xs text-slate-400">
-                  ⚠️ Rows with errors will be skipped. Only {validRows.length} valid row{validRows.length !== 1 ? 's' : ''} will be imported.
-                </p>
-              )}
             </>
           )}
-
-          {/* Actions */}
           <div className="flex gap-3 pt-1">
-            <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-              {importResult ? 'Close' : 'Cancel'}
-            </button>
-            {!importResult && (
-              <button
-                onClick={handleImportConfirm}
-                disabled={importing || validRows.length === 0}
-                className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors"
-              >
-                {importing ? 'Importing…' : `Import ${validRows.length} PCC${validRows.length !== 1 ? 's' : ''}`}
-              </button>
-            )}
+            <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">{importResult ? 'Close' : 'Cancel'}</button>
+            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing…' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
           </div>
         </div>
       </Modal>

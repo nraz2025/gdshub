@@ -29,12 +29,13 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       />
       {/* Dialog */}
       <div className={cn(
-        'relative bg-white rounded-2xl shadow-xl w-full z-10',
+        'relative bg-white rounded-2xl shadow-xl w-full z-10 flex flex-col max-h-[90vh]',
         size === 'sm' && 'max-w-sm',
         size === 'md' && 'max-w-lg',
         size === 'lg' && 'max-w-2xl',
       )}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
           <h2 className="font-semibold text-slate-900">{title}</h2>
           <button
             onClick={onClose}
@@ -45,7 +46,8 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             </svg>
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        {/* Scrollable body */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   )

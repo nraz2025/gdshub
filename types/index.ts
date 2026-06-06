@@ -32,7 +32,7 @@ export interface GDS {
   updated_at: string
 }
 
-// ── PCC List ─────────────────────────────────────────────────
+// ── GDS Info (formerly PCC List) ─────────────────────────────
 export type PCCStatus = 'Active' | 'Pending' | 'Vacant'
 
 export interface PCCList {
@@ -41,11 +41,19 @@ export interface PCCList {
   pcc: string
   status: PCCStatus
   org_id: number | null
+  ota_client_id: number | null
+  functionality_id: number | null
+  remarks: string | null
   created_at: string
   updated_at: string
   gds?: GDS
   organisation?: Organisation
+  ota_client?: OTAClient
+  gds_functionality?: GDSFunctionality
 }
+
+// Alias for clarity
+export type GDSInfo = PCCList
 
 // ── GDS Functionality ─────────────────────────────────────────
 export type BillingCycle = 'monthly' | 'yearly' | 'per_user' | 'per_transaction' | 'one_time'
@@ -115,9 +123,11 @@ export interface AmadeusUser {
   oid: string | null
   user_id: string | null
   ota: boolean
+  ota_client_id: number | null
   created_at: string
   updated_at: string
   users?: User
+  ota_client?: OTAClient
 }
 
 export interface TravelportUser {
@@ -128,9 +138,11 @@ export interface TravelportUser {
   pcc: string | null
   user_id: string | null
   ota: boolean
+  ota_client_id: number | null
   created_at: string
   updated_at: string
   users?: User
+  ota_client?: OTAClient
 }
 
 // ── GDS Assigned User ─────────────────────────────────────────
