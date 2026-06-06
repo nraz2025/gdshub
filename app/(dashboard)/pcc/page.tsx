@@ -59,6 +59,12 @@ export default function GDSInfoPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // PCC Assigned login popup
+  const [loginPopupOpen, setLoginPopupOpen] = useState(false)
+  const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;initial:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupLoading, setLoginPopupLoading] = useState(false)
+
   // GDS Feature detail popup
   const [featurePopup, setFeaturePopup] = useState<PCCList | null>(null)
   const [featurePopupOpen, setFeaturePopupOpen] = useState(false)
@@ -153,6 +159,28 @@ export default function GDSInfoPage() {
     setSaving(true)
     await supabase.from('pcc_list').delete().eq('id', editing.id)
     setSaving(false); setDeleteOpen(false); fetchAll()
+  }
+
+  // ── PCC ASSIGNED LOGIN POPUP ──────────────────────────────────
+  async function openLoginPopup(pcc: PCCList) {
+    if (!pcc.ota_client_id) return
+    setLoginPopupPCC(pcc)
+    setLoginPopupOpen(true)
+    setLoginPopupLoading(true)
+    const gdsName = (pcc.gds as GDS)?.name ?? ''
+    const [{ data: sabreData }, { data: amData }, { data: tpData }] = await Promise.all([
+      gdsName === 'Sabre' || !gdsName
+        ? supabase.from('sabre_user').select('id,epr,initial,pcc,status').eq('ota_client_id', pcc.ota_client_id).order('epr')
+        : Promise.resolve({ data: [] }),
+      gdsName === 'Amadeus' || !gdsName
+        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid').eq('ota_client_id', pcc.ota_client_id).order('login')
+        : Promise.resolve({ data: [] }),
+      gdsName === 'Travelport' || !gdsName
+        ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
+        : Promise.resolve({ data: [] }),
+    ])
+    setLoginPopupData({ sabre: sabreData ?? [], amadeus: amData ?? [], travelport: tpData ?? [] })
+    setLoginPopupLoading(false)
   }
 
   // ── GDS FEATURE POPUP ─────────────────────────────────────────
@@ -320,14 +348,22 @@ export default function GDSInfoPage() {
       key: 'pcc', label: 'PCC',
       render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.pcc}</span>
     },
-    // 4. PCC Assigned
+    // 4. PCC Assigned — badge + view logins link
     {
       key: 'ota_client_id', label: 'PCC Assigned',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
-        return ota
-          ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span>
-          : <span className="text-slate-300 text-xs">—</span>
+        return ota ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span>
+            <button
+              onClick={() => openLoginPopup(row)}
+              className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors whitespace-nowrap"
+            >
+              View IDs
+            </button>
+          </div>
+        ) : <span className="text-slate-300 text-xs">—</span>
       }
     },
     // 5. GDS Feature — clickable badge that opens popup
@@ -614,6 +650,101 @@ export default function GDSInfoPage() {
 
             <div className="flex justify-end">
               <button onClick={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── PCC Assigned Login Popup ── */}
+      <Modal
+        open={loginPopupOpen}
+        onClose={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }}
+        title={`GDS Logins — ${(loginPopupPCC?.ota_client as OTAClient)?.company_name ?? ''}`}
+        size="lg"
+      >
+        {loginPopupLoading ? (
+          <div className="text-center py-10 text-slate-400 text-sm">Loading logins…</div>
+        ) : (
+          <div className="space-y-4">
+            {/* PCC context */}
+            <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex items-center gap-3">
+              <span className="text-xs text-slate-500">PCC:</span>
+              <span className="font-mono font-bold text-slate-800 bg-slate-200 px-2 py-0.5 rounded text-xs">{loginPopupPCC?.pcc}</span>
+              {loginPopupPCC && (() => { const g = loginPopupPCC.gds as GDS; return g ? <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[g.name] ?? 'bg-slate-100 text-slate-600'}`}>{g.name}</span> : null })()}
+            </div>
+
+            {loginPopupData.sabre.length === 0 && loginPopupData.amadeus.length === 0 && loginPopupData.travelport.length === 0 ? (
+              <p className="text-center text-slate-400 text-sm py-6">No GDS logins assigned to this client yet.</p>
+            ) : (
+              <>
+                {loginPopupData.sabre.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-blue-700 mb-2">Sabre ({loginPopupData.sabre.length})</p>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>{['EPR','Initial','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {loginPopupData.sabre.map((r,i)=>(
+                            <tr key={r.id} className={i<loginPopupData.sabre.length-1?'border-b border-slate-50':''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.initial??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??'—'}</td>
+                              <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {loginPopupData.amadeus.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-purple-700 mb-2">Amadeus ({loginPopupData.amadeus.length})</p>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>{['Login','Sign-On ID','OID'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {loginPopupData.amadeus.map((r,i)=>(
+                            <tr key={r.id} className={i<loginPopupData.amadeus.length-1?'border-b border-slate-50':''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??'—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {loginPopupData.travelport.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700 mb-2">Travelport ({loginPopupData.travelport.length})</p>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>{['Sign-On ID','CID','PCC'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {loginPopupData.travelport.map((r,i)=>(
+                            <tr key={r.id} className={i<loginPopupData.travelport.length-1?'border-b border-slate-50':''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??'—'}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??'—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex justify-end">
+              <button onClick={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
             </div>
           </div>
         )}

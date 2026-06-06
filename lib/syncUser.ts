@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/client'
  * Ensures a user exists in the users table.
  * - If email already exists → returns existing user_id (no duplicate)
  * - If email not found → creates new user and returns new id
- * - If no email → returns null
  */
 export async function syncUserToTable(params: {
   email: string
@@ -17,7 +16,6 @@ export async function syncUserToTable(params: {
   const supabase = createClient()
   const normalizedEmail = email.trim().toLowerCase()
 
-  // Check if user already exists
   const { data: existing } = await supabase
     .from('users')
     .select('id')
@@ -26,7 +24,6 @@ export async function syncUserToTable(params: {
 
   if (existing) return existing.id as string
 
-  // Not found — create new user
   const { data: created, error } = await supabase
     .from('users')
     .insert({
@@ -43,33 +40,8 @@ export async function syncUserToTable(params: {
   return created.id as string
 }
 
-/**
- * When a GDS user is saved with an ota_client_id,
- * automatically link that user to the OTA client in ota_client_users.
- * Uses upsert logic — safe to call multiple times.
- */
-export async function syncUserToOTAClient(params: {
-  userId: string
-  otaClientId: number
-}): Promise<void> {
-  const { userId, otaClientId } = params
-  if (!userId || !otaClientId) return
-
-  const supabase = createClient()
-
-  // Check if already linked
-  const { data: existing } = await supabase
-    .from('ota_client_users')
-    .select('user_id')
-    .eq('ota_client_id', otaClientId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (existing) return // already linked — do nothing
-
-  // Link user to OTA client
-  await supabase.from('ota_client_users').insert({
-    ota_client_id: otaClientId,
-    user_id:       userId,
-  })
+// syncUserToOTAClient removed — ota_client_users table dropped.
+// GDS login → client relationship is tracked via ota_client_id on each GDS user table.
+export async function syncUserToOTAClient(_params: { userId: string; otaClientId: number }): Promise<void> {
+  // no-op — kept for compatibility, junction table no longer used
 }

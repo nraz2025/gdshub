@@ -6,24 +6,26 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
-import type { OTAClient, User } from '@/types'
+import type { OTAClient } from '@/types'
 
-interface OTAClientWithUsers extends OTAClient {
-  ota_client_users?: { user_id: string; users: User }[]
+interface SabreRow   { id: number; epr: string; initial: string | null; pcc: string | null; status: string }
+interface AmadeusRow { id: number; login: string; sign_on_id: string | null; oid: string | null; duty_code: string | null }
+interface TravelportRow { id: number; sign_on_id: string | null; cid: string | null; pcc: string | null }
+
+interface GDSLogins {
+  sabre: SabreRow[]
+  amadeus: AmadeusRow[]
+  travelport: TravelportRow[]
 }
 
-const EMPTY = { company_name: '' }
+const EMPTY = { company_name: '', remarks: '' }
 
-interface ImportRow {
-  company_name: string
-  _row: number; _errors: string[]
-}
+interface ImportRow { company_name: string; _row: number; _errors: string[] }
 
 export default function OTAClientPage() {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [records, setRecords] = useState<OTAClientWithUsers[]>([])
-  const [usersList, setUsersList] = useState<User[]>([])
+  const [records, setRecords] = useState<OTAClient[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -32,15 +34,15 @@ export default function OTAClientPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
-  const [editing, setEditing] = useState<OTAClientWithUsers | null>(null)
+  const [editing, setEditing] = useState<OTAClient | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Manage linked users modal
-  const [usersModalOpen, setUsersModalOpen] = useState(false)
-  const [selectedOTA, setSelectedOTA] = useState<OTAClientWithUsers | null>(null)
-  const [linkedUserIds, setLinkedUserIds] = useState<Set<string>>(new Set())
-  const [userToggling, setUserToggling] = useState(false)
+  // GDS Logins popup
+  const [loginsOpen, setLoginsOpen] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<OTAClient | null>(null)
+  const [gdsLogins, setGdsLogins] = useState<GDSLogins>({ sabre: [], amadeus: [], travelport: [] })
+  const [loginsLoading, setLoginsLoading] = useState(false)
 
   // Import
   const [importOpen, setImportOpen] = useState(false)
@@ -58,34 +60,23 @@ export default function OTAClientPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const [{ data: otaData }, { data: usersData }] = await Promise.all([
-      supabase.from('ota_client')
-        .select('*, ota_client_users(user_id, users:user_id(id, first_name, last_name, email_address))')
-        .order('company_name'),
-      supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
-    ])
-    setRecords(otaData ?? [])
-    setUsersList(usersData ?? [])
+    const { data } = await supabase.from('ota_client').select('*').order('company_name')
+    setRecords(data ?? [])
     setLoading(false)
   }
 
   // ── CRUD ──────────────────────────────────────────────────────
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true) }
-
-  function openEdit(row: OTAClientWithUsers) {
-    setEditing(row)
-    setForm({ company_name: row.company_name })
-    setError(''); setModalOpen(true)
-  }
-
-  function openDelete(row: OTAClientWithUsers) { setEditing(row); setDeleteOpen(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
+  function openEdit(row: OTAClient) { setEditing(row); setForm({ company_name: row.company_name, remarks: (row as OTAClient & {remarks?: string}).remarks ?? '' }); setError(''); setSaving(false); setModalOpen(true) }
+  function openDelete(row: OTAClient) { setEditing(row); setDeleteOpen(true) }
 
   async function handleSave() {
     if (!form.company_name.trim()) { setError('Company name is required.'); return }
     setSaving(true); setError('')
+    const payload = { company_name: form.company_name.trim(), remarks: (form as {remarks?: string}).remarks?.trim() || null }
     const { error: err } = editing
-      ? await supabase.from('ota_client').update({ company_name: form.company_name.trim() }).eq('id', editing.id)
-      : await supabase.from('ota_client').insert({ company_name: form.company_name.trim() })
+      ? await supabase.from('ota_client').update(payload).eq('id', editing.id)
+      : await supabase.from('ota_client').insert(payload)
     if (err) { setError(err.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }
@@ -97,59 +88,41 @@ export default function OTAClientPage() {
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  // ── MANAGE LINKED USERS ───────────────────────────────────────
-  function openUsersModal(row: OTAClientWithUsers) {
-    setSelectedOTA(row)
-    const existing = new Set((row.ota_client_users ?? []).map(u => u.user_id))
-    setLinkedUserIds(existing)
-    setUsersModalOpen(true)
+  // ── GDS LOGINS POPUP ─────────────────────────────────────────
+  async function openLogins(row: OTAClient) {
+    setSelectedClient(row)
+    setLoginsOpen(true)
+    setLoginsLoading(true)
+    const [{ data: sabreData }, { data: amData }, { data: tpData }] = await Promise.all([
+      supabase.from('sabre_user').select('id, epr, initial, pcc, status').eq('ota_client_id', row.id).order('epr'),
+      supabase.from('amadeus_user').select('id, login, sign_on_id, oid, duty_code').eq('ota_client_id', row.id).order('login'),
+      supabase.from('travelport_user').select('id, sign_on_id, cid, pcc').eq('ota_client_id', row.id).order('sign_on_id'),
+    ])
+    setGdsLogins({ sabre: sabreData ?? [], amadeus: amData ?? [], travelport: tpData ?? [] })
+    setLoginsLoading(false)
   }
 
-  async function toggleLinkedUser(userId: string) {
-    if (!selectedOTA || !isAdmin) return
-    setUserToggling(true)
-    const has = linkedUserIds.has(userId)
-    if (has) {
-      await supabase.from('ota_client_users').delete()
-        .eq('ota_client_id', selectedOTA.id).eq('user_id', userId)
-      setLinkedUserIds(prev => { const s = new Set(prev); s.delete(userId); return s })
-    } else {
-      await supabase.from('ota_client_users').insert({ ota_client_id: selectedOTA.id, user_id: userId })
-      setLinkedUserIds(prev => new Set([...prev, userId]))
-    }
-    setUserToggling(false)
-    fetchAll()
+  const totalLogins = (client: OTAClient) => {
+    // We'll show the count from the current gdsLogins only when that client is selected
+    return null // count shown in popup
   }
-
-  // ── AUTO-SYNC from GDS tables ─────────────────────────────────
-  // Called automatically when a GDS user with ota_client_id is saved
-  // This is handled by the syncUserToOTAClient utility — see lib/syncUser.ts
-  // The junction table is updated server-side via the GDS user save flow
 
   // ── EXPORT ────────────────────────────────────────────────────
   function handleExport() {
-    const data = filtered.map((r, i) => {
-      const users = (r.ota_client_users ?? []).map(u => u.users).filter(Boolean) as User[]
-      return {
-        'No.':          i + 1,
-        'Company Name': r.company_name,
-        'Linked Users': users.map(u => `${u.first_name} ${u.last_name}`).join('; '),
-        'Emails':       users.map(u => u.email_address).join('; '),
-        'Created':      new Date(r.created_at).toLocaleDateString('en-MY'),
-      }
-    })
+    const data = filtered.map((r, i) => ({
+      'No.': i + 1,
+      'Company Name': r.company_name,
+      'Created': new Date(r.created_at).toLocaleDateString('en-MY'),
+    }))
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 50 }, { wch: 60 }, { wch: 15 }]
+    ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Client')
     XLSX.writeFile(wb, `GDSHub_Client_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   function handleDownloadTemplate() {
-    const ws = XLSX.utils.json_to_sheet([
-      { 'Company Name': 'Example Travel Sdn Bhd' },
-      { 'Company Name': 'Another Client Company' },
-    ])
+    const ws = XLSX.utils.json_to_sheet([{ 'Company Name': 'Example Travel Sdn Bhd' }])
     ws['!cols'] = [{ wch: 40 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Client')
@@ -195,57 +168,33 @@ export default function OTAClientPage() {
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null) }
 
-  // ── FILTER ────────────────────────────────────────────────────
-  const filtered = records.filter(r => {
-    const term = search.toLowerCase()
-    const userNames = (r.ota_client_users ?? []).map(u => `${u.users?.first_name} ${u.users?.last_name}`).join(' ').toLowerCase()
-    return r.company_name.toLowerCase().includes(term) || userNames.includes(term)
-  })
-
-  const validRows   = importRows.filter(r => r._errors.length === 0)
+  const filtered = records.filter(r => r.company_name.toLowerCase().includes(search.toLowerCase()))
+  const validRows = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
+
+  const totalGdsLogins = gdsLogins.sabre.length + gdsLogins.amadeus.length + gdsLogins.travelport.length
 
   // ── COLUMNS ───────────────────────────────────────────────────
   const columns = [
     {
-      key: 'company_name', label: 'Company Name',
-      render: (row: OTAClientWithUsers) => <span className="font-medium text-slate-800">{row.company_name}</span>
+      key: 'company_name', label: 'Company Name', width: '260px',
+      render: (row: OTAClient) => <span className="font-medium text-slate-800">{row.company_name}</span>
     },
     {
-      key: 'ota_client_users', label: 'Linked Users',
-      render: (row: OTAClientWithUsers) => {
-        const users = (row.ota_client_users ?? []).map(u => u.users).filter(Boolean) as User[]
-        if (users.length === 0) {
-          return isAdmin
-            ? <button onClick={() => openUsersModal(row)} className="text-xs text-slate-400 hover:text-blue-500 transition-colors italic">+ link users</button>
-            : <span className="text-slate-300 text-xs">—</span>
-        }
-        return (
-          <div className="flex items-start gap-2">
-            <ul className="list-disc list-inside space-y-0.5">
-              {users.map(u => (
-                <li key={u.id} className="text-sm text-slate-700">
-                  {u.first_name} {u.last_name}
-                  <span className="text-slate-400 text-xs ml-1">({u.email_address})</span>
-                </li>
-              ))}
-            </ul>
-            {isAdmin && (
-              <button
-                onClick={() => openUsersModal(row)}
-                className="flex-shrink-0 text-xs text-blue-500 hover:text-blue-700 transition-colors ml-1"
-                title="Manage linked users"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-            )}
-          </div>
-        )
+      key: 'remarks', label: 'Remarks', width: '380px',
+      render: (row: OTAClient & {remarks?: string}) => {
+        if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
+        const points = row.remarks.split('\n').map((l: string) => l.trim()).filter(Boolean)
+        return points.length > 1 ? (
+          <ul className="list-disc list-inside space-y-0.5">
+            {points.map((p: string, i: number) => <li key={i} className="text-sm text-slate-600">{p}</li>)}
+          </ul>
+        ) : <span className="text-sm text-slate-600">{row.remarks}</span>
       }
     },
     {
-      key: 'created_at', label: 'Created',
-      render: (row: OTAClientWithUsers) => new Date(row.created_at).toLocaleDateString('en-MY')
+      key: 'created_at', label: 'Created', width: '120px',
+      render: (row: OTAClient) => new Date(row.created_at).toLocaleDateString('en-MY')
     },
   ]
 
@@ -253,7 +202,7 @@ export default function OTAClientPage() {
     <div>
       <PageHeader
         title="Client"
-        description="Manage client companies and their linked users"
+        description="Manage client companies and view their GDS login accounts"
         action={
           <div className="flex items-center gap-2">
             <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
@@ -278,12 +227,12 @@ export default function OTAClientPage() {
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search by company or user name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-80 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+        <input type="text" placeholder="Search by company name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-80 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
         {!loading && <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}</span>}
       </div>
 
       {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
-        <DataTable columns={columns} data={filtered as unknown as Record<string, unknown>[]} onEdit={isAdmin ? r => openEdit(r as unknown as OTAClientWithUsers) : undefined} onDelete={isAdmin ? r => openDelete(r as unknown as OTAClientWithUsers) : undefined} isAdmin={isAdmin} emptyMessage="No clients found." />
+        <DataTable columns={columns} data={filtered as unknown as Record<string, unknown>[]} onEdit={isAdmin ? r => openEdit(r as unknown as OTAClient) : undefined} onDelete={isAdmin ? r => openDelete(r as unknown as OTAClient) : undefined} isAdmin={isAdmin} emptyMessage="No clients found." />
       )}
 
       {/* ── Add / Edit Modal ── */}
@@ -291,7 +240,17 @@ export default function OTAClientPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Company Name <span className="text-red-500">*</span></label>
-            <input type="text" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+            <input type="text" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Remarks</label>
+            <textarea
+              value={(form as {remarks?: string}).remarks ?? ''}
+              onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
+              placeholder="Additional notes (one per line for bullet points)…"
+              rows={3}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 resize-none"
+            />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
@@ -312,49 +271,118 @@ export default function OTAClientPage() {
         </div>
       </Modal>
 
-      {/* ── Manage Linked Users Modal ── */}
-      <Modal open={usersModalOpen} onClose={() => { setUsersModalOpen(false); setSelectedOTA(null) }} title={`Linked Users — ${selectedOTA?.company_name}`} size="md">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              {linkedUserIds.size} user{linkedUserIds.size !== 1 ? 's' : ''} linked
-            </p>
-          </div>
-
-          <div className="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
-            {usersList.length === 0 ? (
-              <p className="text-center text-slate-400 text-sm py-8">No users in the system yet.</p>
+      {/* ── GDS Logins Popup ── */}
+      <Modal open={loginsOpen} onClose={() => { setLoginsOpen(false); setSelectedClient(null) }} title={`GDS Logins — ${selectedClient?.company_name}`} size="lg">
+        {loginsLoading ? (
+          <div className="text-center py-10 text-slate-400 text-sm">Loading GDS logins…</div>
+        ) : (
+          <div className="space-y-5">
+            {totalGdsLogins === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-400 text-sm">No GDS logins assigned to this client yet.</p>
+                <p className="text-slate-400 text-xs mt-1">Set the OTA Client field on Sabre, Amadeus, or Travelport user records to link them here.</p>
+              </div>
             ) : (
-              usersList.map((u, i) => {
-                const linked = linkedUserIds.has(u.id)
-                return (
-                  <div key={u.id} className={`flex items-center justify-between px-4 py-3 ${i < usersList.length - 1 ? 'border-b border-slate-100' : ''} ${linked ? 'bg-white' : 'bg-slate-50/50'}`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${linked ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                        {linked ? '✓' : '✕'}
-                      </span>
-                      <div>
-                        <p className={`text-sm ${linked ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{u.first_name} {u.last_name}</p>
-                        <p className="text-xs text-slate-400">{u.email_address}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => toggleLinkedUser(u.id)}
-                      disabled={userToggling}
-                      className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${linked ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
-                    >
-                      {linked ? '− Remove' : '+ Add'}
-                    </button>
-                  </div>
-                )
-              })
-            )}
-          </div>
+              <>
+                {/* Summary bar */}
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-slate-500 font-medium">{totalGdsLogins} login{totalGdsLogins !== 1 ? 's' : ''} total</span>
+                  {gdsLogins.sabre.length > 0      && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-full font-medium">Sabre: {gdsLogins.sabre.length}</span>}
+                  {gdsLogins.amadeus.length > 0    && <span className="bg-purple-50 text-purple-600 border border-purple-200 px-2.5 py-1 rounded-full font-medium">Amadeus: {gdsLogins.amadeus.length}</span>}
+                  {gdsLogins.travelport.length > 0 && <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">Travelport: {gdsLogins.travelport.length}</span>}
+                </div>
 
-          <div className="flex justify-end">
-            <button onClick={() => { setUsersModalOpen(false); setSelectedOTA(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Done</button>
+                {/* Sabre */}
+                {gdsLogins.sabre.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">Sabre</span>
+                    </div>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['EPR','Initial','PCC','Status'].map(h => <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">{h}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gdsLogins.sabre.map((r, i) => (
+                            <tr key={r.id} className={i < gdsLogins.sabre.length - 1 ? 'border-b border-slate-50' : ''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.initial ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc ?? '—'}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status === 'Active' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Amadeus */}
+                {gdsLogins.amadeus.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-full">Amadeus</span>
+                    </div>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['Login','Sign-On ID','OID','Duty Code'].map(h => <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">{h}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gdsLogins.amadeus.map((r, i) => (
+                            <tr key={r.id} className={i < gdsLogins.amadeus.length - 1 ? 'border-b border-slate-50' : ''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.duty_code ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Travelport */}
+                {gdsLogins.travelport.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">Travelport</span>
+                    </div>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['Sign-On ID','CID','PCC'].map(h => <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">{h}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gdsLogins.travelport.map((r, i) => (
+                            <tr key={r.id} className={i < gdsLogins.travelport.length - 1 ? 'border-b border-slate-50' : ''}>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id ?? '—'}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid ?? '—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex justify-end pt-1">
+              <button onClick={() => { setLoginsOpen(false); setSelectedClient(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
+            </div>
           </div>
-        </div>
+        )}
       </Modal>
 
       {/* ── Import Modal ── */}
@@ -378,12 +406,11 @@ export default function OTAClientPage() {
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500">
                 Required: <span className="font-mono font-medium text-slate-700">Company Name</span>
-                <br />Note: Linked users are managed separately via the edit ✏️ button after import.
               </div>
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
-                    <tr>{['Row', 'Company Name', 'Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr>
+                    <tr>{['Row','Company Name','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {importRows.map((row, i) => (

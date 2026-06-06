@@ -4,6 +4,7 @@ interface Column<T> {
   key: string
   label: string
   render?: (row: T) => React.ReactNode
+  width?: string  // e.g. '200px', '30%'
 }
 
 interface DataTableProps<T> {
@@ -25,7 +26,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">
               {columns.map(col => (
-                <th key={col.key} className="text-left px-4 py-3 font-medium text-slate-500 whitespace-nowrap">
+                <th key={col.key} className="text-left px-4 py-3 font-medium text-slate-500 whitespace-nowrap" style={col.width ? { width: col.width } : undefined}>
                   {col.label}
                 </th>
               ))}
@@ -51,7 +52,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                   )}
                 >
                   {columns.map(col => (
-                    <td key={col.key} className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    <td key={col.key} className="px-4 py-3 text-slate-700 whitespace-nowrap" style={col.width ? { width: col.width } : undefined}>
                       {col.render ? col.render(row) : String(row[col.key] ?? '—')}
                     </td>
                   ))}

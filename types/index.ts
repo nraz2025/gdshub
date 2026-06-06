@@ -145,7 +145,6 @@ export interface TravelportUser {
   ota_client?: OTAClient
 }
 
-// ── GDS Assigned User ─────────────────────────────────────────
 export interface GDSAssignedUser {
   id: number
   user_id: string
@@ -162,7 +161,6 @@ export interface GDSAssignedUser {
   travelport_user?: TravelportUser
 }
 
-// ── MidOffice Configuration ───────────────────────────────────
 export interface MidOfficeConfiguration {
   id: number
   auto_ticketing: boolean
@@ -178,11 +176,9 @@ export interface OTAClient {
   id: number
   company_name: string
   user_id: string | null
-  midoffice_id: number | null
   created_at: string
   updated_at: string
   users?: User
-  midoffice_configuration?: MidOfficeConfiguration
 }
 
 // ── Organisation ──────────────────────────────────────────────
