@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { User } from '@/types'
 
 const EMPTY: Partial<User> = { first_name: '', last_name: '', email_address: '', ota_client: false, status: 'Active' }
@@ -47,12 +48,15 @@ export default function UsersPage() {
 
   useEffect(() => { fetchAll() }, [])
 
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
+
   async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
+      setCurrentUserEmail(user.email ?? null)
     }
     const { data } = await supabase.from('users').select('*').order('first_name')
     setUsers(data ?? [])
@@ -84,10 +88,12 @@ export default function UsersPage() {
       status:        form.status ?? 'Active',
     }
     if (editing) {
-      const { error } = await supabase.from('users').update(payload).eq('id', editing.id)
+      const { error } = await supabase.from('users').update({
+        ...payload, modified_by: currentUserEmail
+      }).eq('id', editing.id)
       if (error) { setFormError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('users').insert(payload)
+      const { error } = await supabase.from('users').insert({ ...payload, ...audit })
       if (error) { setFormError(error.message); setSaving(false); return }
     }
     setSaving(false); setModalOpen(false); fetchAll()
@@ -271,6 +277,21 @@ export default function UsersPage() {
     {
       key: 'created_at', label: 'Created',
       render: (row: User) => new Date(row.created_at).toLocaleDateString('en-MY')
+    },
+    {
+      key: 'modified_at', label: 'Modified',
+      render: (row: User) => row.modified_at
+        ? <div>
+            <p className="text-sm text-slate-600">{new Date(row.modified_at).toLocaleDateString('en-MY')}</p>
+            <p className="text-xs text-slate-400">{new Date(row.modified_at).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        : <span className="text-slate-300 text-xs">—</span>
+    },
+    {
+      key: 'modified_by', label: 'Modified By',
+      render: (row: User) => row.modified_by
+        ? <span className="text-sm text-slate-600">{row.modified_by}</span>
+        : <span className="text-slate-300 text-xs">—</span>
     },
   ]
 

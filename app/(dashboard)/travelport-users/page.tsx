@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { TravelportUser, User, OTAClient } from '@/types'
-import { syncUserToTable, syncUserToOTAClient } from '@/lib/syncUser'
+import { syncUserToTable } from '@/lib/syncUser'
 
 const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '',
 }
@@ -69,6 +70,7 @@ export default function TravelportUsersPage() {
   async function handleSave() {
     if (!form.sign_on_id.trim() && !form.cid.trim()) { setError('Sign-On ID or CID is required.'); return }
     setSaving(true); setError('')
+    const audit = await getAuditFields()
 
     // Resolve user_id — use selected user or auto-create from email
     let resolvedUserId = form.user_id || null
@@ -83,22 +85,9 @@ export default function TravelportUsersPage() {
 
     const payload = { sign_on_id: form.sign_on_id.trim().toUpperCase() || null, cid: form.cid.trim().toUpperCase() || null, gtid: form.gtid.trim().toUpperCase() || null, pcc: form.pcc.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null }
     const { error: err } = editing
-      ? await supabase.from('travelport_user').update(payload).eq('id', editing.id)
-      : await supabase.from('travelport_user').insert(payload)
+      ? await supabase.from('travelport_user').update({ ...payload, ...audit }).eq('id', editing.id)
+      : await supabase.from('travelport_user').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
-
-    // Sync ota_client_users junction table
-    if (resolvedUserId) {
-      const prevOtaId = editing?.ota_client_id ?? null
-      const newOtaId  = form.ota_client_id ? Number(form.ota_client_id) : null
-      if (prevOtaId && prevOtaId !== newOtaId) {
-        await supabase.from('ota_client_users').delete().eq('ota_client_id', prevOtaId).eq('user_id', resolvedUserId)
-      }
-      if (newOtaId) { await syncUserToOTAClient({ userId: resolvedUserId, otaClientId: newOtaId }) }
-    }
-    if (!resolvedUserId && editing?.user_id && editing?.ota_client_id) {
-      await supabase.from('ota_client_users').delete().eq('ota_client_id', editing.ota_client_id).eq('user_id', editing.user_id)
-    }
 
     setSaving(false); setModalOpen(false); fetchAll()
   }
@@ -193,6 +182,19 @@ export default function TravelportUsersPage() {
     { key: 'ota', label: 'OTA', render: (row: TravelportUser) => <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${row.ota ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.ota ? 'Yes' : 'No'}</span> },
     { key: 'ota_client_id', label: 'OTA Client', render: (row: TravelportUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
     { key: 'user_id', label: 'Linked User', render: (row: TravelportUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">—</span> } },
+    {
+      key: 'modified_at', label: 'Last Modified',
+      render: (row: TravelportUser) => {
+        const r = row as TravelportUser & {modified_at?: string; modified_by?: string}
+        if (!r.modified_at) return <span className="text-slate-300 text-xs">—</span>
+        return (
+          <div>
+            <p className="text-xs text-slate-600">{new Date(r.modified_at).toLocaleDateString('en-MY')}</p>
+            {r.modified_by && <p className="text-xs text-slate-400">{r.modified_by}</p>}
+          </div>
+        )
+      }
+    },
     { key: 'created_at', label: 'Created', render: (row: TravelportUser) => new Date(row.created_at).toLocaleDateString('en-MY') },
   ]
 

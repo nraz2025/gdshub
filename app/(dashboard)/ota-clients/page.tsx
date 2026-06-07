@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { OTAClient } from '@/types'
 
 interface SabreRow   { id: number; epr: string; initial: string | null; pcc: string | null; status: string }
@@ -73,10 +74,11 @@ export default function OTAClientPage() {
   async function handleSave() {
     if (!form.company_name.trim()) { setError('Company name is required.'); return }
     setSaving(true); setError('')
+    const audit = await getAuditFields()
     const payload = { company_name: form.company_name.trim(), remarks: (form as {remarks?: string}).remarks?.trim() || null }
     const { error: err } = editing
-      ? await supabase.from('ota_client').update(payload).eq('id', editing.id)
-      : await supabase.from('ota_client').insert(payload)
+      ? await supabase.from('ota_client').update({ ...payload, ...audit }).eq('id', editing.id)
+      : await supabase.from('ota_client').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }
@@ -190,6 +192,19 @@ export default function OTAClientPage() {
             {points.map((p: string, i: number) => <li key={i} className="text-sm text-slate-600">{p}</li>)}
           </ul>
         ) : <span className="text-sm text-slate-600">{row.remarks}</span>
+      }
+    },
+    {
+      key: 'modified_at', label: 'Last Modified',
+      render: (row: OTAClient) => {
+        const r = row as OTAClient & {modified_at?: string; modified_by?: string}
+        if (!r.modified_at) return <span className="text-slate-300 text-xs">—</span>
+        return (
+          <div>
+            <p className="text-xs text-slate-600">{new Date(r.modified_at).toLocaleDateString('en-MY')}</p>
+            {r.modified_by && <p className="text-xs text-slate-400">{r.modified_by}</p>}
+          </div>
+        )
       }
     },
     {

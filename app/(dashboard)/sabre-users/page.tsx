@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { SabreUser, User, OTAClient } from '@/types'
-import { syncUserToTable, syncUserToOTAClient } from '@/lib/syncUser'
+import { syncUserToTable } from '@/lib/syncUser'
 
 type SabreStatus = 'Active' | 'Vacant'
 const STATUSES: SabreStatus[] = ['Active', 'Vacant']
@@ -98,6 +99,7 @@ export default function SabreUsersPage() {
   async function handleSave() {
     if (!form.epr.trim()) { setError('EPR is required.'); return }
     setSaving(true); setError('')
+    const audit = await getAuditFields()
 
     // Auto-sync: if admin entered a new email, ensure user exists in users table
     let resolvedUserId = form.user_id || null
@@ -124,36 +126,9 @@ export default function SabreUsersPage() {
       minicom:       form.minicom.trim() || null,
     }
     const { error: err } = editing
-      ? await supabase.from('sabre_user').update(payload).eq('id', editing.id)
-      : await supabase.from('sabre_user').insert(payload)
+      ? await supabase.from('sabre_user').update({ ...payload, ...audit }).eq('id', editing.id)
+      : await supabase.from('sabre_user').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
-
-    // Sync ota_client_users junction table
-    if (resolvedUserId) {
-      const prevOtaId = editing?.ota_client_id ?? null
-      const newOtaId  = form.ota_client_id ? Number(form.ota_client_id) : null
-
-      // OTA was removed or changed — remove the old link
-      if (prevOtaId && prevOtaId !== newOtaId) {
-        await supabase.from('ota_client_users')
-          .delete()
-          .eq('ota_client_id', prevOtaId)
-          .eq('user_id', resolvedUserId)
-      }
-
-      // OTA is set — add new link (if not already there)
-      if (newOtaId) {
-        await syncUserToOTAClient({ userId: resolvedUserId, otaClientId: newOtaId })
-      }
-    }
-
-    // If OTA was cleared and no user_id, still clean up old link
-    if (!resolvedUserId && editing?.user_id && editing?.ota_client_id) {
-      await supabase.from('ota_client_users')
-        .delete()
-        .eq('ota_client_id', editing.ota_client_id)
-        .eq('user_id', editing.user_id)
-    }
 
     setSaving(false); setModalOpen(false); fetchAll()
   }
@@ -291,6 +266,19 @@ export default function SabreUsersPage() {
     { key: 'cta',     label: 'CTA',     render: (row: SabreUser) => row.cta ? <span className="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{row.cta}</span> : <span className="text-slate-300 text-xs">—</span> },
     { key: 'pta',     label: 'PTA',     render: (row: SabreUser) => row.pta ? <span className="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{row.pta}</span> : <span className="text-slate-300 text-xs">—</span> },
     { key: 'minicom', label: 'Minicom', render: (row: SabreUser) => row.minicom ? <span className="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{row.minicom}</span> : <span className="text-slate-300 text-xs">—</span> },
+    {
+      key: 'modified_at', label: 'Last Modified',
+      render: (row: SabreUser) => {
+        const r = row as SabreUser & {modified_at?: string; modified_by?: string}
+        if (!r.modified_at) return <span className="text-slate-300 text-xs">—</span>
+        return (
+          <div>
+            <p className="text-xs text-slate-600">{new Date(r.modified_at).toLocaleDateString('en-MY')}</p>
+            {r.modified_by && <p className="text-xs text-slate-400">{r.modified_by}</p>}
+          </div>
+        )
+      }
+    },
     { key: 'created_at', label: 'Created', render: (row: SabreUser) => new Date(row.created_at).toLocaleDateString('en-MY') },
   ]
 

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
 
 type PCCStatus = 'Active' | 'Pending' | 'Vacant'
@@ -158,6 +159,7 @@ export default function GDSInfoPage() {
     if (!form.pcc?.trim()) { setError('PCC code is required.'); return }
     const pccUpper = form.pcc.trim().toUpperCase()
     setSaving(true); setError('')
+    const audit = await getAuditFields()
     const payload = {
       gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active',
       org_id: form.org_id ?? null, ota_client_id: form.ota_client_id ?? null,
@@ -165,8 +167,8 @@ export default function GDSInfoPage() {
       pcc_functionality: (form as Partial<PCCList>).pcc_functionality ?? null,
     }
     const { error: err } = editing
-      ? await supabase.from('pcc_list').update(payload).eq('id', editing.id)
-      : await supabase.from('pcc_list').insert(payload)
+      ? await supabase.from('pcc_list').update({ ...payload, ...audit }).eq('id', editing.id)
+      : await supabase.from('pcc_list').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }

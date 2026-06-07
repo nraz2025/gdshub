@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/shared/PageHeader'
 import Modal from '@/components/shared/Modal'
+import { getAuditFields } from '@/lib/audit'
 import type { GDSFeature, GDS } from '@/types'
 
 const GDS_COLORS: Record<string, { badge: string; row: string; btn: string }> = {
