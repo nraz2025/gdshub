@@ -99,6 +99,16 @@ export default function SabreUsersPage() {
   async function handleSave() {
     if (!form.epr.trim()) { setError('EPR is required.'); return }
     setSaving(true); setError('')
+    // Check for duplicate EPR under same OTA Client
+    const eprUpper = form.epr.trim().toUpperCase()
+    const { data: dupCheck } = await supabase.from('sabre_user')
+      .select('id').eq('epr', eprUpper)
+      .eq('ota_client_id', form.ota_client_id || 0)
+      .maybeSingle()
+    if (dupCheck && (!editing || dupCheck.id !== editing.id)) {
+      setError(`EPR "${eprUpper}" already exists for this OTA Client.`)
+      setSaving(false); return
+    }
     const audit = await getAuditFields()
 
     // Auto-sync: if admin entered a new email, ensure user exists in users table

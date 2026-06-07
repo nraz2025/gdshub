@@ -70,6 +70,17 @@ export default function TravelportUsersPage() {
   async function handleSave() {
     if (!form.sign_on_id.trim() && !form.cid.trim()) { setError('Sign-On ID or CID is required.'); return }
     setSaving(true); setError('')
+    // Check for duplicate Sign-On ID under same OTA Client
+    if (form.sign_on_id.trim() && form.ota_client_id) {
+      const { data: dupCheck } = await supabase.from('travelport_user')
+        .select('id').ilike('sign_on_id', form.sign_on_id.trim())
+        .eq('ota_client_id', form.ota_client_id)
+        .maybeSingle()
+      if (dupCheck && (!editing || dupCheck.id !== editing.id)) {
+        setError("Sign-On ID "" + form.sign_on_id.trim().toUpperCase() + "" already exists for this OTA Client.")
+        setSaving(false); return
+      }
+    }
     const audit = await getAuditFields()
 
     // Resolve user_id — use selected user or auto-create from email

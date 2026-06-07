@@ -68,8 +68,19 @@ export default function AmadeusUsersPage() {
   function openDelete(row: AmadeusUser) { setEditing(row); setDeleteOpen(true) }
 
   async function handleSave() {
-    if (!form.login.trim()) { setError('Login is required.'); return }
     setSaving(true); setError('')
+    // Check for duplicate login under same OTA Client
+    if (form.login?.trim()) {
+      const loginUpper = (form.login as string).trim().toUpperCase()
+      const { data: dupCheck } = await supabase.from('amadeus_user')
+        .select('id').ilike('login', loginUpper)
+        .eq('ota_client_id', (form as {ota_client_id?: number|null}).ota_client_id || 0)
+        .maybeSingle()
+      if (dupCheck && (!editing || dupCheck.id !== editing.id)) {
+        setError("Login already exists for this OTA Client: " + loginUpper)
+        setSaving(false); return
+      }
+    }
     const audit = await getAuditFields()
 
     // Resolve user_id — use selected user or auto-create from email
