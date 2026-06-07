@@ -1,10 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that are public (no login required)
 const PUBLIC_ROUTES = ['/pcc', '/login', '/reset-password']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -27,20 +26,16 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  // Allow public routes without login
   const isPublic = PUBLIC_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'))
 
-  // Redirect root / to GDS Info (public)
   if (pathname === '/') {
     return NextResponse.redirect(new URL('/pcc', request.url))
   }
 
-  // Unauthenticated users can only access public routes
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/pcc', request.url))
   }
 
-  // Authenticated users visiting login → go to dashboard
   if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }

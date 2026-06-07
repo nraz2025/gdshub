@@ -26,12 +26,15 @@ const STATUS_COLORS: Record<string, string> = {
 const PCC_FUNC_COLORS: Record<string, string> = {
   'Booking Only':        'bg-sky-50 text-sky-700 border-sky-200',
   'Booking & Ticketing': 'bg-violet-50 text-violet-700 border-violet-200',
+  'Profile':             'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Fareview':            'bg-amber-50 text-amber-700 border-amber-200',
+  'Cert PCC':            'bg-rose-50 text-rose-700 border-rose-200',
 }
-const PCC_FUNCTIONALITY = ['Booking Only', 'Booking & Ticketing'] as const
+const PCC_FUNCTIONALITY = ['Booking Only', 'Booking & Ticketing', 'Profile', 'Fareview', 'Cert PCC'] as const
 
 const EMPTY: Partial<PCCList> = {
   gds_id: undefined, pcc: '', status: 'Active',
-  org_id: null, ota_client_id: null, functionality_id: null, remarks: null, pcc_functionality: null,
+  org_id: null, ota_client_id: null, functionality_id: null, pcc_functionality: null, client_group_id: null, remarks: null,
 }
 
 interface ImportRow {
@@ -45,6 +48,8 @@ export default function GDSInfoPage() {
 
   const [records, setRecords] = useState<PCCList[]>([])
   const [gdsList, setGdsList] = useState<GDS[]>([])
+  const [clientGroups, setClientGroups] = useState<{id:number;name:string}[]>([])
+  const [filterGroup, setFilterGroup] = useState('')
   const [orgList, setOrgList] = useState<Organisation[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [funcList, setFuncList] = useState<GDSFunctionality[]>([])
@@ -54,9 +59,9 @@ export default function GDSInfoPage() {
   const [search, setSearch] = useState('')
   const [filterGDS, setFilterGDS] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [filterOrg, setFilterOrg] = useState('all')
-  const [filterPCC, setFilterPCC] = useState('all')
-  const [filterOTA, setFilterOTA] = useState('all')
+  const [filterOrg, setFilterOrg] = useState('')
+  const [filterPCC, setFilterPCC] = useState('')
+  const [filterOTA, setFilterOTA] = useState('')
 
   // Add/Edit modal
   const [modalOpen, setModalOpen] = useState(false)
@@ -69,7 +74,7 @@ export default function GDSInfoPage() {
   // PCC Assigned login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
-  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;initial:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
   // GDS Feature detail popup
@@ -104,15 +109,17 @@ export default function GDSInfoPage() {
       const role = profile?.role ?? 'user'
       setIsAdmin(role === 'admin' || role === 'manager')
     }
-    const [{ data: pccData }, { data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }] = await Promise.all([
+    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }] = await Promise.all([
       supabase.from('pcc_list').select(`
         *, gds:gds_id(id, name),
         organisation:org_id(id, organisation, iata),
         ota_client:ota_client_id(id, company_name),
+        client_group:client_group_id(id, name),
         gds_functionality:functionality_id(id, name, gds_id),
         pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
-      `).order('pcc'),  // initial fetch order; client-side sort applied below
+      `).order('pcc'),
       supabase.from('gds').select('*').order('name'),
+      supabase.from('client_group').select('id,name').order('name'),
       supabase.from('organisation').select('*').order('organisation'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
@@ -127,6 +134,7 @@ export default function GDSInfoPage() {
     })
     setRecords(sorted)
     setGdsList(gdsData ?? [])
+    setClientGroups(groupData ?? [])
     setOrgList(orgData ?? [])
     setOtaClients(otaData ?? [])
     setFuncList(funcData ?? [])
@@ -146,7 +154,7 @@ export default function GDSInfoPage() {
     setForm({
       gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active',
       org_id: row.org_id ?? null, ota_client_id: row.ota_client_id ?? null,
-      functionality_id: row.functionality_id ?? null, pcc_functionality: row.pcc_functionality ?? null, remarks: row.remarks ?? null,
+      functionality_id: row.functionality_id ?? null, pcc_functionality: row.pcc_functionality ?? null, client_group_id: (row as PCCList & {client_group_id?:number|null}).client_group_id ?? null, remarks: row.remarks ?? null,
       pcc_functionality: row.pcc_functionality ?? null,
     })
     setError(''); setModalOpen(true)
@@ -163,7 +171,7 @@ export default function GDSInfoPage() {
     const payload = {
       gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active',
       org_id: form.org_id ?? null, ota_client_id: form.ota_client_id ?? null,
-      functionality_id: form.functionality_id ?? null, pcc_functionality: form.pcc_functionality ?? null, remarks: form.remarks ?? null,
+      functionality_id: form.functionality_id ?? null, pcc_functionality: form.pcc_functionality ?? null, client_group_id: (form as Partial<PCCList> & {client_group_id?:number|null}).client_group_id ?? null, remarks: form.remarks ?? null,
       pcc_functionality: (form as Partial<PCCList>).pcc_functionality ?? null,
     }
     const { error: err } = editing
@@ -189,7 +197,7 @@ export default function GDSInfoPage() {
     const gdsName = (pcc.gds as GDS)?.name ?? ''
     const [{ data: sabreData }, { data: amData }, { data: tpData }] = await Promise.all([
       gdsName === 'Sabre' || !gdsName
-        ? supabase.from('sabre_user').select('id,epr,initial,pcc,status').eq('ota_client_id', pcc.ota_client_id).order('epr')
+        ? supabase.from('sabre_user').select('id,epr,pcc,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('epr')
         : Promise.resolve({ data: [] }),
       gdsName === 'Amadeus' || !gdsName
         ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid').eq('ota_client_id', pcc.ota_client_id).order('login')
@@ -314,12 +322,14 @@ export default function GDSInfoPage() {
 
   // ── FILTER ────────────────────────────────────────────────────
   const filtered = records.filter(r => {
+    const pccGroup = r.client_group as {id:number;name:string} | null
+    if (filterGroup && !pccGroup?.name?.toLowerCase().includes(filterGroup.toLowerCase())) return false
     const matchSearch = r.pcc.toLowerCase().includes(search.toLowerCase())
     const matchGDS    = filterGDS    === 'all' || String(r.gds_id)        === filterGDS
     const matchStatus = filterStatus === 'all' || (r.status ?? 'Active')  === filterStatus
-    const matchOrg    = filterOrg    === 'all' || String(r.org_id)        === filterOrg
-    const matchPCC    = filterPCC    === 'all' || r.pcc                   === filterPCC
-    const matchOTA    = filterOTA    === 'all' || String(r.ota_client_id) === filterOTA
+    const matchOrg    = !filterOrg    || (r.organisation as {organisation:string}|null)?.organisation?.toLowerCase().includes(filterOrg.toLowerCase())
+    const matchPCC    = !filterPCC    || r.pcc.toLowerCase().includes(filterPCC.toLowerCase())
+    const matchOTA    = !filterOTA    || (r.ota_client as {company_name:string}|null)?.company_name?.toLowerCase().includes(filterOTA.toLowerCase())
     return matchSearch && matchGDS && matchStatus && matchOrg && matchPCC && matchOTA
   })
 
@@ -393,7 +403,7 @@ export default function GDSInfoPage() {
   const columns = [
     // 0. Checkbox
     {
-      key: '_select', label: '',
+      key: '_select', label: '', width: '44px',
       width: '48px',
       render: (row: PCCList) => isAdmin ? (
         <input
@@ -425,12 +435,12 @@ export default function GDSInfoPage() {
     },
     // 3. PCC
     {
-      key: 'pcc', label: 'PCC',
+      key: 'pcc', label: 'PCC', width: '110px',
       render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.pcc}</span>
     },
     // 4. PCC Assigned — badge + view logins link
     {
-      key: 'ota_client_id', label: 'PCC Assigned',
+      key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
         return ota ? (
@@ -446,9 +456,19 @@ export default function GDSInfoPage() {
         ) : <span className="text-slate-300 text-xs">—</span>
       }
     },
+    // 4b. Client Group
+    {
+      key: 'client_group', label: 'Client Group', width: '130px',
+      render: (row: PCCList) => {
+        const g = row.client_group as {id:number;name:string} | null
+        return g
+          ? <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 whitespace-nowrap">{g.name}</span>
+          : <span className="text-slate-300 text-xs">—</span>
+      }
+    },
     // 5. PCC Functionality
     {
-      key: 'pcc_functionality', label: 'PCC Functionality',
+      key: 'pcc_functionality', label: 'PCC Functionality', width: '160px',
       render: (row: PCCList) => {
         const val = row.pcc_functionality
         return val
@@ -458,7 +478,7 @@ export default function GDSInfoPage() {
     },
     // 6. GDS Feature — clickable badge that opens popup
     {
-      key: 'functionality_id', label: 'GDS Feature',
+      key: 'functionality_id', label: 'GDS Feature', width: '130px',
       render: (row: PCCList) => {
         const func = row.gds_functionality as GDSFunctionality
         const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
@@ -475,7 +495,7 @@ export default function GDSInfoPage() {
     },
     // 7. Status
     {
-      key: 'status', label: 'Status',
+      key: 'status', label: 'Status', width: '90px',
       render: (row: PCCList) => {
         const s = row.status ?? 'Active'
         return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{s}</span>
@@ -483,7 +503,7 @@ export default function GDSInfoPage() {
     },
     // 8. Remarks
     {
-      key: 'remarks', label: 'Remarks',
+      key: 'remarks', label: 'Remarks', width: '150px',
       render: (row: PCCList) => {
         if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
@@ -535,28 +555,59 @@ export default function GDSInfoPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Organisation */}
-        <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All Organisation</option>
-          {orgList.map(o => <option key={o.id} value={String(o.id)}>{o.organisation}</option>)}
-        </select>
-        {/* PCC */}
-        <select value={filterPCC} onChange={e => setFilterPCC(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All PCC</option>
-          {[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
-        </select>
-        {/* PCC Assigned (OTA Client) */}
-        <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All PCC Assigned</option>
-          {otaClients.map(o => <option key={o.id} value={String(o.id)}>{o.company_name}</option>)}
-        </select>
-        {/* GDS */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+
+        {/* Organisation — text + dropdown combo */}
+        <div className="relative">
+          <input type="text" list="org-list" value={filterOrg} onChange={e => setFilterOrg(e.target.value)}
+            placeholder="Organisation…"
+            className="w-40 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
+          <datalist id="org-list">
+            {orgList.map(o => <option key={o.id} value={o.organisation} />)}
+          </datalist>
+          {filterOrg && <button onClick={() => setFilterOrg('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
+        </div>
+
+        {/* PCC — text + dropdown combo */}
+        <div className="relative">
+          <input type="text" list="pcc-list" value={filterPCC} onChange={e => setFilterPCC(e.target.value)}
+            placeholder="PCC…"
+            className="w-28 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
+          <datalist id="pcc-list">
+            {[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc} />)}
+          </datalist>
+          {filterPCC && <button onClick={() => setFilterPCC('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
+        </div>
+
+        {/* PCC Assigned — text + dropdown combo */}
+        <div className="relative">
+          <input type="text" list="ota-list" value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
+            placeholder="PCC Assigned…"
+            className="w-44 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
+          <datalist id="ota-list">
+            {otaClients.map(o => <option key={o.id} value={o.company_name} />)}
+          </datalist>
+          {filterOTA && <button onClick={() => setFilterOTA('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
+        </div>
+
+        {/* Client Group — text + dropdown combo */}
+        <div className="relative">
+          <input type="text" list="group-list" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
+            placeholder="Client Group…"
+            className="w-36 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
+          <datalist id="group-list">
+            {clientGroups.map(g => <option key={g.id} value={g.name} />)}
+          </datalist>
+          {filterGroup && <button onClick={() => setFilterGroup('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
+        </div>
+
+        {/* GDS — dropdown */}
         <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
           <option value="all">All GDS</option>
           {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
         </select>
-        {/* Status */}
+
+        {/* Status — dropdown */}
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
           <option value="all">All Status</option>
           {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -581,9 +632,9 @@ export default function GDSInfoPage() {
         {!loading && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
-            {(filterOrg !== 'all' || filterPCC !== 'all' || filterOTA !== 'all' || filterGDS !== 'all' || filterStatus !== 'all') && (
+            {(filterOrg || filterPCC || filterOTA || filterGDS !== 'all' || filterStatus !== 'all' || filterGroup) && (
               <button
-                onClick={() => { setFilterOrg('all'); setFilterPCC('all'); setFilterOTA('all'); setFilterGDS('all'); setFilterStatus('all') }}
+                onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup('') }}
                 className="text-xs text-blue-500 hover:text-blue-700 underline"
               >
                 Clear filters
@@ -631,6 +682,13 @@ export default function GDSInfoPage() {
             <select value={(form as Partial<PCCList>).pcc_functionality ?? ''} onChange={e => setForm(f => ({ ...f, pcc_functionality: e.target.value || null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">— None —</option>
               {PCC_FUNCTIONALITY.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Client Group</label>
+            <select value={(form as Partial<PCCList> & {client_group_id?:number|null}).client_group_id ?? ''} onChange={e => setForm(f => ({ ...f, client_group_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">— None —</option>
+              {clientGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div>
@@ -832,13 +890,13 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['EPR','Initial','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['EPR','Email','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.sabre.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.sabre.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.initial??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{(r as {users?:{email_address:string}|null}).users?.email_address??'—'}</td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??'—'}</td>
                               <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>

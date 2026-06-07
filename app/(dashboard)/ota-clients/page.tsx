@@ -27,6 +27,7 @@ export default function OTAClientPage() {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<OTAClient[]>([])
+
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -61,7 +62,9 @@ export default function OTAClientPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const { data } = await supabase.from('ota_client').select('*').order('company_name')
+    const [{ data }] = await Promise.all([
+      supabase.from('ota_client').select('*').order('company_name')
+    ])
     setRecords(data ?? [])
     setLoading(false)
   }
@@ -182,6 +185,7 @@ export default function OTAClientPage() {
       key: 'company_name', label: 'Company Name', width: '260px',
       render: (row: OTAClient) => <span className="font-medium text-slate-800">{row.company_name}</span>
     },
+
     {
       key: 'remarks', label: 'Remarks', width: '380px',
       render: (row: OTAClient & {remarks?: string}) => {
@@ -259,6 +263,7 @@ export default function OTAClientPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Company Name <span className="text-red-500">*</span></label>
             <input type="text" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Remarks</label>
             <textarea

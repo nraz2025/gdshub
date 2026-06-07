@@ -1,10 +1,13 @@
+'use client'
+
+import { useRef, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface Column<T> {
   key: string
   label: string
   render?: (row: T) => React.ReactNode
-  width?: string  // e.g. '200px', '30%'
+  width?: string
 }
 
 interface DataTableProps<T> {
@@ -19,10 +22,51 @@ interface DataTableProps<T> {
 export default function DataTable<T extends Record<string, unknown>>({
   columns, data, onEdit, onDelete, isAdmin = false, emptyMessage = 'No records found.'
 }: DataTableProps<T>) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const mirrorRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [scrollWidth, setScrollWidth] = useState(0)
+
+  // Sync top scrollbar mirror → table scroll
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = () => setScrollWidth(el.scrollWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [data, columns])
+
+  function onMirrorScroll() {
+    if (mirrorRef.current && scrollRef.current)
+      scrollRef.current.scrollLeft = mirrorRef.current.scrollLeft
+  }
+
+  function onTableScroll() {
+    if (mirrorRef.current && scrollRef.current)
+      mirrorRef.current.scrollLeft = scrollRef.current.scrollLeft
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* Top scrollbar mirror */}
+      <div
+        ref={mirrorRef}
+        onScroll={onMirrorScroll}
+        className="overflow-x-auto"
+        style={{ height: '12px' }}
+      >
+        <div style={{ width: scrollWidth, height: '1px' }} />
+      </div>
+
+      {/* Actual table */}
+      <div
+        ref={scrollRef}
+        onScroll={onTableScroll}
+        className="overflow-x-auto"
+      >
+        <table className="w-full text-sm" style={{ minWidth: '1400px' }}>
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">
               {columns.map(col => (
@@ -60,18 +104,12 @@ export default function DataTable<T extends Record<string, unknown>>({
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {onEdit && (
-                          <button
-                            onClick={() => onEdit(row)}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
-                          >
+                          <button onClick={() => onEdit(row)} className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium">
                             Edit
                           </button>
                         )}
                         {onDelete && (
-                          <button
-                            onClick={() => onDelete(row)}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors font-medium"
-                          >
+                          <button onClick={() => onDelete(row)} className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors font-medium">
                             Delete
                           </button>
                         )}

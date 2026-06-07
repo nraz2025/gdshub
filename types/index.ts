@@ -20,6 +20,8 @@ export interface User {
   status: UserStatus
   created_at: string
   updated_at: string
+  modified_at: string | null
+  modified_by: string | null
 }
 
 // ── GDS ──────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ export interface PCCList {
   ota_client_id: number | null
   functionality_id: number | null
   pcc_functionality: string | null
+  client_group_id: number | null
   remarks: string | null
   created_at: string
   updated_at: string
