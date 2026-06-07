@@ -15,20 +15,14 @@ const GDS_CHECK_COLORS: Record<string, string> = {
   Sabre: 'accent-blue-500', Amadeus: 'accent-purple-500', Travelport: 'accent-emerald-500',
 }
 
-const BILLING_CYCLES = [
-  { value: 'monthly',         label: 'Per Month'       },
-  { value: 'yearly',          label: 'Per Year'        },
-  { value: 'per_user',        label: 'Per User'        },
-  { value: 'per_transaction', label: 'Per Transaction' },
-  { value: 'one_time',        label: 'One-Time'        },
-]
+interface BillingCycle { id: number; value: string; label: string; sort_order: number }
 const CURRENCIES = ['USD', 'MYR', 'EUR', 'GBP', 'SGD']
 
-function fmtCost(cost: number, currency: string, cycle: string) {
+function fmtCost(cost: number, currency: string, cycle: string, cycles: {value:string;label:string}[]) {
   if (!cost) return null
   const amt = new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
-  const s: Record<string, string> = { monthly: '/mo', yearly: '/yr', per_user: '/user', per_transaction: '/txn', one_time: '' }
-  return `${amt}${s[cycle] ?? ''}`
+  const cycleLabel = cycles.find(c => c.value === cycle)?.label ?? ''
+  return cycleLabel && cycleLabel !== 'One-Time' ? `${amt} / ${cycleLabel}` : amt
 }
 
 interface FeatureWithGDS extends GDSFeature { gds?: GDS }
@@ -43,6 +37,7 @@ export default function GDSFunctionalityPage() {
   const supabase = createClient()
   const [features, setFeatures] = useState<FeatureWithGDS[]>([])
   const [gdsList, setGdsList] = useState<GDS[]>([])
+  const [billingCycles, setBillingCycles] = useState<BillingCycle[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [filterGDS, setFilterGDS] = useState('all')
@@ -74,12 +69,14 @@ export default function GDSFunctionalityPage() {
       const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(prof?.role === 'admin')
     }
-    const [{ data: featureData }, { data: gdsData }] = await Promise.all([
+    const [{ data: featureData }, { data: gdsData }, { data: cycleData }] = await Promise.all([
       supabase.from('gds_features').select('*, gds:gds_id(id, name)').order('label'),
       supabase.from('gds').select('*').order('name'),
+      supabase.from('billing_cycles').select('*').order('sort_order'),
     ])
     setFeatures(featureData ?? [])
     setGdsList(gdsData ?? [])
+    setBillingCycles(cycleData ?? [])
     setLoading(false)
   }
 
@@ -203,8 +200,8 @@ export default function GDSFunctionalityPage() {
                 ) : (
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     {gdsFeatures.map((f, i) => {
-                      const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
-                      const cycleLabel = BILLING_CYCLES.find(c => c.value === f.billing_cycle)?.label ?? ''
+                      const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string, billingCycles)
+                      const cycleLabel = billingCycles.find(c => c.value === f.billing_cycle)?.label ?? ''
                       return (
                         <div key={f.id} className={`flex items-center justify-between px-5 py-3.5 ${i < gdsFeatures.length - 1 ? `border-b ${colors.row}` : ''}`}>
                           <div className="flex items-center gap-3 min-w-0">
@@ -300,7 +297,8 @@ export default function GDSFunctionalityPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Billing Cycle</label>
             <select value={editForm.billing_cycle} onChange={e => setEditForm(f => ({ ...f, billing_cycle: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              {BILLING_CYCLES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              <option value="">— None —</option>
+              {billingCycles.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
           {editError && <p className="text-sm text-red-500">{editError}</p>}

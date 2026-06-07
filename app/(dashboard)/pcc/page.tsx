@@ -22,9 +22,15 @@ const STATUS_COLORS: Record<string, string> = {
   Vacant:  'bg-slate-100 text-slate-500 border-slate-200',
 }
 
+const PCC_FUNC_COLORS: Record<string, string> = {
+  'Booking Only':        'bg-sky-50 text-sky-700 border-sky-200',
+  'Booking & Ticketing': 'bg-violet-50 text-violet-700 border-violet-200',
+}
+const PCC_FUNCTIONALITY = ['Booking Only', 'Booking & Ticketing'] as const
+
 const EMPTY: Partial<PCCList> = {
   gds_id: undefined, pcc: '', status: 'Active',
-  org_id: null, ota_client_id: null, functionality_id: null, remarks: null,
+  org_id: null, ota_client_id: null, functionality_id: null, remarks: null, pcc_functionality: null,
 }
 
 interface ImportRow {
@@ -71,6 +77,14 @@ export default function GDSInfoPage() {
   const [profileFeatureIds, setProfileFeatureIds] = useState<Set<number>>(new Set())
   const [featureToggling, setFeatureToggling] = useState(false)
 
+  // Bulk edit
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkFeatureIds, setBulkFeatureIds] = useState<Set<number>>(new Set())
+  const [bulkMode, setBulkMode] = useState<'add' | 'remove'>('add')
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkResult, setBulkResult] = useState<string | null>(null)
+
   // Import
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
@@ -86,7 +100,8 @@ export default function GDSInfoPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
+      const role = profile?.role ?? 'user'
+      setIsAdmin(role === 'admin' || role === 'manager')
     }
     const [{ data: pccData }, { data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }] = await Promise.all([
       supabase.from('pcc_list').select(`
@@ -130,7 +145,8 @@ export default function GDSInfoPage() {
     setForm({
       gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active',
       org_id: row.org_id ?? null, ota_client_id: row.ota_client_id ?? null,
-      functionality_id: row.functionality_id ?? null, remarks: row.remarks ?? null,
+      functionality_id: row.functionality_id ?? null, pcc_functionality: row.pcc_functionality ?? null, remarks: row.remarks ?? null,
+      pcc_functionality: row.pcc_functionality ?? null,
     })
     setError(''); setModalOpen(true)
   }
@@ -145,7 +161,8 @@ export default function GDSInfoPage() {
     const payload = {
       gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active',
       org_id: form.org_id ?? null, ota_client_id: form.ota_client_id ?? null,
-      functionality_id: form.functionality_id ?? null, remarks: form.remarks ?? null,
+      functionality_id: form.functionality_id ?? null, pcc_functionality: form.pcc_functionality ?? null, remarks: form.remarks ?? null,
+      pcc_functionality: (form as Partial<PCCList>).pcc_functionality ?? null,
     }
     const { error: err } = editing
       ? await supabase.from('pcc_list').update(payload).eq('id', editing.id)
@@ -224,6 +241,8 @@ export default function GDSInfoPage() {
         'Status': r.status ?? '',
         'PCC Assigned': ota?.company_name ?? '',
         'GDS Feature': func?.name ?? '',
+        'PCC Functionality': r.pcc_functionality ?? '',
+        'PCC Functionality': (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
         'Remarks': r.remarks ?? '',
         'Created': new Date(r.created_at).toLocaleDateString('en-MY'),
       }
@@ -304,6 +323,51 @@ export default function GDSInfoPage() {
 
   const filteredFuncs = funcList.filter(f => !form.gds_id || f.gds_id === form.gds_id)
 
+  // Bulk selection helpers
+  const allFilteredIds = filtered.map(r => r.id)
+  const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id))
+  const someSelected = allFilteredIds.some(id => selectedIds.has(id)) && !allSelected
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(prev => { const s = new Set(prev); allFilteredIds.forEach(id => s.delete(id)); return s })
+    } else {
+      setSelectedIds(prev => new Set([...prev, ...allFilteredIds]))
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+
+  function openBulk() {
+    setBulkFeatureIds(new Set())
+    setBulkMode('add')
+    setBulkResult(null)
+    setBulkOpen(true)
+  }
+
+  async function handleBulkApply() {
+    if (selectedIds.size === 0 || bulkFeatureIds.size === 0) return
+    setBulkSaving(true); setBulkResult(null)
+    let done = 0
+    for (const pccId of selectedIds) {
+      for (const featId of bulkFeatureIds) {
+        if (bulkMode === 'add') {
+          await supabase.from('pcc_features')
+            .upsert({ pcc_list_id: pccId, feature_id: featId }, { onConflict: 'pcc_list_id,feature_id' })
+        } else {
+          await supabase.from('pcc_features')
+            .delete().eq('pcc_list_id', pccId).eq('feature_id', featId)
+        }
+      }
+      done++
+    }
+    setBulkSaving(false)
+    setBulkResult(`${bulkMode === 'add' ? 'Added' : 'Removed'} ${bulkFeatureIds.size} feature${bulkFeatureIds.size !== 1 ? 's' : ''} across ${done} PCC${done !== 1 ? 's' : ''}.`)
+    fetchAll()
+  }
+
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
@@ -325,6 +389,20 @@ export default function GDSInfoPage() {
 
   // ── COLUMNS ───────────────────────────────────────────────────
   const columns = [
+    // 0. Checkbox
+    {
+      key: '_select', label: '',
+      width: '48px',
+      render: (row: PCCList) => isAdmin ? (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.id)}
+          onChange={() => toggleSelect(row.id)}
+          onClick={e => e.stopPropagation()}
+          className="w-4 h-4 rounded accent-blue-500 cursor-pointer"
+        />
+      ) : null
+    },
     // 1. Organisation
     {
       key: 'organisation', label: 'Organisation',
@@ -355,10 +433,10 @@ export default function GDSInfoPage() {
         const ota = row.ota_client as OTAClient
         return ota ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span>
+            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full w-40 text-center truncate block" title={ota.company_name}>{ota.company_name}</span>
             <button
               onClick={() => openLoginPopup(row)}
-              className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors whitespace-nowrap"
+              className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors whitespace-nowrap flex-shrink-0"
             >
               View IDs
             </button>
@@ -366,7 +444,17 @@ export default function GDSInfoPage() {
         ) : <span className="text-slate-300 text-xs">—</span>
       }
     },
-    // 5. GDS Feature — clickable badge that opens popup
+    // 5. PCC Functionality
+    {
+      key: 'pcc_functionality', label: 'PCC Functionality',
+      render: (row: PCCList) => {
+        const val = row.pcc_functionality
+        return val
+          ? <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${PCC_FUNC_COLORS[val] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{val}</span>
+          : <span className="text-slate-300 text-xs">—</span>
+      }
+    },
+    // 6. GDS Feature — clickable badge that opens popup
     {
       key: 'functionality_id', label: 'GDS Feature',
       render: (row: PCCList) => {
@@ -383,7 +471,7 @@ export default function GDSInfoPage() {
         )
       }
     },
-    // 6. Status
+    // 7. Status
     {
       key: 'status', label: 'Status',
       render: (row: PCCList) => {
@@ -391,7 +479,7 @@ export default function GDSInfoPage() {
         return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{s}</span>
       }
     },
-    // 7. Remarks
+    // 8. Remarks
     {
       key: 'remarks', label: 'Remarks',
       render: (row: PCCList) => {
@@ -415,10 +503,18 @@ export default function GDSInfoPage() {
         description="Manage GDS PCC codes, OTA clients and functionality profiles"
         action={
           <div className="flex items-center gap-2">
+            {isAdmin && (
             <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Export xlsx
             </button>
+            )}
+            {isAdmin && selectedIds.size > 0 && (
+              <button onClick={openBulk} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Bulk Edit ({selectedIds.size})
+              </button>
+            )}
             {isAdmin && (
               <>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
@@ -463,6 +559,23 @@ export default function GDSInfoPage() {
           <option value="all">All Status</option>
           {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        {isAdmin && !loading && filtered.length > 0 && (
+          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-slate-200 rounded-lg bg-white hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected }}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded accent-blue-500"
+            />
+            <span className="text-xs text-slate-600 font-medium">Select all</span>
+          </label>
+        )}
+        {isAdmin && selectedIds.size > 0 && (
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-400 hover:text-slate-600 underline">
+            Clear ({selectedIds.size} selected)
+          </button>
+        )}
         {!loading && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
@@ -509,6 +622,13 @@ export default function GDSInfoPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
             <select value={form.status ?? 'Active'} onChange={e => setForm(f => ({ ...f, status: e.target.value as PCCStatus }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC Functionality</label>
+            <select value={(form as Partial<PCCList>).pcc_functionality ?? ''} onChange={e => setForm(f => ({ ...f, pcc_functionality: e.target.value || null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">— None —</option>
+              {PCC_FUNCTIONALITY.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <div>
@@ -591,10 +711,7 @@ export default function GDSInfoPage() {
                     ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full mt-0.5 inline-block">{popupOta.company_name}</span>
                     : <p className="text-sm text-slate-300 mt-0.5">—</p>}
                 </div>
-                <div>
-                  <p className="text-xs text-slate-400">GDS Feature Profile</p>
-                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupFunc?.name ?? <span className="text-slate-300">Not assigned</span>}</p>
-                </div>
+
               </div>
             </div>
 
@@ -614,7 +731,8 @@ export default function GDSInfoPage() {
                 <p className="text-sm text-slate-400 italic text-center py-4">
                   No features defined for {popupGds?.name ?? 'this GDS'} yet. Add them in GDS Functionality.
                 </p>
-              ) : (
+              ) : isAdmin ? (
+                // Admin/Manager: show all features with toggle buttons
                 <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
                   {availableFeatures.map((f, i) => {
                     const enabled = profileFeatureIds.has(f.id)
@@ -627,24 +745,53 @@ export default function GDSInfoPage() {
                           </span>
                           <div>
                             <p className={`text-sm ${enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{f.label}</p>
-                            {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
+                              {f.billing_cycle && costStr && <span className="text-xs text-slate-300">·</span>}
+                              {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
+                            </div>
                           </div>
                         </div>
-                        {isAdmin && (
-                          <button
-                            onClick={() => toggleProfileFeature(f.id)}
-                            disabled={featureToggling}
-                            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                              enabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                            }`}
-                          >
-                            {enabled ? '− Remove' : '+ Add'}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => toggleProfileFeature(f.id)}
+                          disabled={featureToggling}
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                            enabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {enabled ? '− Remove' : '+ Add'}
+                        </button>
                       </div>
                     )
                   })}
                 </div>
+              ) : (
+                // Viewer: show only enabled features as clean list
+                (() => {
+                  const enabledFeatures = availableFeatures.filter(f => profileFeatureIds.has(f.id))
+                  return enabledFeatures.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic text-center py-4">No features assigned to this PCC.</p>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      {enabledFeatures.map((f, i) => {
+                        const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
+                        return (
+                          <div key={f.id} className={`flex items-center gap-3 px-4 py-3 ${i < enabledFeatures.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex-shrink-0">✓</span>
+                            <div>
+                              <p className="text-sm text-slate-800 font-medium">{f.label}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
+                                {f.billing_cycle && <span className="text-xs text-slate-300">·</span>}
+                                {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()
               )}
             </div>
 
@@ -748,6 +895,110 @@ export default function GDSInfoPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── Bulk Edit Modal ── */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`Bulk Edit GDS Features — ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''} selected`} size="md">
+        <div className="space-y-4">
+          {bulkResult ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-emerald-700 font-medium">✅ {bulkResult}</p>
+            </div>
+          ) : (
+            <>
+              {/* Mode toggle */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Action</label>
+                <div className="flex gap-2">
+                  {(['add', 'remove'] as const).map(m => (
+                    <button key={m} onClick={() => setBulkMode(m)}
+                      className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors border ${
+                        bulkMode === m
+                          ? m === 'add' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-red-500 text-white border-red-500'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}>
+                      {m === 'add' ? '+ Add features to all selected' : '− Remove features from all selected'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected PCCs summary */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+                <p className="text-xs font-medium text-slate-500 mb-2">Applying to {selectedIds.size} PCC{selectedIds.size !== 1 ? 's' : ''}:</p>
+                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                  {filtered.filter(r => selectedIds.has(r.id)).map(r => (
+                    <span key={r.id} className="font-mono text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{r.pcc}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Feature selection — grouped by GDS */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Select features to {bulkMode} <span className="text-slate-400 font-normal">(click to toggle)</span>
+                </label>
+                {(() => {
+                  // Get unique GDS IDs from selected PCCs
+                  const selectedPCCs = filtered.filter(r => selectedIds.has(r.id))
+                  const gdsIds = [...new Set(selectedPCCs.map(r => r.gds_id))]
+                  const relevantFeatures = allFeatures.filter(f => gdsIds.includes(f.gds_id ?? 0))
+
+                  if (relevantFeatures.length === 0) return (
+                    <p className="text-sm text-slate-400 italic py-4 text-center">No features available for the selected PCCs' GDS platforms.</p>
+                  )
+
+                  const grouped = gdsList
+                    .filter(g => gdsIds.includes(g.id))
+                    .map(g => ({ gds: g, features: relevantFeatures.filter(f => f.gds_id === g.id) }))
+                    .filter(g => g.features.length > 0)
+
+                  return (
+                    <div className="space-y-3 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                      {grouped.map(({ gds, features }) => (
+                        <div key={gds.id}>
+                          <p className={`text-xs font-semibold mb-1.5 px-2 py-1 rounded-full inline-block border ${GDS_COLORS[gds.name] ?? 'bg-slate-100 text-slate-600'}`}>{gds.name}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {features.map(f => {
+                              const selected = bulkFeatureIds.has(f.id)
+                              return (
+                                <button key={f.id}
+                                  onClick={() => setBulkFeatureIds(prev => { const s = new Set(prev); s.has(f.id) ? s.delete(f.id) : s.add(f.id); return s })}
+                                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                                    selected ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                  }`}>
+                                  {f.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {bulkFeatureIds.size > 0 && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-xs text-indigo-700">
+                  {bulkMode === 'add' ? 'Will add' : 'Will remove'} <strong>{bulkFeatureIds.size} feature{bulkFeatureIds.size !== 1 ? 's' : ''}</strong> on <strong>{selectedIds.size} PCC{selectedIds.size !== 1 ? 's' : ''}</strong> ({selectedIds.size * bulkFeatureIds.size} total operations)
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setBulkOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+              {bulkResult ? 'Close' : 'Cancel'}
+            </button>
+            {!bulkResult && (
+              <button onClick={handleBulkApply} disabled={bulkSaving || bulkFeatureIds.size === 0}
+                className={`flex-1 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-50 transition-colors ${bulkMode === 'add' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'}`}>
+                {bulkSaving ? 'Applying…' : `${bulkMode === 'add' ? 'Add' : 'Remove'} to ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''}`}
+              </button>
+            )}
+          </div>
+        </div>
       </Modal>
 
       {/* ── Import Modal ── */}

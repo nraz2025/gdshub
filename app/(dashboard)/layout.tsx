@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import IdleLogout from '@/components/shared/IdleLogout'
+import PublicTopBar from '@/components/layout/PublicTopBar'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -10,8 +10,20 @@ export const revalidate = 0
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
+  // If not logged in — show public minimal layout (no sidebar)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <PublicTopBar />
+        <main className="max-w-screen-2xl mx-auto px-6 py-6">
+          {children}
+        </main>
+      </div>
+    )
+  }
+
+  // Logged in — full layout with sidebar
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -21,13 +33,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const role = (profile?.role as string) ?? 'user'
   const isAdmin = role === 'admin'
 
-  // Fetch permissions from DB for this role
   const { data: perms } = await supabase
     .from('role_permissions')
     .select('module, can_access, can_edit')
     .eq('role', role)
 
-  // Build a map: module -> { can_access, can_edit }
   const permMap: Record<string, { can_access: boolean; can_edit: boolean }> = {}
   for (const p of perms ?? []) {
     permMap[p.module] = { can_access: p.can_access, can_edit: p.can_edit }

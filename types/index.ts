@@ -43,6 +43,7 @@ export interface PCCList {
   org_id: number | null
   ota_client_id: number | null
   functionality_id: number | null
+  pcc_functionality: string | null
   remarks: string | null
   created_at: string
   updated_at: string
