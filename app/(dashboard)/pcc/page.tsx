@@ -438,6 +438,16 @@ export default function GDSInfoPage() {
       key: 'pcc', label: 'PCC', width: '110px',
       render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.pcc}</span>
     },
+    // 5. PCC Functionality
+    {
+      key: 'pcc_functionality', label: 'PCC Functionality', width: '160px',
+      render: (row: PCCList) => {
+        const val = row.pcc_functionality
+        return val
+          ? <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${PCC_FUNC_COLORS[val] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{val}</span>
+          : <span className="text-slate-300 text-xs">—</span>
+      }
+    },
     // 4. PCC Assigned — badge + view logins link
     {
       key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
@@ -463,16 +473,6 @@ export default function GDSInfoPage() {
         const g = row.client_group as {id:number;name:string} | null
         return g
           ? <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 whitespace-nowrap">{g.name}</span>
-          : <span className="text-slate-300 text-xs">—</span>
-      }
-    },
-    // 5. PCC Functionality
-    {
-      key: 'pcc_functionality', label: 'PCC Functionality', width: '160px',
-      render: (row: PCCList) => {
-        const val = row.pcc_functionality
-        return val
-          ? <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${PCC_FUNC_COLORS[val] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{val}</span>
           : <span className="text-slate-300 text-xs">—</span>
       }
     },
