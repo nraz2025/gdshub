@@ -450,12 +450,12 @@ export default function GDSInfoPage() {
     },
     // 4. PCC Assigned — badge + view logins link
     {
-      key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
+      key: 'ota_client_id', label: 'PCC Assigned', width: '280px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
         return ota ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full w-40 text-center truncate block" title={ota.company_name}>{ota.company_name}</span>
+            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full whitespace-nowrap">{ota.company_name}</span>
             <button
               onClick={() => openLoginPopup(row)}
               className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors whitespace-nowrap flex-shrink-0"
