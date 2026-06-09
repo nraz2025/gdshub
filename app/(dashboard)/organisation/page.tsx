@@ -48,7 +48,7 @@ export default function OrganisationPage() {
     }
     const [{ data: orgData }, { data: pccData }] = await Promise.all([
       supabase.from('organisation').select('*').order('organisation'),
-      supabase.from('pcc_list').select('*, gds:gds_id(id, name), organisation:org_id(id, organisation, iata)').order('pcc'),
+      supabase.from('pcc_list').select('id, pcc, status, org_id, gds:gds_id(id, name)').order('pcc'),
     ])
     setRecords(orgData ?? [])
     setPccList(pccData ?? [])
