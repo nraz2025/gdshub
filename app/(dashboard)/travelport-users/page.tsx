@@ -10,7 +10,7 @@ import { getAuditFields } from '@/lib/audit'
 import type { TravelportUser, User, OTAClient } from '@/types'
 import { syncUserToTable } from '@/lib/syncUser'
 
-const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '',
+const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active',
 }
 
 interface ImportRow {
@@ -27,6 +27,7 @@ export default function TravelportUsersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -62,7 +63,7 @@ export default function TravelportUsersPage() {
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
   function openEdit(row: TravelportUser) {
     setEditing(row)
-    setForm({ sign_on_id: row.sign_on_id ?? '', cid: row.cid ?? '', gtid: row.gtid ?? '', pcc: row.pcc ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '' })
+    setForm({ sign_on_id: row.sign_on_id ?? '', cid: row.cid ?? '', gtid: row.gtid ?? '', pcc: row.pcc ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active' })
     setError(''); setSaving(false); setModalOpen(true)
   }
   function openDelete(row: TravelportUser) { setEditing(row); setDeleteOpen(true) }
@@ -94,7 +95,7 @@ export default function TravelportUsersPage() {
       if (synced) { resolvedUserId = synced }
     }
 
-    const payload = { sign_on_id: form.sign_on_id.trim().toUpperCase() || null, cid: form.cid.trim().toUpperCase() || null, gtid: form.gtid.trim().toUpperCase() || null, pcc: form.pcc.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null }
+    const payload = { sign_on_id: form.sign_on_id.trim().toUpperCase() || null, cid: form.cid.trim().toUpperCase() || null, gtid: form.gtid.trim().toUpperCase() || null, pcc: form.pcc.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active' }
     const { error: err } = editing
       ? await supabase.from('travelport_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('travelport_user').insert({ ...payload, ...audit })
@@ -106,7 +107,30 @@ export default function TravelportUsersPage() {
   async function handleDelete() {
     if (!editing) return
     setSaving(true)
+    // Archive to resigned_user before deleting
+    const u = (editing as TravelportUser & { users?: { id?: string; first_name?: string; last_name?: string; email_address?: string } }).users
+    const ota = (editing as TravelportUser & { ota_client?: { company_name?: string } }).ota_client
+    await supabase.from('resigned_user').insert({
+      source_gds:            'Travelport',
+      source_record_id:      editing.id,
+      full_name:             u ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : null,
+      initial:               (editing as TravelportUser & { initial?: string }).initial ?? null,
+      email:                 u?.email_address ?? null,
+      travelport_sign_on_id: editing.sign_on_id ?? null,
+      travelport_cid:        editing.cid ?? null,
+      travelport_gtid:       editing.gtid ?? null,
+      travelport_pcc:        editing.pcc ?? null,
+      pcc:                   editing.pcc ?? null,
+      ota_client:            ota?.company_name ?? null,
+      date_created_in_gds:   new Date(editing.created_at).toISOString().slice(0, 10),
+      date_resigned:         new Date().toISOString().slice(0, 10),
+    })
+    // Delete the GDS user record
     await supabase.from('travelport_user').delete().eq('id', editing.id)
+    // Also delete from users table if linked
+    if (u?.email_address) {
+      await supabase.from('users').delete().eq('email_address', u.email_address)
+    }
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
@@ -179,7 +203,8 @@ export default function TravelportUsersPage() {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
     const term = search.toLowerCase()
-    return (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term)
+    const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active') === filterStatus
+    return ((r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term) || (r.initial ?? '').toLowerCase().includes(term)) && matchStatus
   })
 
   const validRows = importRows.filter(r => r._errors.length === 0)
@@ -191,6 +216,11 @@ export default function TravelportUsersPage() {
     { key: 'gtid', label: 'GTID', render: (row: TravelportUser) => <span className="font-mono text-xs text-slate-600">{row.gtid ?? '—'}</span> },
     { key: 'pcc', label: 'PCC', render: (row: TravelportUser) => <span className="font-mono text-xs text-slate-600">{row.pcc ?? '—'}</span> },
     { key: 'ota', label: 'OTA', render: (row: TravelportUser) => <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${row.ota ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.ota ? 'Yes' : 'No'}</span> },
+    { key: 'status', label: 'Status', render: (row: TravelportUser) => {
+      const s = ((row as {status?: string}).status ?? 'active').toLowerCase()
+      const map: Record<string, string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', inactive:'bg-slate-100 text-slate-500 border-slate-200', suspended:'bg-amber-50 text-amber-700 border-amber-200', resigned:'bg-red-50 text-red-600 border-red-200' }
+      return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${map[s] ?? map.active}`}>{s}</span>
+    }},
     { key: 'ota_client_id', label: 'OTA Client', render: (row: TravelportUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
     { key: 'user_id', label: 'Linked User', render: (row: TravelportUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">—</span> } },
     {
@@ -225,7 +255,14 @@ export default function TravelportUsersPage() {
         </div>}
       />
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search Sign-On, CID, PCC or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
+        <input type="text" placeholder="Search Sign-On, CID, PCC, initial or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
+          <option value="resigned">Resigned</option>
+        </select>
         {!loading && <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}</span>}
       </div>
       {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
@@ -251,6 +288,13 @@ export default function TravelportUsersPage() {
             <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">— None —</option>
               {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+              <option value="resigned">Resigned</option>
             </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">

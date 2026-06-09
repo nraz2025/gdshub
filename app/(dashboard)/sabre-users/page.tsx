@@ -10,11 +10,13 @@ import { getAuditFields } from '@/lib/audit'
 import type { SabreUser, User, OTAClient } from '@/types'
 import { syncUserToTable } from '@/lib/syncUser'
 
-type SabreStatus = 'Active' | 'Vacant'
-const STATUSES: SabreStatus[] = ['Active', 'Vacant']
+type SabreStatus = 'Active' | 'Inactive' | 'Suspended' | 'Resigned'
+const STATUSES: SabreStatus[] = ['Active', 'Inactive', 'Suspended', 'Resigned']
 const STATUS_COLORS: Record<string, string> = {
-  Active: 'bg-blue-50 text-blue-600 border-blue-200',
-  Vacant: 'bg-slate-100 text-slate-500 border-slate-200',
+  Active:    'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Inactive:  'bg-slate-100 text-slate-500 border-slate-200',
+  Suspended: 'bg-amber-50 text-amber-700 border-amber-200',
+  Resigned:  'bg-red-50 text-red-600 border-red-200',
 }
 
 const EMPTY = {
@@ -146,7 +148,28 @@ export default function SabreUsersPage() {
   async function handleDelete() {
     if (!editing) return
     setSaving(true)
+    // Archive to resigned_user before deleting
+    const u = (editing as SabreUser & { users?: { id?: string; first_name?: string; last_name?: string; email_address?: string } }).users
+    const ota = (editing as SabreUser & { ota_client?: { company_name?: string } }).ota_client
+    await supabase.from('resigned_user').insert({
+      source_gds:         'Sabre',
+      source_record_id:   editing.id,
+      full_name:          u ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : null,
+      initial:            (editing as SabreUser & { initial?: string }).initial ?? null,
+      email:              u?.email_address ?? null,
+      sabre_epr:          editing.epr ?? null,
+      sabre_pcc:          editing.pcc ?? null,
+      pcc:                editing.pcc ?? null,
+      ota_client:         ota?.company_name ?? null,
+      date_created_in_gds: new Date(editing.created_at).toISOString().slice(0, 10),
+      date_resigned:      new Date().toISOString().slice(0, 10),
+    })
+    // Delete the GDS user record
     await supabase.from('sabre_user').delete().eq('id', editing.id)
+    // Also delete from users table if linked
+    if (u?.email_address) {
+      await supabase.from('users').delete().eq('email_address', u.email_address)
+    }
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
@@ -208,7 +231,7 @@ export default function SabreUsersPage() {
         const minicom = getF(r, 'Minicom', 'minicom')
         const errors: string[] = []
         if (!epr) errors.push('EPR is required')
-        if (status && !STATUSES.includes(status as SabreStatus)) errors.push('Status must be Active or Vacant')
+        if (status && !STATUSES.includes(status as SabreStatus)) errors.push('Status must be Active, Inactive, Suspended or Resigned')
         return { epr, initial, status: status || 'Active', pcc, cta, pta, minicom, _row: i + 2, _errors: errors }
       })
       setImportRows(parsed); setImportOpen(true)
@@ -243,6 +266,7 @@ export default function SabreUsersPage() {
       || (r.pcc ?? '').toLowerCase().includes(term)
       || name.includes(term)
       || (ota?.company_name ?? '').toLowerCase().includes(term)
+      || (r.initial ?? '').toLowerCase().includes(term)
     const matchStatus = filterStatus === 'all' || r.status === filterStatus
     return matchSearch && matchStatus
   })
@@ -323,7 +347,7 @@ export default function SabreUsersPage() {
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search EPR, PCC, OTA or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
+        <input type="text" placeholder="Search EPR, PCC, OTA, initial or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
           <option value="all">All Status</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

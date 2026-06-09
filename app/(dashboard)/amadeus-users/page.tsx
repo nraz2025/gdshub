@@ -10,12 +10,44 @@ import { getAuditFields } from '@/lib/audit'
 import type { AmadeusUser, User, OTAClient } from '@/types'
 import { syncUserToTable } from '@/lib/syncUser'
 
-const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '',
+const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active',
 }
 
 interface ImportRow {
   login: string; sign_on_id: string; initial: string; duty_code: string; oid: string; ota: boolean
   _row: number; _errors: string[]
+}
+
+
+// Sign-On ID prefix lookup helper
+function SignOnLookup({ prefix, records }: { prefix: string; records: AmadeusUser[] }) {
+  if (!prefix) return (
+    <p className="text-xs text-slate-400 mt-1">Type a number prefix to check existing IDs (e.g. 30, 40...)</p>
+  )
+  const matches = records
+    .map(r => r.sign_on_id ?? '')
+    .filter(Boolean)
+    .filter(s => s.replace(/[^0-9]/g, '').startsWith(prefix))
+    .sort((a, b) => parseInt(b.replace(/\D/g, ''), 10) - parseInt(a.replace(/\D/g, ''), 10))
+  if (matches.length === 0) return (
+    <p className="text-xs text-emerald-600 mt-1 font-medium">No existing IDs starting with {prefix}</p>
+  )
+  return (
+    <div style={{marginTop:'6px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'7px',padding:'8px 10px'}}>
+      <p style={{fontSize:'11px',fontWeight:600,color:'#475569',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.04em'}}>
+        Existing IDs starting with {prefix} - last used first
+      </p>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'4px',maxHeight:'80px',overflowY:'auto'}}>
+        {matches.map((s, i) => (
+          <span key={i} style={{fontFamily:'monospace',fontSize:'12px',fontWeight:600,padding:'2px 7px',borderRadius:'5px',
+            background: i === 0 ? '#fef9c3' : '#f1f5f9',
+            color: i === 0 ? '#854d0e' : '#475569',
+            border: i === 0 ? '1px solid #fef08a' : '1px solid #e2e8f0',
+          }}>{s}{i === 0 ? ' (last)' : ''}</span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function AmadeusUsersPage() {
@@ -27,6 +59,7 @@ export default function AmadeusUsersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -62,7 +95,7 @@ export default function AmadeusUsersPage() {
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
   function openEdit(row: AmadeusUser) {
     setEditing(row)
-    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '' })
+    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active' })
     setError(''); setSaving(false); setModalOpen(true)
   }
   function openDelete(row: AmadeusUser) { setEditing(row); setDeleteOpen(true) }
@@ -83,7 +116,7 @@ export default function AmadeusUsersPage() {
     }
     const audit = await getAuditFields()
 
-    // Resolve user_id — use selected user or auto-create from email
+    // Resolve user_id - use selected user or auto-create from email
     let resolvedUserId = form.user_id || null
     if ((form as {newEmail?: string}).newEmail?.trim()) {
       const synced = await syncUserToTable({
@@ -94,7 +127,7 @@ export default function AmadeusUsersPage() {
       if (synced) { resolvedUserId = synced }
     }
 
-    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null }
+    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active' }
     const { error: err } = editing
       ? await supabase.from('amadeus_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('amadeus_user').insert({ ...payload, ...audit })
@@ -106,6 +139,18 @@ export default function AmadeusUsersPage() {
   async function handleDelete() {
     if (!editing) return
     setSaving(true)
+    const u = (editing as AmadeusUser & { users?: { id?: string; first_name?: string; last_name?: string; email_address?: string } }).users
+    const ota = (editing as AmadeusUser & { ota_client?: { company_name?: string } }).ota_client
+    await supabase.from('resigned_user').insert({
+      source_gds: 'Amadeus', source_record_id: editing.id,
+      full_name: u ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : null,
+      initial: editing.initial ?? null, email: u?.email_address ?? null,
+      amadeus_login: editing.login ?? null, amadeus_sign_on_id: editing.sign_on_id ?? null,
+      amadeus_duty_code: editing.duty_code ?? null, amadeus_oid: editing.oid ?? null,
+      ota_client: ota?.company_name ?? null,
+      date_created_in_gds: new Date(editing.created_at).toISOString().slice(0, 10),
+      date_resigned: new Date().toISOString().slice(0, 10),
+    })
     await supabase.from('amadeus_user').delete().eq('id', editing.id)
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
@@ -168,7 +213,7 @@ export default function AmadeusUsersPage() {
     let success = 0; let failed = 0; const failedRows: string[] = []
     for (const row of valid) {
       const { error } = await supabase.from('amadeus_user').insert({ login: row.login, sign_on_id: row.sign_on_id || null, initial: row.initial || null, duty_code: row.duty_code || null, oid: row.oid || null, ota: row.ota })
-      if (error) { failed++; failedRows.push(`${row.login} — ${error.message}`) } else { success++ }
+      if (error) { failed++; failedRows.push(`${row.login} - ${error.message}`) } else { success++ }
     }
     setImporting(false); setImportResult({ success, failed, failedRows })
     if (success > 0) fetchAll()
@@ -180,7 +225,8 @@ export default function AmadeusUsersPage() {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
     const term = search.toLowerCase()
-    return r.login.toLowerCase().includes(term) || (r.oid ?? '').toLowerCase().includes(term) || name.includes(term) || (r.sign_on_id ?? '').toLowerCase().includes(term)
+    const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active') === filterStatus
+    return (r.login.toLowerCase().includes(term) || (r.oid ?? '').toLowerCase().includes(term) || name.includes(term) || (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.initial ?? '').toLowerCase().includes(term)) && matchStatus
   })
 
   const validRows = importRows.filter(r => r._errors.length === 0)
@@ -188,18 +234,23 @@ export default function AmadeusUsersPage() {
 
   const columns = [
     { key: 'login', label: 'Login', render: (row: AmadeusUser) => <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.login}</span> },
-    { key: 'sign_on_id', label: 'Sign-On ID', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.sign_on_id ?? '—'}</span> },
-    { key: 'initial', label: 'Initial', render: (row: AmadeusUser) => <span className="text-slate-600">{row.initial ?? '—'}</span> },
-    { key: 'duty_code', label: 'Duty Code', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.duty_code ?? '—'}</span> },
-    { key: 'oid', label: 'OID', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.oid ?? '—'}</span> },
+    { key: 'sign_on_id', label: 'Sign-On ID', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.sign_on_id ?? '-'}</span> },
+    { key: 'initial', label: 'Initial', render: (row: AmadeusUser) => <span className="text-slate-600">{row.initial ?? '-'}</span> },
+    { key: 'duty_code', label: 'Duty Code', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.duty_code ?? '-'}</span> },
+    { key: 'oid', label: 'OID', render: (row: AmadeusUser) => <span className="font-mono text-xs text-slate-600">{row.oid ?? '-'}</span> },
     { key: 'ota', label: 'OTA', render: (row: AmadeusUser) => <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${row.ota ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.ota ? 'Yes' : 'No'}</span> },
-    { key: 'ota_client_id', label: 'OTA Client', render: (row: AmadeusUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
-    { key: 'user_id', label: 'Linked User', render: (row: AmadeusUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">—</span> } },
+    { key: 'ota_client_id', label: 'OTA Client', render: (row: AmadeusUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">-</span> } },
+    { key: 'status', label: 'Status', render: (row: AmadeusUser) => {
+      const s = ((row as {status?: string}).status ?? 'active').toLowerCase()
+      const map: Record<string, string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', inactive:'bg-slate-100 text-slate-500 border-slate-200', suspended:'bg-amber-50 text-amber-700 border-amber-200', resigned:'bg-red-50 text-red-600 border-red-200' }
+      return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${map[s] ?? map.active}`}>{s}</span>
+    }},
+    { key: 'user_id', label: 'Linked User', render: (row: AmadeusUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">-</span> } },
     {
       key: 'modified_at', label: 'Last Modified',
       render: (row: AmadeusUser) => {
         const r = row as AmadeusUser & {modified_at?: string; modified_by?: string}
-        if (!r.modified_at) return <span className="text-slate-300 text-xs">—</span>
+        if (!r.modified_at) return <span className="text-slate-300 text-xs">-</span>
         return (
           <div>
             <p className="text-xs text-slate-600">{new Date(r.modified_at).toLocaleDateString('en-MY')}</p>
@@ -227,10 +278,17 @@ export default function AmadeusUsersPage() {
         </div>}
       />
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search login, OID or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
+        <input type="text" placeholder="Search login, OID, initial or name..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
+          <option value="resigned">Resigned</option>
+        </select>
         {!loading && <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}</span>}
       </div>
-      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading...</div> : (
         <DataTable columns={columns} data={filtered as unknown as Record<string, unknown>[]} onEdit={isAdmin ? r => openEdit(r as unknown as AmadeusUser) : undefined} onDelete={isAdmin ? r => openDelete(r as unknown as AmadeusUser) : undefined} isAdmin={isAdmin} emptyMessage="No Amadeus users found." />
       )}
 
@@ -241,7 +299,8 @@ export default function AmadeusUsersPage() {
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Login <span className="text-red-500">*</span></label>
               <input type="text" value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} placeholder="e.g. JOHNSMITH" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
-              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. JS" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. 4042GY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+              <SignOnLookup prefix={form.sign_on_id.replace(/[^0-9]/g, '').slice(0, 4)} records={records} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
@@ -251,21 +310,28 @@ export default function AmadeusUsersPage() {
           </div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
             <input type="text" value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY255W" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+              <option value="resigned">Resigned</option>
+            </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
             <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
             </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}</select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA
           {/* Create & link new user inline */}
           {!form.user_id && (
             <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet - fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                 <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
@@ -286,7 +352,7 @@ export default function AmadeusUsersPage() {
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add User'}</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}</button>
           </div>
         </div>
       </Modal>
@@ -297,7 +363,7 @@ export default function AmadeusUsersPage() {
           <p className="text-sm text-slate-600">Delete Amadeus user <strong>{editing?.login}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
             <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting…' : 'Delete'}</button>
+            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting...' : 'Delete'}</button>
           </div>
         </div>
       </Modal>
@@ -307,8 +373,8 @@ export default function AmadeusUsersPage() {
         <div className="space-y-4">
           {importResult ? (
             <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-              {importResult.failed === 0 ? <p className="font-medium">✅ Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p> : (
-                <div className="space-y-1"><p className="font-medium">✅ {importResult.success} imported · ⚠️ {importResult.failed} skipped</p>
+              {importResult.failed === 0 ? <p className="font-medium"> Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p> : (
+                <div className="space-y-1"><p className="font-medium"> {importResult.success} imported .  {importResult.failed} skipped</p>
                   {importResult.failedRows.map((r, i) => <p key={i} className="text-xs opacity-70 font-mono">{r}</p>)}</div>
               )}
             </div>
@@ -316,11 +382,11 @@ export default function AmadeusUsersPage() {
             <>
               <div className="flex items-center justify-between">
                 <div><p className="text-sm text-slate-600">File: <span className="font-medium">{importFileName}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows — <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p></div>
+                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows - <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p></div>
                 <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500">
-                Required: <span className="font-mono font-medium text-slate-700">Login</span> · Optional: <span className="font-mono font-medium text-slate-700">Sign-On ID</span>, <span className="font-mono font-medium text-slate-700">Initial</span>, <span className="font-mono font-medium text-slate-700">Duty Code</span>, <span className="font-mono font-medium text-slate-700">OID</span>, <span className="font-mono font-medium text-slate-700">OTA</span>
+                Required: <span className="font-mono font-medium text-slate-700">Login</span> . Optional: <span className="font-mono font-medium text-slate-700">Sign-On ID</span>, <span className="font-mono font-medium text-slate-700">Initial</span>, <span className="font-mono font-medium text-slate-700">Duty Code</span>, <span className="font-mono font-medium text-slate-700">OID</span>, <span className="font-mono font-medium text-slate-700">OTA</span>
               </div>
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
@@ -332,23 +398,23 @@ export default function AmadeusUsersPage() {
                       <tr key={i} className={`border-b border-slate-50 ${row._errors.length > 0 ? 'bg-red-50/60' : ''}`}>
                         <td className="px-3 py-2 text-slate-400">{row._row}</td>
                         <td className="px-3 py-2 font-mono font-bold">{row.login || <span className="text-red-400 italic font-normal">empty</span>}</td>
-                        <td className="px-3 py-2 font-mono">{row.sign_on_id || '—'}</td>
-                        <td className="px-3 py-2">{row.initial || '—'}</td>
-                        <td className="px-3 py-2 font-mono">{row.duty_code || '—'}</td>
-                        <td className="px-3 py-2 font-mono">{row.oid || '—'}</td>
+                        <td className="px-3 py-2 font-mono">{row.sign_on_id || '-'}</td>
+                        <td className="px-3 py-2">{row.initial || '-'}</td>
+                        <td className="px-3 py-2 font-mono">{row.duty_code || '-'}</td>
+                        <td className="px-3 py-2 font-mono">{row.oid || '-'}</td>
                         <td className="px-3 py-2">{row.ota ? 'Yes' : 'No'}</td>
-                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium">✓ OK</span> : <span className="text-red-500">✗ {row._errors[0]}</span>}</td>
+                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium"> OK</span> : <span className="text-red-500"> {row._errors[0]}</span>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {invalidRows.length > 0 && <p className="text-xs text-slate-400">⚠️ {invalidRows.length} row{invalidRows.length !== 1 ? 's' : ''} with errors will be skipped.</p>}
+              {invalidRows.length > 0 && <p className="text-xs text-slate-400"> {invalidRows.length} row{invalidRows.length !== 1 ? 's' : ''} with errors will be skipped.</p>}
             </>
           )}
           <div className="flex gap-3 pt-1">
             <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">{importResult ? 'Close' : 'Cancel'}</button>
-            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing…' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
+            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing...' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
           </div>
         </div>
       </Modal>
