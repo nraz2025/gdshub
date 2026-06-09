@@ -52,6 +52,7 @@ export default function OrganisationPage() {
     ])
     setRecords(orgData ?? [])
     setPccList(pccData ?? [])
+    console.log('[OrgPage] orgs:', orgData?.length, '| pccs:', pccData?.length, '| sample org_id:', pccData?.[0]?.org_id, typeof pccData?.[0]?.org_id)
     setLoading(false)
   }
 
@@ -84,7 +85,7 @@ export default function OrganisationPage() {
 
   // ── VIEW LINKED PCCs ─────────────────────────────────────────
   function openPCCs(row: Organisation) { setSelectedOrg(row); setPccOpen(true) }
-  function linkedPCCs(orgId: number) { return pccList.filter(p => p.org_id === orgId) }
+  function linkedPCCs(orgId: number) { return pccList.filter(p => Number(p.org_id) === Number(orgId)) }
 
   // ── EXPORT ────────────────────────────────────────────────────
   function handleExport() {
@@ -219,6 +220,33 @@ export default function OrganisationPage() {
           </div>
         }
       />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Organisations</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{records.length}</p>
+          <p className="text-xs text-slate-400 mt-1">registered</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Linked PCCs</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{pccList.filter(p => p.org_id != null).length}</p>
+          <p className="text-xs text-slate-400 mt-1">active PCC codes</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avg PCCs / Org</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">
+            {records.length > 0 ? (pccList.filter(p => p.org_id != null).length / records.length).toFixed(1) : '0.0'}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">per organisation</p>
+        </div>
+        <div className="bg-blue-500 rounded-xl p-4 text-white">
+          <p className="text-xs font-medium text-blue-200 uppercase tracking-wide">Efficiency Index</p>
+          <p className="text-3xl font-bold mt-1">
+            {records.length > 0 ? Math.min(100, Math.round((pccList.filter(p => p.org_id != null).length / Math.max(pccList.length, 1)) * 100)).toFixed(1) : '0.0'}%
+          </p>
+          <p className="text-xs text-blue-200 mt-1">PCCs assigned to orgs</p>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <input type="text" placeholder="Search organisation or IATA…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-80 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
