@@ -77,7 +77,7 @@ export default function TravelportUsersPage() {
         .eq('ota_client_id', form.ota_client_id)
         .maybeSingle()
       if (dupCheck && (!editing || dupCheck.id !== editing.id)) {
-        setError("Sign-On ID "" + form.sign_on_id.trim().toUpperCase() + "" already exists for this OTA Client.")
+        setError(`Sign-On ID "${form.sign_on_id.trim().toUpperCase()}" already exists for this OTA Client.`)
         setSaving(false); return
       }
     }

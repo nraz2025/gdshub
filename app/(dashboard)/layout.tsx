@@ -14,9 +14,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // If not logged in — show public minimal layout (no sidebar)
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen" style={{background:'#f7f9fb'}}>
         <PublicTopBar />
-        <main className="max-w-screen-2xl mx-auto px-6 py-6">
+        <main className="px-8 py-6">
           {children}
         </main>
       </div>

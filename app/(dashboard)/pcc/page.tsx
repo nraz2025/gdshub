@@ -83,6 +83,11 @@ export default function GDSInfoPage() {
   const [profileFeatureIds, setProfileFeatureIds] = useState<Set<number>>(new Set())
   const [featureToggling, setFeatureToggling] = useState(false)
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number|"all">(25)
+  const PAGE_SIZE = pageSize
+
   // Bulk edit
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -335,8 +340,16 @@ export default function GDSInfoPage() {
 
   const filteredFuncs = funcList.filter(f => !form.gds_id || f.gds_id === form.gds_id)
 
+  // Pagination
+  const effectiveSize = pageSize === "all" ? filtered.length : pageSize
+  const totalPages = pageSize === "all" ? 1 : Math.ceil(filtered.length / effectiveSize)
+  const paginated = pageSize === "all" ? filtered : filtered.slice((currentPage - 1) * effectiveSize, currentPage * effectiveSize)
+
+  // Reset to page 1 when filters change
+  const resetPage = () => setCurrentPage(1)
+
   // Bulk selection helpers
-  const allFilteredIds = filtered.map(r => r.id)
+  const allFilteredIds = paginated.map(r => r.id)
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id))
   const someSelected = allFilteredIds.some(id => selectedIds.has(id)) && !allSelected
 
@@ -427,83 +440,100 @@ export default function GDSInfoPage() {
     },
     // 2. GDS
     {
-      key: 'gds', label: 'GDS',
+      key: 'gds', label: 'GDS', width: '120px',
       render: (row: PCCList) => {
         const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? '—'
-        return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`}>{name}</span>
+        return <span className={`font-medium rounded-full border text-center ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`} style={{display:'inline-block',width:'100px',fontSize:'12px',padding:'4px 0',textAlign:'center'}}>{name}</span>
       }
     },
     // 3. PCC
     {
-      key: 'pcc', label: 'PCC', width: '110px',
-      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.pcc}</span>
+      key: 'pcc', label: 'PCC', width: '120px',
+      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 rounded" style={{display:'inline-block',width:'100px',textAlign:'center',fontSize:'13px',padding:'4px 0',textTransform:"uppercase",letterSpacing:'0.04em'}}>{row.pcc}</span>
     },
     // 5. PCC Functionality
     {
-      key: 'pcc_functionality', label: 'PCC Functionality', width: '160px',
+      key: 'pcc_functionality', label: 'PCC Functionality', width: '140px',
       render: (row: PCCList) => {
         const val = row.pcc_functionality
+        const colors: Record<string,string> = {
+          'Booking Only':'#0891b2','Booking & Ticketing':'#7c3aed',
+          'Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626'
+        }
         return val
-          ? <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${PCC_FUNC_COLORS[val] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{val}</span>
-          : <span className="text-slate-300 text-xs">—</span>
+          ? <span style={{fontSize:'13px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
+          : <span style={{color:'#cbd5e1'}}>—</span>
       }
     },
     // 4. PCC Assigned — badge + view logins link
     {
-      key: 'ota_client_id', label: 'PCC Assigned', width: '280px',
+      key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
         return ota ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full whitespace-nowrap">{ota.company_name}</span>
-            <button
-              onClick={() => openLoginPopup(row)}
-              className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors whitespace-nowrap flex-shrink-0"
-            >
+          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+            <span style={{fontSize:'13px',fontWeight:500,color:'#334155',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'0.02em'}}>{ota.company_name}</span>
+            <button onClick={() => openLoginPopup(row)}
+              style={{fontSize:'12px',color:'#3b82f6',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0,whiteSpace:'nowrap'}}>
               View IDs
             </button>
           </div>
-        ) : <span className="text-slate-300 text-xs">—</span>
+        ) : <span style={{color:'#cbd5e1'}}>—</span>
       }
     },
     // 4b. Client Group
     {
-      key: 'client_group', label: 'Client Group', width: '130px',
+      key: 'client_group', label: 'Client Group', width: '120px',
       render: (row: PCCList) => {
         const g = row.client_group as {id:number;name:string} | null
         return g
-          ? <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 whitespace-nowrap">{g.name}</span>
-          : <span className="text-slate-300 text-xs">—</span>
+          ? <span style={{fontSize:'13px',fontWeight:500,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.03em'}}>{g.name}</span>
+          : <span style={{color:'#cbd5e1'}}>—</span>
       }
     },
     // 6. GDS Feature — clickable badge that opens popup
     {
-      key: 'functionality_id', label: 'GDS Feature', width: '130px',
+      key: 'functionality_id', label: 'GDS Feature', width: '120px',
       render: (row: PCCList) => {
         const func = row.gds_functionality as GDSFunctionality
         const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
         return (
-          <button
-            onClick={() => openFeaturePopup(row)}
-            className="group flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors"
-          >
-            {func ? <span>{func.name}</span> : <span className="text-slate-400">No profile</span>}
-            <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold leading-none ${directCount > 0 ? 'bg-blue-200 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>{directCount}</span>
+          <button onClick={() => openFeaturePopup(row)}
+            style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
+            <span style={{fontSize:'13px',color: directCount > 0 ? '#334155' : '#94a3b8',fontWeight: directCount > 0 ? 500 : 400,textTransform:'uppercase',letterSpacing:'0.02em'}}>
+              {func ? func.name : 'No profile'}
+            </span>
+            <span style={{fontSize:'11px',fontWeight:600,color: directCount > 0 ? '#2563eb' : '#94a3b8',
+              background: directCount > 0 ? '#dbeafe' : '#f1f5f9',
+              borderRadius:'20px',padding:'1px 7px'}}>
+              {directCount}
+            </span>
           </button>
         )
       }
     },
     // 7. Status
     {
-      key: 'status', label: 'Status', width: '90px',
+      key: 'status', label: 'Status', width: '100px',
       render: (row: PCCList) => {
         const s = row.status ?? 'Active'
-        return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{s}</span>
+        const dotColor: Record<string,string> = {
+          Active:'#10b981', Vacant:'#94a3b8', Pending:'#f59e0b'
+        }
+        const txtColor: Record<string,string> = {
+          Active:'#059669', Vacant:'#64748b', Pending:'#d97706'
+        }
+        return (
+          <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,color:txtColor[s]??'#334155',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+            <span style={{width:'7px',height:'7px',borderRadius:'50%',background:dotColor[s]??'#94a3b8',flexShrink:0,display:'inline-block'}}/>
+            {s}
+          </span>
+        )
       }
     },
     // 8. Remarks
     {
-      key: 'remarks', label: 'Remarks', width: '150px',
+      key: 'remarks', label: 'Remarks', width: '120px',
       render: (row: PCCList) => {
         if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
@@ -520,139 +550,214 @@ export default function GDSInfoPage() {
 
   return (
     <div>
-      <PageHeader
-        title="GDS Info"
-        description="Manage GDS PCC codes, OTA clients and functionality profiles"
-        action={
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-            <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export xlsx
+      {/* Page Header */}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h1 style={{fontSize:"28px",fontWeight:700,color:"#0f172a",lineHeight:"1.2"}}>GDS Info</h1>
+          <p style={{fontSize:"14px",color:"#64748b",marginTop:"4px"}}>Manage GDS, PCC, OTA clients and PCC functionality</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+          <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export xlsx
+          </button>
+          )}
+          {isAdmin && selectedIds.size > 0 && (
+            <button onClick={openBulk} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              Bulk Edit ({selectedIds.size})
             </button>
-            )}
-            {isAdmin && selectedIds.size > 0 && (
-              <button onClick={openBulk} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Bulk Edit ({selectedIds.size})
+          )}
+          {isAdmin && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
+              <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import xlsx
               </button>
-            )}
-            {isAdmin && (
-              <>
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Import xlsx
-                </button>
-                <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add GDS Info
-                </button>
-              </>
-            )}
-          </div>
-        }
-      />
+              <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                + Add GDS Info
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:"10px",padding:"14px 16px",marginBottom:"16px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr auto",alignItems:"flex-end",gap:"10px",width:"100%"}}>
 
-        {/* Organisation — text + dropdown combo */}
-        <div className="relative">
-          <input type="text" list="org-list" value={filterOrg} onChange={e => setFilterOrg(e.target.value)}
-            placeholder="Organisation…"
-            className="w-40 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
-          <datalist id="org-list">
-            {orgList.map(o => <option key={o.id} value={o.organisation} />)}
-          </datalist>
-          {filterOrg && <button onClick={() => setFilterOrg('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
+          {/* Organisation */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Organisation</label>
+            <div style={{position:"relative"}}>
+              <input type="text" list="org-list" value={filterOrg} onChange={e => { setFilterOrg(e.target.value); resetPage() }}
+                placeholder="Search org..."
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+              <datalist id="org-list">{orgList.map(o => <option key={o.id} value={o.organisation} />)}</datalist>
+            </div>
+          </div>
+
+          {/* PCC */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC</label>
+            <div style={{position:"relative"}}>
+              <input type="text" list="pcc-list" value={filterPCC} onChange={e => { setFilterPCC(e.target.value); resetPage() }}
+                placeholder="Code..."
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+              <datalist id="pcc-list">{[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc} />)}</datalist>
+            </div>
+          </div>
+
+          {/* PCC Assigned */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC Assigned</label>
+            <div style={{position:"relative"}}>
+              <input type="text" list="ota-list" value={filterOTA} onChange={e => { setFilterOTA(e.target.value); resetPage() }}
+                placeholder="Assigned..."
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+              <datalist id="ota-list">{otaClients.map(o => <option key={o.id} value={o.company_name} />)}</datalist>
+            </div>
+          </div>
+
+          {/* Client Group */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Client Group</label>
+            <div style={{position:"relative"}}>
+              <input type="text" list="group-list" value={filterGroup} onChange={e => { setFilterGroup(e.target.value); resetPage() }}
+                placeholder="Group..."
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+              <datalist id="group-list">{clientGroups.map(g => <option key={g.id} value={g.name} />)}</datalist>
+            </div>
+          </div>
+
+          {/* GDS */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>GDS</label>
+            <select value={filterGDS} onChange={e => { setFilterGDS(e.target.value); resetPage() }}
+              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              <option value="all">All GDS</option>
+              {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+            </select>
+          </div>
+
+          {/* Status */}
+          <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Status</label>
+            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); resetPage() }}
+              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              <option value="all">All Status</option>
+              {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Reset button only */}
+          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:"1px"}}>
+            <button
+              onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup(''); resetPage() }}
+              title="Reset filters"
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"34px",height:"34px",background:"white",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:"7px",cursor:"pointer",flexShrink:0}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+
         </div>
+      </div>
 
-        {/* PCC — text + dropdown combo */}
-        <div className="relative">
-          <input type="text" list="pcc-list" value={filterPCC} onChange={e => setFilterPCC(e.target.value)}
-            placeholder="PCC…"
-            className="w-28 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
-          <datalist id="pcc-list">
-            {[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc} />)}
-          </datalist>
-          {filterPCC && <button onClick={() => setFilterPCC('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
-        </div>
-
-        {/* PCC Assigned — text + dropdown combo */}
-        <div className="relative">
-          <input type="text" list="ota-list" value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
-            placeholder="PCC Assigned…"
-            className="w-44 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
-          <datalist id="ota-list">
-            {otaClients.map(o => <option key={o.id} value={o.company_name} />)}
-          </datalist>
-          {filterOTA && <button onClick={() => setFilterOTA('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
-        </div>
-
-        {/* Client Group — text + dropdown combo */}
-        <div className="relative">
-          <input type="text" list="group-list" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-            placeholder="Client Group…"
-            className="w-36 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 pr-7" />
-          <datalist id="group-list">
-            {clientGroups.map(g => <option key={g.id} value={g.name} />)}
-          </datalist>
-          {filterGroup && <button onClick={() => setFilterGroup('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>}
-        </div>
-
-        {/* GDS — dropdown */}
-        <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All GDS</option>
-          {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-        </select>
-
-        {/* Status — dropdown */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All Status</option>
-          {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+      {/* Select all + records count bar */}
+      <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px',isolation:'isolate'}}>
         {isAdmin && !loading && filtered.length > 0 && (
-          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-slate-200 rounded-lg bg-white hover:bg-slate-50">
+          <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:'#475569',fontWeight:500}}>
             <input
               type="checkbox"
               checked={allSelected}
               ref={el => { if (el) el.indeterminate = someSelected }}
               onChange={toggleSelectAll}
-              className="w-4 h-4 rounded accent-blue-500"
+              style={{width:'15px',height:'15px',cursor:'pointer',accentColor:'#0f172a'}}
             />
-            <span className="text-xs text-slate-600 font-medium">Select all</span>
+            Select all
           </label>
         )}
         {isAdmin && selectedIds.size > 0 && (
-          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-400 hover:text-slate-600 underline">
+          <button onClick={() => setSelectedIds(new Set())}
+            style={{fontSize:'12px',color:'#94a3b8',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0}}>
             Clear ({selectedIds.size} selected)
           </button>
         )}
         {!loading && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
-            {(filterOrg || filterPCC || filterOTA || filterGDS !== 'all' || filterStatus !== 'all' || filterGroup) && (
-              <button
-                onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup('') }}
-                className="text-xs text-blue-500 hover:text-blue-700 underline"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
+          <span style={{fontSize:'12px',color:'#94a3b8',fontWeight:500,marginLeft:'auto'}}>
+            {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+            {totalPages > 1 ? ' · Page ' + currentPage + ' of ' + totalPages : ''}
+          </span>
         )}
       </div>
 
       {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
         <DataTable
           columns={columns}
-          data={filtered as unknown as Record<string, unknown>[]}
+          data={paginated as unknown as Record<string, unknown>[]}
           onEdit={isAdmin ? r => openEdit(r as unknown as PCCList) : undefined}
           onDelete={isAdmin ? r => openDelete(r as unknown as PCCList) : undefined}
           isAdmin={isAdmin}
           emptyMessage="No GDS Info records found."
         />
+      )}
+
+      {/* ── Pagination ── */}
+      {!loading && filtered.length > 0 && (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"16px",background:"white",border:"1px solid #e2e8f0",borderRadius:"10px",padding:"10px 16px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",overflow:"hidden",position:"relative",zIndex:1}}>
+          {/* Left: record count + page size */}
+          <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+            <span style={{fontSize:"13px",fontWeight:600,color:"#334155"}}>
+              {pageSize === "all"
+                ? <><span style={{color:"#0f172a"}}>{filtered.length}</span> records total</>
+                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}–{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
+              }
+            </span>
+            <div style={{width:"1px",height:"18px",background:"#e2e8f0"}}/>
+            <select value={String(pageSize)} onChange={e => { setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); setCurrentPage(1) }}
+              style={{padding:"5px 10px",fontSize:"12px",fontWeight:600,border:"1px solid #6366f1",borderRadius:"7px",background:"#eef2ff",color:"#4338ca",outline:"none",cursor:"pointer"}}>
+              <option value="25">25 / page</option>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+
+          {/* Right: page buttons */}
+          <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageSize === "all"}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
+              ‹
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+              const show = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2
+              const ellipsisBefore = page === 2 && currentPage > 4
+              const ellipsisAfter = page === totalPages - 1 && currentPage < totalPages - 3
+              if (!show) return null
+              if (ellipsisBefore) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
+              if (ellipsisAfter) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
+              return (
+                <button key={page} onClick={() => setCurrentPage(page)}
+                  style={{display:"flex",alignItems:"center",justifyContent:"center",minWidth:"32px",height:"32px",padding:"0 8px",borderRadius:"8px",border: currentPage===page ? "1px solid #3b82f6" : "1px solid #e2e8f0",background: currentPage===page ? "#3b82f6" : "white",color: currentPage===page ? "white" : "#475569",fontSize:"13px",fontWeight: currentPage===page ? 700 : 500,cursor:"pointer",transition:"all 0.15s",boxShadow: currentPage===page ? "0 2px 6px rgba(59,130,246,0.35)" : "none"}}>
+                  {page}
+                </button>
+              )
+            })}
+
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || pageSize === "all"}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
+              ›
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Add / Edit Modal ── */}
