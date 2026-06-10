@@ -2,17 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import PageHeader from '@/components/shared/PageHeader'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { GDSFeature, GDS } from '@/types'
-
-
-const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
-}
-
 
 const GDS_COLORS: Record<string, { badge: string; row: string; btn: string }> = {
   Sabre:      { badge: 'bg-blue-50 text-blue-700 border-blue-200',         row: 'border-blue-100',    btn: 'bg-blue-500 hover:bg-blue-600'     },
@@ -35,10 +28,10 @@ function fmtCost(cost: number, currency: string, cycle: string, cycles: {value:s
 
 interface FeatureWithGDS extends GDSFeature { gds?: GDS }
 
-//  ADD form: one name, multiple GDS 
+// ── ADD form: one name, multiple GDS ──────────────────────────
 const ADD_EMPTY = { label: '', selectedGDS: new Set<number>() }
 
-//  EDIT form: single GDS entry 
+// ── EDIT form: single GDS entry ───────────────────────────────
 const EDIT_EMPTY = { label: '', cost: '0', currency: 'USD', billing_cycle: 'monthly' }
 
 export default function GDSFunctionalityPage() {
@@ -50,13 +43,13 @@ export default function GDSFunctionalityPage() {
   const [loading, setLoading] = useState(true)
   const [filterGDS, setFilterGDS] = useState('all')
 
-  // ADD modal  one name, tick GDS
+  // ADD modal — one name, tick GDS
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState(ADD_EMPTY)
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState('')
 
-  // EDIT modal  single feature row
+  // EDIT modal — single feature row
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<FeatureWithGDS | null>(null)
   const [editForm, setEditForm] = useState(EDIT_EMPTY)
@@ -88,7 +81,7 @@ export default function GDSFunctionalityPage() {
     setLoading(false)
   }
 
-  //  ADD handlers 
+  // ── ADD handlers ──────────────────────────────────────────────
   function openAdd() {
     setAddForm({ label: '', selectedGDS: new Set() })
     setAddError(''); setAddSaving(false); setAddOpen(true)
@@ -115,7 +108,7 @@ export default function GDSFunctionalityPage() {
     setAddSaving(false); setAddOpen(false); fetchAll()
   }
 
-  //  EDIT handlers (per individual GDS row) 
+  // ── EDIT handlers (per individual GDS row) ────────────────────
   function openEdit(f: FeatureWithGDS) {
     setEditTarget(f)
     setEditForm({
@@ -146,7 +139,7 @@ export default function GDSFunctionalityPage() {
     setEditSaving(false); setEditOpen(false); fetchAll()
   }
 
-  //  DELETE 
+  // ── DELETE ────────────────────────────────────────────────────
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleteSaving(true)
@@ -154,7 +147,7 @@ export default function GDSFunctionalityPage() {
     setDeleteSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  //  DISPLAY: group by GDS then sort by label 
+  // ── DISPLAY: group by GDS then sort by label ──────────────────
   const filtered = filterGDS === 'all'
     ? features
     : features.filter(f => String(f.gds_id) === filterGDS)
@@ -166,49 +159,30 @@ export default function GDSFunctionalityPage() {
 
   const editGdsName = editTarget ? (editTarget.gds as GDS)?.name ?? '' : ''
 
-  const sabreCount = features.filter(r=>(r.gds as {name?:string})?.name==='Sabre').length
-  const amadeusCount = features.filter(r=>(r.gds as {name?:string})?.name==='Amadeus').length
-  const tpCount = features.filter(r=>(r.gds as {name?:string})?.name==='Travelport').length
-
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
-      {/* Header */}
-      <div style={{background:'white',borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
-          <div>
-            <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>GDS Functionality</h1>
-            <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Master list of features available per GDS platform</p>
-          </div>
-          {isAdmin && (
-            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Feature
-            </button>
-          )}
-        </div>
+    <div>
+      <PageHeader
+        title="GDS Functionality"
+        description="Master list of features available per GDS platform"
+        action={isAdmin && (
+          <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Feature
+          </button>
+        )}
+      />
+
+      {/* Filter */}
+      <div className="flex items-center gap-3 mb-5">
+        <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
+          <option value="all">All GDS</option>
+          {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+        </select>
+        {!loading && <span className="text-xs text-slate-400">{filtered.length} feature{filtered.length !== 1 ? 's' : ''}</span>}
       </div>
-      <div style={{padding:'0 28px 28px'}}>
-        {/* Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px',marginBottom:'24px'}}>
-          {[{label:'Sabre Features',value:sabreCount,bg:'#eff6ff',color:'#1d4ed8',border:'#bfdbfe'},{label:'Amadeus Features',value:amadeusCount,bg:'#faf5ff',color:'#7c3aed',border:'#ddd6fe'},{label:'Travelport Features',value:tpCount,bg:'#f0fdf4',color:'#166534',border:'#bbf7d0'}].map((s,i)=>(
-            <div key={i} style={{background: i===2?T.primary:'white',border:`1px solid ${i===2?T.primary:T.border}`,borderRadius:T.radius,padding:'16px 18px',boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
-              <div style={{fontSize:'11px',fontWeight:700,color:i===2?'rgba(255,255,255,0.75)':T.textLight,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'6px'}}>{s.label}</div>
-              <div style={{fontSize:'28px',fontWeight:800,color:i===2?'white':T.text,letterSpacing:'-0.03em',lineHeight:1}}>{s.value}</div>
-            </div>
-          ))}
-        </div>
-        {/* Filter */}
-        <div style={{background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
-          <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)}
-            style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:'white',color:T.text,outline:'none',cursor:'pointer'}}>
-            <option value="all">All GDS</option>
-            {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-          </select>
-          {!loading && <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} feature{filtered.length !== 1 ? 's' : ''}</span>}
-        </div>
 
       {loading ? (
-        <div className="text-center py-16 text-slate-400 text-sm">Loading</div>
+        <div className="text-center py-16 text-slate-400 text-sm">Loading…</div>
       ) : (
         <div className="space-y-6">
           {grouped.map(({ gds, features: gdsFeatures }) => {
@@ -264,7 +238,7 @@ export default function GDSFunctionalityPage() {
         </div>
       )}
 
-      {/*  ADD Modal  one name, tick GDS  */}
+      {/* ── ADD Modal — one name, tick GDS ── */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Feature" size="sm">
         <div className="space-y-4">
           <div>
@@ -281,7 +255,7 @@ export default function GDSFunctionalityPage() {
                   <label key={gds.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${checked ? `${colors?.badge ?? 'bg-slate-50 text-slate-700 border-slate-200'}` : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
                     <input type="checkbox" checked={checked} onChange={() => toggleAddGDS(gds.id)} className={`w-4 h-4 rounded ${GDS_CHECK_COLORS[gds.name] ?? 'accent-blue-500'}`} />
                     <span className="text-sm font-medium">{gds.name}</span>
-                    {checked && <span className="ml-auto text-xs opacity-60"></span>}
+                    {checked && <span className="ml-auto text-xs opacity-60">✓</span>}
                   </label>
                 )
               })}
@@ -290,14 +264,14 @@ export default function GDSFunctionalityPage() {
           </div>
           {addError && <p className="text-sm text-red-500">{addError}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setAddOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
-            <button onClick={handleAdd} disabled={addSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{addSaving ? 'Adding' : 'Add Feature'}</button>
+            <button onClick={() => setAddOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button onClick={handleAdd} disabled={addSaving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{addSaving ? 'Adding…' : 'Add Feature'}</button>
           </div>
         </div>
       </Modal>
 
-      {/*  EDIT Modal  per GDS row  */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Edit  ${editTarget?.label ?? ''}`} size="sm">
+      {/* ── EDIT Modal — per GDS row ── */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Edit — ${editTarget?.label ?? ''}`} size="sm">
         <div className="space-y-4">
           {editGdsName && (
             <div className="flex items-center gap-2">
@@ -324,34 +298,33 @@ export default function GDSFunctionalityPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Billing Cycle</label>
             <select value={editForm.billing_cycle} onChange={e => setEditForm(f => ({ ...f, billing_cycle: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value=""> None </option>
+              <option value="">— None —</option>
               {billingCycles.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
           {editError && <p className="text-sm text-red-500">{editError}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setEditOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
-            <button onClick={handleEdit} disabled={editSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{editSaving ? 'Saving' : 'Save Changes'}</button>
+            <button onClick={() => setEditOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button onClick={handleEdit} disabled={editSaving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{editSaving ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </div>
       </Modal>
 
-      {/*  DELETE Modal  */}
+      {/* ── DELETE Modal ── */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Feature" size="sm">
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-            <p className="text-sm text-amber-700 font-medium"> Warning</p>
+            <p className="text-sm text-amber-700 font-medium">⚠️ Warning</p>
             <p className="text-sm text-amber-600 mt-1">
               Delete <strong>{deleteTarget?.label}</strong> for <strong>{(deleteTarget?.gds as GDS)?.name}</strong>? This will also remove it from PCC assignments.
             </p>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
-            <button onClick={handleDelete} disabled={deleteSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.danger,color:"white",cursor:"pointer"}}>{deleteSaving ? 'Deleting' : 'Delete'}</button>
+            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button onClick={handleDelete} disabled={deleteSaving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{deleteSaving ? 'Deleting…' : 'Delete'}</button>
           </div>
         </div>
       </Modal>
-      </div>
     </div>
   )
 }

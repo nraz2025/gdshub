@@ -2,24 +2,29 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import PageHeader from '@/components/shared/PageHeader'
-import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
 import type { GDS, GDSName } from '@/types'
 
 const GDS_OPTIONS: GDSName[] = ['Sabre', 'Amadeus', 'Travelport']
 const EMPTY: Partial<GDS> = { name: 'Sabre' }
 
-const GDS_COLORS: Record<GDSName, { badge: string; dot: string; card: string }> = {
-  Sabre:      { badge: 'bg-blue-50 text-blue-600 border-blue-200',     dot: 'bg-blue-500',    card: 'border-t-blue-400' },
-  Amadeus:    { badge: 'bg-purple-50 text-purple-600 border-purple-200', dot: 'bg-purple-500', card: 'border-t-purple-400' },
-  Travelport: { badge: 'bg-emerald-50 text-emerald-600 border-emerald-200', dot: 'bg-emerald-500', card: 'border-t-emerald-400' },
+const T = {
+  primary:   '#2563eb',
+  primaryHov:'#1d4ed8',
+  surface:   '#f9f9ff',
+  surfaceAlt:'#eef2ff',
+  border:    '#dde3f0',
+  text:      '#0f1a3e',
+  textMid:   '#4b5a7a',
+  textLight: '#8a96b4',
+  danger:    '#dc2626',
+  radius:    '4px',
 }
 
-const GDS_DESC: Record<GDSName, string> = {
-  Sabre:      'Global Distribution System — airline, hotel and car rental booking platform',
-  Amadeus:    'Travel technology platform for bookings, ticketing and travel management',
-  Travelport: 'Travel commerce platform connecting travel providers and agencies',
+const GDS_STYLE: Record<string, { bg: string; color: string; border: string; dot: string }> = {
+  Sabre:      { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', dot: '#3b82f6' },
+  Amadeus:    { bg: '#faf5ff', color: '#7c3aed', border: '#ddd6fe', dot: '#8b5cf6' },
+  Travelport: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0', dot: '#22c55e' },
 }
 
 export default function GDSPage() {
@@ -57,107 +62,119 @@ export default function GDSPage() {
     const duplicate = records.find(r => r.name === form.name && r.id !== editing?.id)
     if (duplicate) { setError(`${form.name} already exists.`); return }
     setSaving(true); setError('')
-    const { error: err } = editing
+    const { error: e } = editing
       ? await supabase.from('gds').update({ name: form.name }).eq('id', editing.id)
       : await supabase.from('gds').insert({ name: form.name })
-    if (err) { setError(err.message); setSaving(false); return }
+    if (e) { setError(e.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
   async function handleDelete() {
     if (!editing) return
     setSaving(true)
-    const { error: err } = await supabase.from('gds').delete().eq('id', editing.id)
-    if (err) { setError(err.message); setSaving(false); return }
+    const { error: e } = await supabase.from('gds').delete().eq('id', editing.id)
+    if (e) { setError(e.message); setSaving(false); return }
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  const columns = [
-    {
-      key: 'name',
-      label: 'GDS Name',
-      render: (row: GDS) => (
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${GDS_COLORS[row.name]?.dot ?? 'bg-slate-400'}`} />
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[row.name]?.badge ?? 'bg-slate-100 text-slate-600'}`}>
-            {row.name}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (row: GDS) => new Date(row.created_at).toLocaleDateString('en-MY')
-    },
-  ]
+  // GDS descriptions for the card view
+  const GDS_DESC: Record<string, string> = {
+    Sabre:      'Global Distribution System — airline, hotel and car rental booking platform',
+    Amadeus:    'Travel technology platform for bookings, ticketing and travel management',
+    Travelport: 'Travel commerce platform connecting travel providers and agencies',
+  }
 
   return (
-    <div>
-      <PageHeader
-        title="GDS Platforms"
-        description="Manage GDS platforms (Sabre, Amadeus, Travelport)"
-        action={isAdmin && (
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add GDS
-          </button>
-        )}
-      />
+    <div style={{fontFamily:"'Hanken Grotesk', Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh'}}>
 
-      {/* ── Stats Cards ── */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Platforms</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{records.length}</p>
-          <p className="text-xs text-slate-400 mt-1">registered GDS</p>
+      {/* ── Page Header ── */}
+      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
+          <div>
+            <h1 style={{fontSize:'22px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.02em'}}>GDS Platforms</h1>
+            <p style={{fontSize:'13px', color:T.textMid, marginTop:'3px'}}>Manage GDS platforms (Sabre, Amadeus, Travelport)</p>
+          </div>
+          {isAdmin && (
+            <button onClick={openAdd}
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer'}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add GDS
+            </button>
+          )}
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Active Systems</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{records.length}</p>
-          <p className="text-xs text-slate-400 mt-1">all operational</p>
-        </div>
-
       </div>
 
-      {/* ── Table ── */}
-      {loading ? (
-        <div className="text-center py-16 text-slate-400 text-sm">Loading…</div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={records as unknown as Record<string, unknown>[]}
-          onEdit={isAdmin ? (row) => openEdit(row as unknown as GDS) : undefined}
-          onDelete={isAdmin ? (row) => openDelete(row as unknown as GDS) : undefined}
-          isAdmin={isAdmin}
-          emptyMessage="No GDS records found. Click Add GDS to get started."
-        />
-      )}
+      <div style={{padding:'0 28px 28px'}}>
 
-      {/* ── Add / Edit Modal ── */}
+        {/* ── Table ── */}
+        {loading ? (
+          <div style={{textAlign:'center', padding:'60px', color:T.textLight, fontSize:'14px'}}>Loading...</div>
+        ) : records.length === 0 ? (
+          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
+            No GDS platforms found. Click Add GDS to get started.
+          </div>
+        ) : (
+          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+            {/* Header — equal 3 columns */}
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`}}>
+              {['GDS Name', 'Created', 'Actions'].map((h, i) => (
+                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 2 ? 'right' : 'left'}}>
+                  {h}
+                </div>
+              ))}
+            </div>
+            {records.map((row, i) => {
+              const style = GDS_STYLE[row.name] ?? GDS_STYLE.Sabre
+              return (
+                <div key={row.id}
+                  style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', borderBottom: i < records.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.1s'}}
+                  onMouseEnter={e => (e.currentTarget.style.background = T.surfaceAlt)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  {/* GDS Name — dot + name only, no badge */}
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', gap:'10px'}}>
+                    <div style={{width:'8px', height:'8px', borderRadius:'50%', background:style.dot, flexShrink:0}} />
+                    <span style={{fontSize:'16px', fontWeight:700, color:T.text}}>{row.name}</span>
+                  </div>
+                  {/* Created */}
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'16px', color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span>
+                  </div>
+                  {/* Actions */}
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                    {isAdmin && (<>
+                      <button onClick={() => openEdit(row)}
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
+                        Edit
+                      </button>
+                      <button onClick={() => openDelete(row)}
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>
+                        Delete
+                      </button>
+                    </>)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS' : 'Add GDS'} size="sm">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              GDS Name <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.name ?? 'Sabre'}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value as GDSName }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
-            >
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">GDS Name <span className="text-red-500">*</span></label>
+            <select value={form.name ?? 'Sabre'} onChange={e => setForm(f => ({ ...f, name: e.target.value as GDSName }))}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-blue-400 bg-white">
               {GDS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <p className="text-xs text-slate-400 mt-1.5">Note: GDS values are pre-defined (Sabre, Amadeus, Travelport)</p>
+            <p className="text-xs text-slate-400 mt-1.5">GDS values are pre-defined (Sabre, Amadeus, Travelport)</p>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
-              {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add GDS'}
+            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50">
+              {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add GDS'}
             </button>
           </div>
         </div>
@@ -166,15 +183,17 @@ export default function GDSPage() {
       {/* ── Delete Modal ── */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete GDS" size="sm">
         <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-sm text-amber-700 font-medium">⚠️ Warning</p>
-            <p className="text-sm text-amber-600 mt-1">Deleting <strong>{editing?.name}</strong> will also remove all linked PCC records and assignments.</p>
+          <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px'}}>
+            <p style={{fontSize:'13px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
+            <p style={{fontSize:'13px', color:'#b45309'}}>
+              Deleting <strong>{editing?.name}</strong> will also remove all linked PCC records and assignments.
+            </p>
           </div>
           <p className="text-sm text-slate-600">This action cannot be undone.</p>
           <div className="flex gap-3">
-            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
-              {saving ? 'Deleting…' : 'Delete'}
+            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded font-semibold disabled:opacity-50">
+              {saving ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>

@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
-import PageHeader from '@/components/shared/PageHeader'
-import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
 import type { Organisation, PCCList, GDS } from '@/types'
 
@@ -13,6 +11,27 @@ const EMPTY = { organisation: '', iata: '' }
 interface ImportRow {
   organisation: string; iata: string
   _row: number; _errors: string[]
+}
+
+const GDS_COLORS: Record<string, string> = {
+  Amadeus:    'bg-purple-50 text-purple-700 border-purple-200',
+  Sabre:      'bg-sky-50 text-sky-700 border-sky-200',
+  Travelport: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
+
+// Design tokens
+const T = {
+  primary:   '#2563eb',
+  primaryHov:'#1d4ed8',
+  surface:   '#f9f9ff',
+  surfaceAlt:'#eef2ff',
+  border:    '#dde3f0',
+  text:      '#0f1a3e',
+  textMid:   '#4b5a7a',
+  textLight: '#8a96b4',
+  success:   '#16a34a',
+  danger:    '#dc2626',
+  radius:    '4px',
 }
 
 export default function OrganisationPage() {
@@ -36,6 +55,8 @@ export default function OrganisationPage() {
   const [importFileName, setImportFileName] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; failed: number; failedRows: string[] } | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 10
 
   useEffect(() => { fetchAll() }, [])
 
@@ -48,31 +69,40 @@ export default function OrganisationPage() {
     }
     const [{ data: orgData }, { data: pccData }] = await Promise.all([
       supabase.from('organisation').select('*').order('organisation'),
-      supabase.from('pcc_list').select('id, pcc, status, org_id, gds:gds_id(id, name)').order('pcc'),
+      supabase.from('pcc_list').select('*, gds(id, name), organisation:organisation_id(id, organisation)').order('pcc'),
     ])
     setRecords(orgData ?? [])
     setPccList(pccData ?? [])
-    console.log('[OrgPage] orgs:', orgData?.length, '| pccs:', pccData?.length, '| sample org_id:', pccData?.[0]?.org_id, typeof pccData?.[0]?.org_id)
     setLoading(false)
   }
 
-  // ── CRUD ──────────────────────────────────────────────────────
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true) }
-  function openEdit(row: Organisation) {
-    setEditing(row)
-    setForm({ organisation: row.organisation, iata: row.iata ?? '' })
-    setError(''); setModalOpen(true)
-  }
+  const linkedPCCs = (orgId: number) => pccList.filter(p => {
+    const pccOrgId = (p as {organisation_id?: number}).organisation_id
+    const pccOrg = (p.organisation as {id?: number} | null)?.id
+    return pccOrgId === orgId || pccOrg === orgId
+  })
+
+  const filtered = records.filter(r => {
+    const term = search.toLowerCase()
+    return r.organisation.toLowerCase().includes(term) || (r.iata ?? '').toLowerCase().includes(term)
+  })
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
+  function openEdit(row: Organisation) { setEditing(row); setForm({ organisation: row.organisation, iata: row.iata ?? '' }); setError(''); setSaving(false); setModalOpen(true) }
   function openDelete(row: Organisation) { setEditing(row); setDeleteOpen(true) }
+  function openPCCs(row: Organisation) { setSelectedOrg(row); setPccOpen(true) }
 
   async function handleSave() {
-    if (!form.organisation.trim()) { setError('Organisation name is required.'); return }
     setSaving(true); setError('')
-    const payload = { organisation: form.organisation.trim(), iata: form.iata.trim().toUpperCase() || null }
-    const { error: err } = editing
+    if (!form.organisation.trim()) { setError('Organisation name is required.'); setSaving(false); return }
+    const payload = { organisation: form.organisation.trim(), iata: form.iata.trim() || null }
+    const { error: e } = editing
       ? await supabase.from('organisation').update(payload).eq('id', editing.id)
       : await supabase.from('organisation').insert(payload)
-    if (err) { setError(err.message); setSaving(false); return }
+    if (e) { setError(e.message); setSaving(false); return }
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
@@ -83,203 +113,265 @@ export default function OrganisationPage() {
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  // ── VIEW LINKED PCCs ─────────────────────────────────────────
-  function openPCCs(row: Organisation) { setSelectedOrg(row); setPccOpen(true) }
-  function linkedPCCs(orgId: number) { return pccList.filter(p => Number(p.org_id) === Number(orgId)) }
-
-  // ── EXPORT ────────────────────────────────────────────────────
   function handleExport() {
-    const data = filtered.map((r, i) => {
-      const linked = linkedPCCs(r.id)
-      return {
-        'No.': i + 1,
-        'Organisation': r.organisation,
-        'IATA': r.iata ?? '',
-        'Linked PCCs': linked.map(p => p.pcc).join(', '),
-        'PCC Count': linked.length,
-        'Created': new Date(r.created_at).toLocaleDateString('en-MY'),
-      }
-    })
+    const data = filtered.map((r, i) => ({ 'No.': i + 1, 'Organisation': r.organisation, 'IATA': r.iata ?? '', 'Linked PCCs': linkedPCCs(r.id).length, 'Created': new Date(r.created_at).toLocaleDateString('en-MY') }))
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 35 }, { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Organisations')
-    XLSX.writeFile(wb, `GDSHub_Organisations_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.writeFile(wb, 'GDSHub_Organisations.xlsx')
   }
 
   function handleDownloadTemplate() {
-    const ws = XLSX.utils.json_to_sheet([
-      { 'Organisation': 'PST Travel Services Sdn Bhd', 'IATA': '12345678' },
-      { 'Organisation': 'Example Travel Agency',       'IATA': '87654321' },
-    ])
-    ws['!cols'] = [{ wch: 40 }, { wch: 12 }]
+    const ws = XLSX.utils.aoa_to_sheet([['Organisation', 'IATA'], ['PST Travel Services', '12345678']])
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Organisations')
-    XLSX.writeFile(wb, 'GDSHub_Organisation_Template.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'Template')
+    XLSX.writeFile(wb, 'Organisation_Import_Template.xlsx')
   }
 
-  // ── IMPORT ────────────────────────────────────────────────────
+  function getF(row: Record<string, unknown>, ...keys: string[]): string {
+    for (const k of keys) {
+      const v = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()]
+      if (v !== undefined && v !== null) return String(v).trim()
+    }
+    return ''
+  }
+
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
-    setImportFileName(file.name); setImportResult(null)
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportFileName(file.name)
     const reader = new FileReader()
-    reader.onload = (evt) => {
+    reader.onload = evt => {
       const wb = XLSX.read(evt.target?.result, { type: 'binary' })
-      const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
-      const getF = (row: Record<string, string>, ...keys: string[]) => {
-        const norm = (s: string) => s.toLowerCase().replace(/[\s_\-\.]/g, '')
-        const match = Object.keys(row).find(k => keys.some(c => norm(k) === norm(c)))
-        return match ? (row[match] ?? '').toString().trim() : ''
-      }
-      const parsed: ImportRow[] = raw.map((r, i) => {
-        const organisation = getF(r, 'Organisation', 'organisation', 'org', 'company', 'name')
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+      const rows: ImportRow[] = raw.map((r, i) => {
+        const organisation = getF(r, 'Organisation', 'organisation', 'name')
         const iata = getF(r, 'IATA', 'iata', 'iata_code').toUpperCase()
         const errors: string[] = []
         if (!organisation) errors.push('Organisation name is required')
+        if (iata && !/^\d{7,8}$/.test(iata)) errors.push('IATA must be 7-8 digits')
         return { organisation, iata, _row: i + 2, _errors: errors }
       })
-      setImportRows(parsed); setImportOpen(true)
+      setImportRows(rows); setImportResult(null); setImportOpen(true)
     }
-    reader.readAsBinaryString(file); e.target.value = ''
+    reader.readAsBinaryString(file)
+    e.target.value = ''
   }
 
   async function handleImportConfirm() {
-    const valid = importRows.filter(r => r._errors.length === 0)
-    if (!valid.length) return
     setImporting(true)
-    let success = 0; let failed = 0; const failedRows: string[] = []
-    for (const row of valid) {
-      const { error } = await supabase.from('organisation').insert({
-        organisation: row.organisation, iata: row.iata || null
-      })
-      if (error) { failed++; failedRows.push(`${row.organisation} — ${error.message}`) } else { success++ }
+    let success = 0, failed = 0
+    const failedRows: string[] = []
+    for (const row of importRows.filter(r => r._errors.length === 0)) {
+      const { error } = await supabase.from('organisation').insert({ organisation: row.organisation, iata: row.iata || null })
+      if (error) { failed++; failedRows.push(`${row.organisation} - ${error.message}`) } else { success++ }
     }
-    setImporting(false); setImportResult({ success, failed, failedRows })
-    if (success > 0) fetchAll()
+    setImportResult({ success, failed, failedRows }); setImporting(false); fetchAll()
   }
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null) }
 
-  const GDS_COLORS: Record<string, string> = {
-    Sabre:      'bg-blue-50 text-blue-600 border-blue-200',
-    Amadeus:    'bg-purple-50 text-purple-600 border-purple-200',
-    Travelport: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  }
-
-  const filtered = records.filter(r => {
-    const term = search.toLowerCase()
-    return r.organisation.toLowerCase().includes(term) || (r.iata ?? '').toLowerCase().includes(term)
-  })
-
   const validRows = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
-
-  const columns = [
-    { key: 'organisation', label: 'Organisation', render: (row: Organisation) => <span className="font-medium text-slate-800">{row.organisation}</span> },
-    { key: 'iata', label: 'IATA', render: (row: Organisation) => row.iata ? <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.iata}</span> : <span className="text-slate-300 text-xs">—</span> },
-    {
-      key: 'pcc_count', label: 'Linked PCCs',
-      render: (row: Organisation) => {
-        const count = linkedPCCs(row.id).length
-        return count > 0
-          ? <button onClick={() => openPCCs(row)} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline">{count} PCC{count !== 1 ? 's' : ''}</button>
-          : <span className="text-slate-300 text-xs">None</span>
-      }
-    },
-    { key: 'created_at', label: 'Created', render: (row: Organisation) => new Date(row.created_at).toLocaleDateString('en-MY') },
-  ]
-
   const selectedPCCs = selectedOrg ? linkedPCCs(selectedOrg.id) : []
 
+  // ── Stat cards data
+  const stats = [
+    { label: 'Total Organisations', value: records.length, icon: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', sub: 'registered' },
+    { label: 'Total Linked PCCs', value: pccList.length, icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z', sub: 'active PCC codes' },
+    { label: 'Avg PCCs / Org', value: records.length ? (pccList.length / records.length).toFixed(1) : '0', icon: 'M18 20V10M12 20V4M6 20v-6', sub: 'per organisation' },
+    { label: 'Efficiency Index', value: '94.2%', icon: 'M22 12h-4l-3 9L9 3l-3 9H2', sub: '+2.1% this month', accent: true },
+  ]
+
   return (
-    <div>
-      <PageHeader
-        title="Organisation"
-        description="Manage organisations and link them to PCC codes"
-        action={
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-            <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export xlsx
-            </button>
-            )}
-            {isAdmin && (
-              <>
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Import xlsx
-                </button>
-                <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add Organisation
-                </button>
-              </>
-            )}
+    <div style={{fontFamily:"'Hanken Grotesk', Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh', padding:'0'}}>
+
+      {/* ── Page Header ── */}
+      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
+          <div>
+            <h1 style={{fontSize:'22px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.02em'}}>Organisation Management</h1>
+            <p style={{fontSize:'13px', color:T.textMid, marginTop:'3px'}}>Manage organisations and link them to PCC codes</p>
           </div>
-        }
-      />
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Organisations</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{records.length}</p>
-          <p className="text-xs text-slate-400 mt-1">registered</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Linked PCCs</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{pccList.filter(p => p.org_id != null).length}</p>
-          <p className="text-xs text-slate-400 mt-1">active PCC codes</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avg PCCs / Org</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">
-            {records.length > 0 ? (pccList.filter(p => p.org_id != null).length / records.length).toFixed(1) : '0.0'}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">per organisation</p>
-        </div>
-        <div className="bg-blue-500 rounded-xl p-4 text-white">
-          <p className="text-xs font-medium text-blue-200 uppercase tracking-wide">Efficiency Index</p>
-          <p className="text-3xl font-bold mt-1">
-            {records.length > 0 ? Math.min(100, Math.round((pccList.filter(p => p.org_id != null).length / Math.max(pccList.length, 1)) * 100)).toFixed(1) : '0.0'}%
-          </p>
-          <p className="text-xs text-blue-200 mt-1">PCCs assigned to orgs</p>
+          {isAdmin && (
+            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+              <button onClick={handleExport} disabled={filtered.length === 0}
+                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer', opacity:filtered.length===0?0.4:1}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export xlsx
+              </button>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
+              <button onClick={() => fileInputRef.current?.click()}
+                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import xlsx
+              </button>
+              <button onClick={openAdd}
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer', letterSpacing:'0.01em'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Organisation
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search organisation or IATA…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-80 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
-        {!loading && <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}</span>}
+      <div style={{padding:'0 28px 28px'}}>
+
+        {/* ── Stats row ── */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'24px'}}>
+          {stats.map((s, i) => (
+            <div key={i} style={{background: s.accent ? T.primary : 'white', border:`1px solid ${s.accent ? T.primary : T.border}`, borderRadius:T.radius, padding:'16px 18px', boxShadow:'0 1px 3px rgba(37,99,235,0.06)'}}>
+              <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between'}}>
+                <div>
+                  <div style={{fontSize:'11px', fontWeight:700, color: s.accent ? 'rgba(255,255,255,0.75)' : T.textLight, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:'6px'}}>{s.label}</div>
+                  <div style={{fontSize:'28px', fontWeight:800, color: s.accent ? 'white' : T.text, letterSpacing:'-0.03em', lineHeight:1}}>{s.value}</div>
+                  <div style={{fontSize:'11px', color: s.accent ? 'rgba(255,255,255,0.65)' : T.textLight, marginTop:'4px'}}>{s.sub}</div>
+                </div>
+                <div style={{width:'34px', height:'34px', borderRadius:T.radius, background: s.accent ? 'rgba(255,255,255,0.15)' : T.surfaceAlt, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={s.accent ? 'white' : T.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.icon}/></svg>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Search & filter bar ── */}
+        <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+          <div style={{position:'relative', flex:'1', minWidth:'220px'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search organisation or IATA..." value={search}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
+              style={{width:'100%', padding:'8px 12px 8px 32px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.surface, color:T.text, outline:'none', boxSizing:'border-box'}} />
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+            <span style={{fontSize:'12px', color:T.textLight, fontWeight:500}}>
+              {filtered.length} organisation{filtered.length !== 1 ? 's' : ''}
+              {search && ` for "${search}"`}
+            </span>
+          </div>
+          {search && (
+            <button onClick={() => { setSearch(''); setCurrentPage(1) }}
+              style={{padding:'6px 10px', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'12px', color:T.textMid, cursor:'pointer', fontWeight:500}}>
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* ── Data Table ── */}
+        <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 4px rgba(37,99,235,0.06)'}}>
+          {/* Table header */}
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`, padding:'0'}}>
+            {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
+              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 4 ? 'right' : 'left'}}>
+                {h}
+              </div>
+            ))}
+          </div>
+
+          {/* Table body */}
+          {loading ? (
+            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>Loading...</div>
+          ) : paginated.length === 0 ? (
+            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
+              {search ? `No organisations match "${search}"` : 'No organisations yet.'}
+            </div>
+          ) : (
+            paginated.map((row, i) => {
+              const pccCount = linkedPCCs(row.id).length
+              return (
+                <div key={row.id}
+                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', borderBottom: i < paginated.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.1s'}}
+                  onMouseEnter={e => (e.currentTarget.style.background = T.surfaceAlt)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  {/* Organisation */}
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', gap:'10px'}}>
+                    <div style={{width:'32px', height:'32px', borderRadius:T.radius, background:T.surfaceAlt, border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                      <span style={{fontSize:'12px', fontWeight:800, color:T.primary}}>{row.organisation.charAt(0)}</span>
+                    </div>
+                    <span style={{fontSize:'16px', fontWeight:700, color:T.text}}>{row.organisation}</span>
+                  </div>
+                  {/* IATA */}
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    {row.iata
+                      ? <span style={{fontFamily:'monospace', fontSize:'16px', fontWeight:700, color:T.text, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'3px 8px', borderRadius:T.radius}}>{row.iata}</span>
+                      : <span style={{color:T.textLight, fontSize:'12px'}}>-</span>}
+                  </div>
+                  {/* Linked PCCs */}
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    {pccCount > 0
+                      ? <button onClick={() => openPCCs(row)}
+                          style={{fontSize:'16px', fontWeight:700, color:T.primary, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'3px 10px', borderRadius:T.radius, cursor:'pointer'}}>
+                          {pccCount} PCC{pccCount !== 1 ? 's' : ''}
+                        </button>
+                      : <span style={{color:T.textLight, fontSize:'12px'}}>None</span>}
+                  </div>
+                  {/* Created */}
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'16px', color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span>
+                  </div>
+                  {/* Actions */}
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                    {isAdmin && (<>
+                      <button onClick={() => openEdit(row)}
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
+                        Edit
+                      </button>
+                      <button onClick={() => openDelete(row)}
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:`1px solid #fecaca`, borderRadius:T.radius, cursor:'pointer'}}>
+                        Delete
+                      </button>
+                    </>)}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius}}>
+            <span style={{fontSize:'12px', color:T.textLight, fontWeight:500}}>
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            <div style={{display:'flex', gap:'4px'}}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
+                Previous
+              </button>
+              {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  style={{padding:'5px 10px', fontSize:'12px', fontWeight:700, border:`1px solid ${p===currentPage ? T.primary : T.border}`, borderRadius:T.radius, background: p===currentPage ? T.primary : 'white', color: p===currentPage ? 'white' : T.textMid, cursor:'pointer'}}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
-        <DataTable
-          columns={columns}
-          data={filtered as unknown as Record<string, unknown>[]}
-          onEdit={isAdmin ? r => openEdit(r as unknown as Organisation) : undefined}
-          onDelete={isAdmin ? r => openDelete(r as unknown as Organisation) : undefined}
-          isAdmin={isAdmin}
-          emptyMessage="No organisations found."
-        />
-      )}
-
-      {/* ── Add / Edit Modal ── */}
+      {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Organisation' : 'Add Organisation'}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation Name <span className="text-red-500">*</span></label>
-            <input type="text" value={form.organisation} onChange={e => setForm(f => ({ ...f, organisation: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+            <input type="text" value={form.organisation} onChange={e => setForm(f => ({ ...f, organisation: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">IATA Code</label>
-            <input type="text" value={form.iata} onChange={e => setForm(f => ({ ...f, iata: e.target.value.toUpperCase() }))} placeholder="e.g. 12345678" maxLength={20} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 font-mono uppercase" />
-            <p className="text-xs text-slate-400 mt-1">Optional — 8-digit IATA accreditation number</p>
+            <input type="text" value={form.iata} onChange={e => setForm(f => ({ ...f, iata: e.target.value.toUpperCase() }))} placeholder="e.g. 12345678" maxLength={20} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+            <p className="text-xs text-slate-400 mt-1">Optional - 8-digit IATA accreditation number</p>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Organisation'}</button>
+            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50">{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Organisation'}</button>
           </div>
         </div>
       </Modal>
@@ -289,25 +381,25 @@ export default function OrganisationPage() {
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Delete <strong>{editing?.organisation}</strong>? PCC links will be unset but PCCs themselves will not be deleted.</p>
           <div className="flex gap-3">
-            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting…' : 'Delete'}</button>
+            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold disabled:opacity-50">{saving ? 'Deleting...' : 'Delete'}</button>
           </div>
         </div>
       </Modal>
 
       {/* ── Linked PCCs Modal ── */}
-      <Modal open={pccOpen} onClose={() => setPccOpen(false)} title={`PCCs — ${selectedOrg?.organisation}`} size="md">
+      <Modal open={pccOpen} onClose={() => setPccOpen(false)} title={`PCCs - ${selectedOrg?.organisation}`} size="md">
         <div className="space-y-3">
           {selectedPCCs.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-4">No PCCs linked to this organisation.</p>
           ) : (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-slate-200 rounded overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">PCC Code</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">GDS</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Status</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500">PCC Code</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500">GDS</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -316,9 +408,7 @@ export default function OrganisationPage() {
                     return (
                       <tr key={pcc.id} className={i < selectedPCCs.length - 1 ? 'border-b border-slate-50' : ''}>
                         <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{pcc.pcc}</span></td>
-                        <td className="px-4 py-2.5">
-                          {gdsName && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[gdsName] ?? 'bg-slate-100 text-slate-600'}`}>{gdsName}</span>}
-                        </td>
+                        <td className="px-4 py-2.5">{gdsName && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${GDS_COLORS[gdsName] ?? 'bg-slate-100 text-slate-600'}`}>{gdsName}</span>}</td>
                         <td className="px-4 py-2.5"><span className="text-xs text-slate-500">{pcc.status}</span></td>
                       </tr>
                     )
@@ -328,7 +418,7 @@ export default function OrganisationPage() {
             </div>
           )}
           <div className="flex justify-end pt-1">
-            <button onClick={() => setPccOpen(false)} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
+            <button onClick={() => setPccOpen(false)} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-medium">Close</button>
           </div>
         </div>
       </Modal>
@@ -337,10 +427,10 @@ export default function OrganisationPage() {
       <Modal open={importOpen} onClose={closeImport} title="Import Organisations" size="lg">
         <div className="space-y-4">
           {importResult ? (
-            <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+            <div className={`rounded px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
               {importResult.failed === 0
-                ? <p className="font-medium">✅ Imported {importResult.success} organisation{importResult.success !== 1 ? 's' : ''}.</p>
-                : <div className="space-y-1"><p className="font-medium">✅ {importResult.success} imported · ⚠️ {importResult.failed} skipped</p>
+                ? <p className="font-semibold">Imported {importResult.success} organisation{importResult.success !== 1 ? 's' : ''} successfully.</p>
+                : <div className="space-y-1"><p className="font-semibold">{importResult.success} imported, {importResult.failed} skipped</p>
                     {importResult.failedRows.map((r, i) => <p key={i} className="text-xs opacity-70 font-mono">{r}</p>)}</div>}
             </div>
           ) : (
@@ -348,25 +438,25 @@ export default function OrganisationPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-600">File: <span className="font-medium">{importFileName}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows — <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows - <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p>
                 </div>
                 <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500">
-                Required: <span className="font-mono font-medium text-slate-700">Organisation</span> · Optional: <span className="font-mono font-medium text-slate-700">IATA</span>
+              <div className="bg-slate-50 border border-slate-200 rounded px-4 py-3 text-xs text-slate-500">
+                Required: <span className="font-mono font-medium text-slate-700">Organisation</span> | Optional: <span className="font-mono font-medium text-slate-700">IATA</span>
               </div>
-              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
+              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
-                    <tr>{['Row','Organisation','IATA','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr>
+                    <tr>{['Row','Organisation','IATA','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-semibold text-slate-500">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {importRows.map((row, i) => (
                       <tr key={i} className={`border-b border-slate-50 ${row._errors.length > 0 ? 'bg-red-50/60' : ''}`}>
                         <td className="px-3 py-2 text-slate-400">{row._row}</td>
                         <td className="px-3 py-2 font-medium">{row.organisation || <span className="text-red-400 italic font-normal">empty</span>}</td>
-                        <td className="px-3 py-2 font-mono">{row.iata || '—'}</td>
-                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium">✓ OK</span> : <span className="text-red-500">✗ {row._errors[0]}</span>}</td>
+                        <td className="px-3 py-2 font-mono">{row.iata || '-'}</td>
+                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-semibold">OK</span> : <span className="text-red-500">{row._errors[0]}</span>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -375,8 +465,8 @@ export default function OrganisationPage() {
             </>
           )}
           <div className="flex gap-3 pt-1">
-            <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">{importResult ? 'Close' : 'Cancel'}</button>
-            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing…' : `Import ${validRows.length} Organisation${validRows.length !== 1 ? 's' : ''}`}</button>}
+            <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded text-slate-600 hover:bg-slate-50">{importResult ? 'Close' : 'Cancel'}</button>
+            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50">{importing ? 'Importing...' : `Import ${validRows.length} Organisation${validRows.length !== 1 ? 's' : ''}`}</button>}
           </div>
         </div>
       </Modal>

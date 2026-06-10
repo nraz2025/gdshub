@@ -4,14 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
 
-const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
-}
-
-
-//  Types 
+// ── Types ────────────────────────────────────────────────────
 interface GDS { id: number; name: string }
 interface Organisation { id: number; organisation: string }
 
@@ -77,7 +70,7 @@ const GDS_COLORS: Record<string, string> = {
   Travelport: '#dcfce7',
 }
 
-//  Component 
+// ── Component ────────────────────────────────────────────────
 export default function ReportingPage() {
   const supabase = createClient()
 
@@ -115,7 +108,7 @@ export default function ReportingPage() {
   const blankUser = { gds_name: '', pcc: '', organisation: '', first_name: '', last_name: '', initial: '', email: '', login_id: '', sign_on_id: '', duty_code: '', user_status: 'active', last_login_date: '', last_login_note: '' }
   const [userForm, setUserForm] = useState(blankUser)
 
-  //  Load initial data 
+  // ── Load initial data ──
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -131,7 +124,7 @@ export default function ReportingPage() {
     init()
   }, [])
 
-  //  Load distinct year/month from all 3 GDS user tables 
+  // ── Load distinct year/month from all 3 GDS user tables ──
   const loadAvailableMonths = useCallback(async () => {
     setLoadingMonths(true)
     const tables = ['amadeus_user', 'sabre_user', 'travelport_user']
@@ -183,7 +176,7 @@ export default function ReportingPage() {
 
   const [pulling, setPulling] = useState(false)
 
-  //  Pull live data from all 3 GDS user tables filtered by snapshot month/year 
+  // ── Pull live data from all 3 GDS user tables filtered by snapshot month/year ──
   const pullFromGDS = useCallback(async (snap: ReportSnapshot) => {
     if (!snap) return
     setPulling(true); setError('')
@@ -197,7 +190,7 @@ export default function ReportingPage() {
       supabase.from('travelport_user').select('id, sign_on_id, cid, gtid, pcc, initial, status, created_at, ota, users:user_id(first_name, last_name, email_address, organisation:organisation_id(id, organisation)), ota_client:ota_client_id(company_name)'),
     ])
 
-    //  Build user detail rows 
+    // ── Build user detail rows ──
     const detailRows: object[] = []
     const amadeusGdsId = gdsList.find(g => g.name === 'Amadeus')?.id ?? null
     const sabreGdsId   = gdsList.find(g => g.name === 'Sabre')?.id ?? null
@@ -225,7 +218,7 @@ export default function ReportingPage() {
       await supabase.from('report_user_detail').insert(detailRows.slice(i, i + 100))
     }
 
-    //  Build monthly count grouped by GDS + PCC + Organisation 
+    // ── Build monthly count grouped by GDS + PCC + Organisation ──
     type CountEntry = { gds_name: string; pcc: string; organisation: string; organisation_id: number | null; total: number; active: number; inactive: number; ota: number }
     const countMap = new Map<string, CountEntry>()
 
@@ -267,7 +260,7 @@ export default function ReportingPage() {
   }, [gdsList, loadSnapshotDetail])
 
 
-  //  Create snapshot 
+  // ── Create snapshot ──
   async function createSnapshot() {
     setSaving(true); setError('')
     if (!snapForm.report_name.trim()) { setError('Report name is required.'); setSaving(false); return }
@@ -289,7 +282,7 @@ export default function ReportingPage() {
     setTimeout(() => setSuccess(''), 3000)
   }
 
-  //  Add count row 
+  // ── Add count row ──
   async function addCountRow() {
     if (!selected) return
     setSaving(true); setError('')
@@ -310,7 +303,7 @@ export default function ReportingPage() {
     await loadSnapshotDetail(selected); setSaving(false)
   }
 
-  //  Add user detail row 
+  // ── Add user detail row ──
   async function addUserRow() {
     if (!selected) return
     setSaving(true); setError('')
@@ -336,14 +329,14 @@ export default function ReportingPage() {
     await loadSnapshotDetail(selected); setSaving(false)
   }
 
-  //  Update snapshot status 
+  // ── Update snapshot status ──
   async function updateStatus(id: number, status: string) {
     await supabase.from('report_snapshot').update({ status, modified_at: new Date().toISOString() }).eq('id', id)
     await loadSnapshots()
     if (selected?.id === id) setSelected(s => s ? { ...s, status: status as ReportSnapshot['status'] } : s)
   }
 
-  //  Delete snapshot 
+  // ── Delete snapshot ──
   async function deleteSnapshot(id: number) {
     if (!confirm('Delete this report snapshot and all its data?')) return
     await supabase.from('report_snapshot').delete().eq('id', id)
@@ -351,14 +344,14 @@ export default function ReportingPage() {
     await loadSnapshots()
   }
 
-  //  Export Excel 
+  // ── Export Excel ──
   function exportExcel() {
     if (!selected) return
     const wb = XLSX.utils.book_new()
     // Summary sheet
     const summaryData = [
       ['Report Name', selected.report_name],
-      ['Period', selected.date_from && selected.date_to ? `${selected.date_from}  ${selected.date_to}` : `${MONTHS[selected.report_month - 1]} ${selected.report_year}`],
+      ['Period', selected.date_from && selected.date_to ? `${selected.date_from} → ${selected.date_to}` : `${MONTHS[selected.report_month - 1]} ${selected.report_year}`],
       ['GDS', (selected.gds as GDS)?.name ?? 'All GDS'],
       ['Status', selected.status],
       ['Notes', selected.notes ?? ''],
@@ -379,23 +372,23 @@ export default function ReportingPage() {
     XLSX.writeFile(wb, `GDSHub_Report_${selected.date_from ?? selected.report_year}_to_${selected.date_to ?? selected.report_month}.xlsx`)
   }
 
-  //  Input style helper 
+  // ── Input style helper ──
   const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:'white', color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lbl = { fontSize:'11px', fontWeight:600, color:'#475569', textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'4px', display:'block' }
 
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',color:'#94a3b8',fontSize:'14px'}}>
-      Loading reporting module
+      Loading reporting module…
     </div>
   )
 
   return (
     <div style={{fontFamily:'Inter,system-ui,sans-serif'}}>
 
-      {/*  Page Header  */}
+      {/* ── Page Header ── */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'20px'}}>
         <div>
-          <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Reporting</h1>
+          <h1 style={{fontSize:'26px',fontWeight:700,color:'#0f172a',margin:0}}>Reporting</h1>
           <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Monthly GDS user snapshots by GDS, PCC and Organisation</p>
         </div>
         {isAdmin && (
@@ -407,13 +400,13 @@ export default function ReportingPage() {
         )}
       </div>
 
-      {/*  Toast messages  */}
+      {/* ── Toast messages ── */}
       {error   && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{error}</div>}
       {success && <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#16a34a',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{success}</div>}
 
       <div style={{display:'grid',gridTemplateColumns:'300px 1fr',gap:'16px',alignItems:'start'}}>
 
-        {/*  Left: Snapshot list  */}
+        {/* ── Left: Snapshot list ── */}
         <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
           <div style={{padding:'12px 14px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc'}}>
             <span style={{fontSize:'12px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em'}}>Report Snapshots</span>
@@ -422,7 +415,7 @@ export default function ReportingPage() {
           {snapshots.length === 0 ? (
             <div style={{padding:'32px 16px',textAlign:'center',color:'#94a3b8',fontSize:'13px'}}>
               No reports yet.<br/>
-              {isAdmin && <span style={{color:'#6366f1',cursor:'pointer',fontWeight:500}} onClick={() => setShowForm(true)}>Create the first one </span>}
+              {isAdmin && <span style={{color:'#6366f1',cursor:'pointer',fontWeight:500}} onClick={() => setShowForm(true)}>Create the first one →</span>}
             </div>
           ) : (
             <div style={{maxHeight:'600px',overflowY:'auto'}}>
@@ -441,8 +434,8 @@ export default function ReportingPage() {
                     </div>
                     <div style={{fontSize:'12px',color:'#64748b'}}>
                       {snap.date_from && snap.date_to
-                        ? `${snap.date_from}  ${snap.date_to}`
-                        : snap.date_from && snap.date_to ? `${snap.date_from}  ${snap.date_to}` : `${MONTHS[snap.report_month - 1]} ${snap.report_year}`}
+                        ? `${snap.date_from} → ${snap.date_to}`
+                        : snap.date_from && snap.date_to ? `${snap.date_from} → ${snap.date_to}` : `${MONTHS[snap.report_month - 1]} ${snap.report_year}`}
                       {snap.gds && <span style={{marginLeft:'6px',padding:'1px 6px',borderRadius:'4px',background: GDS_COLORS[snap.gds.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600,color:'#334155'}}>{snap.gds.name}</span>}
                     </div>
                   </div>
@@ -452,7 +445,7 @@ export default function ReportingPage() {
           )}
         </div>
 
-        {/*  Right: Detail panel  */}
+        {/* ── Right: Detail panel ── */}
         {!selected ? (
           <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px 24px',textAlign:'center',color:'#94a3b8',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -466,9 +459,9 @@ export default function ReportingPage() {
               <div>
                 <div style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>{selected.report_name}</div>
                 <div style={{fontSize:'12px',color:'#64748b',marginTop:'2px'}}>
-                  {selected.date_from && selected.date_to ? `${selected.date_from}  ${selected.date_to}` : `${MONTHS[selected.report_month - 1]} ${selected.report_year}`}
+                  {selected.date_from && selected.date_to ? `${selected.date_from} → ${selected.date_to}` : `${MONTHS[selected.report_month - 1]} ${selected.report_year}`}
                   {selected.gds && <span style={{marginLeft:'8px',padding:'1px 7px',borderRadius:'4px',background: GDS_COLORS[(selected.gds as GDS)?.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{(selected.gds as GDS)?.name}</span>}
-                  {selected.notes && <span style={{marginLeft:'8px',color:'#94a3b8'}}> {selected.notes}</span>}
+                  {selected.notes && <span style={{marginLeft:'8px',color:'#94a3b8'}}>· {selected.notes}</span>}
                 </div>
               </div>
               <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
@@ -483,7 +476,7 @@ export default function ReportingPage() {
                     <button onClick={() => pullFromGDS(selected)} disabled={pulling}
                       style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#4f46e5',color:'white',border:'none',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer',opacity:pulling?0.6:1}}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                      {pulling ? 'Pulling' : 'Pull from GDS'}
+                      {pulling ? 'Pulling…' : 'Pull from GDS'}
                     </button>
                     <button onClick={exportExcel}
                       style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
@@ -515,7 +508,7 @@ export default function ReportingPage() {
             {/* Tab content */}
             <div style={{padding:'16px 18px'}}>
 
-              {/*  Monthly Count Tab  */}
+              {/* ── Monthly Count Tab ── */}
               {activeTab === 'counts' && (
                 <>
                   {isAdmin && (
@@ -553,8 +546,8 @@ export default function ReportingPage() {
                               <td style={{padding:'10px 12px',color:'#16a34a',fontWeight:600,textAlign:'center'}}>{c.active_users}</td>
                               <td style={{padding:'10px 12px',color:'#dc2626',fontWeight:600,textAlign:'center'}}>{c.inactive_users}</td>
                               <td style={{padding:'10px 12px',color:'#7c3aed',fontWeight:600,textAlign:'center'}}>{c.ota_users}</td>
-                              <td style={{padding:'10px 12px',color:'#0369a1',fontWeight:600,textAlign:'center'}}>{c.adjusted_count ?? ''}</td>
-                              <td style={{padding:'10px 12px',color:'#64748b',fontSize:'12px'}}>{c.count_note ?? ''}</td>
+                              <td style={{padding:'10px 12px',color:'#0369a1',fontWeight:600,textAlign:'center'}}>{c.adjusted_count ?? '—'}</td>
+                              <td style={{padding:'10px 12px',color:'#64748b',fontSize:'12px'}}>{c.count_note ?? '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -575,7 +568,7 @@ export default function ReportingPage() {
                 </>
               )}
 
-              {/*  User Detail Tab  */}
+              {/* ── User Detail Tab ── */}
               {activeTab === 'users' && (
                 <>
                   {isAdmin && (
@@ -609,19 +602,19 @@ export default function ReportingPage() {
                               </td>
                               <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{u.pcc}</td>
                               <td style={{padding:'10px 12px',color:'#334155'}}>{u.organisation}</td>
-                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#7c3aed'}}>{u.initial ?? ''}</td>
-                              <td style={{padding:'10px 12px',color:'#334155'}}>{[u.first_name, u.last_name].filter(Boolean).join(' ') || ''}</td>
-                              <td style={{padding:'10px 12px',color:'#0369a1',fontSize:'12px'}}>{u.email ?? ''}</td>
-                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.login_id ?? ''}</td>
-                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.sign_on_id ?? ''}</td>
+                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#7c3aed'}}>{u.initial ?? '—'}</td>
+                              <td style={{padding:'10px 12px',color:'#334155'}}>{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</td>
+                              <td style={{padding:'10px 12px',color:'#0369a1',fontSize:'12px'}}>{u.email ?? '—'}</td>
+                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.login_id ?? '—'}</td>
+                              <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.sign_on_id ?? '—'}</td>
                               <td style={{padding:'10px 12px'}}>
                                 <span style={{fontSize:'11px',fontWeight:600,padding:'2px 8px',borderRadius:'20px',
                                   background: u.user_status==='active' ? '#dcfce7' : u.user_status==='inactive' ? '#fee2e2' : '#fef9c3',
                                   color:      u.user_status==='active' ? '#166534' : u.user_status==='inactive' ? '#dc2626' : '#854d0e'}}>
-                                  {u.user_status ?? ''}
+                                  {u.user_status ?? '—'}
                                 </span>
                               </td>
-                              <td style={{padding:'10px 12px',color:'#64748b',fontSize:'12px'}}>{u.last_login_date ?? ''}</td>
+                              <td style={{padding:'10px 12px',color:'#64748b',fontSize:'12px'}}>{u.last_login_date ?? '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -635,15 +628,15 @@ export default function ReportingPage() {
         )}
       </div>
 
-      {/* 
+      {/* ════════════════════════════════════════════════════
           MODAL: New Snapshot
-       */}
+      ════════════════════════════════════════════════════ */}
       {showForm && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
           <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'500px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>New Report Snapshot</span>
-              <button onClick={() => setShowForm(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
+              <button onClick={() => setShowForm(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:'14px'}}>
               <div>
@@ -662,7 +655,7 @@ export default function ReportingPage() {
                 </div>
               </div>
               <div>
-                <label style={lbl}>GDS (optional  leave blank for all)</label>
+                <label style={lbl}>GDS (optional — leave blank for all)</label>
                 <select value={snapForm.gds_id} onChange={e => setSnapForm(s => ({...s, gds_id: e.target.value}))} style={inp()}>
                   <option value="">All GDS</option>
                   {gdsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -679,29 +672,29 @@ export default function ReportingPage() {
               <button onClick={() => setShowForm(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={createSnapshot} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
-                {saving ? 'Creating' : 'Create Report'}
+                {saving ? 'Creating…' : 'Create Report'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 
+      {/* ════════════════════════════════════════════════════
           MODAL: Add Count Row
-       */}
+      ════════════════════════════════════════════════════ */}
       {showAddCount && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
           <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'520px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Add Count Row</span>
-              <button onClick={() => setShowAddCount(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
+              <button onClick={() => setShowAddCount(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:'12px'}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}}>
                 <div>
                   <label style={lbl}>GDS</label>
                   <select value={countForm.gds_name} onChange={e => setCountForm(s => ({...s, gds_name: e.target.value}))} style={inp()}>
-                    <option value="">Select</option>
+                    <option value="">Select…</option>
                     {gdsList.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                   </select>
                 </div>
@@ -729,7 +722,7 @@ export default function ReportingPage() {
                 </div>
                 <div>
                   <label style={lbl}>Note</label>
-                  <input value={countForm.count_note} onChange={e => setCountForm(s => ({...s, count_note: e.target.value}))} placeholder="Reason for adjustment" style={inp()} />
+                  <input value={countForm.count_note} onChange={e => setCountForm(s => ({...s, count_note: e.target.value}))} placeholder="Reason for adjustment…" style={inp()} />
                 </div>
               </div>
             </div>
@@ -737,29 +730,29 @@ export default function ReportingPage() {
               <button onClick={() => setShowAddCount(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={addCountRow} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
-                {saving ? 'Saving' : 'Add Row'}
+                {saving ? 'Saving…' : 'Add Row'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 
+      {/* ════════════════════════════════════════════════════
           MODAL: Add User Detail
-       */}
+      ════════════════════════════════════════════════════ */}
       {showAddUser && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
           <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'580px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Add User Record</span>
-              <button onClick={() => setShowAddUser(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
+              <button onClick={() => setShowAddUser(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:'12px'}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}}>
                 <div>
                   <label style={lbl}>GDS</label>
                   <select value={userForm.gds_name} onChange={e => setUserForm(s => ({...s, gds_name: e.target.value}))} style={inp()}>
-                    <option value="">Select</option>
+                    <option value="">Select…</option>
                     {gdsList.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                   </select>
                 </div>
@@ -829,7 +822,7 @@ export default function ReportingPage() {
               <button onClick={() => setShowAddUser(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={addUserRow} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
-                {saving ? 'Saving' : 'Add User'}
+                {saving ? 'Saving…' : 'Add User'}
               </button>
             </div>
           </div>

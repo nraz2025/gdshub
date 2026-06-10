@@ -3,12 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
-import PageHeader from '@/components/shared/PageHeader'
-import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { TravelportUser, User, OTAClient } from '@/types'
 import { syncUserToTable } from '@/lib/syncUser'
+
+
+const T = {
+  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
+  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
+  danger:'#dc2626', radius:'6px',
+}
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:   {bg:'#f0fdf4',color:'#166534',border:'#bbf7d0'},
+  inactive: {bg:'#f1f5f9',color:'#64748b',border:'#e2e8f0'},
+  suspended:{bg:'#fffbeb',color:'#92400e',border:'#fde68a'},
+  resigned: {bg:'#fef2f2',color:'#dc2626',border:'#fecaca'},
+}
+
 
 const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active',
 }
@@ -84,7 +96,7 @@ export default function TravelportUsersPage() {
     }
     const audit = await getAuditFields()
 
-    // Resolve user_id — use selected user or auto-create from email
+    // Resolve user_id - use selected user or auto-create from email
     let resolvedUserId = form.user_id || null
     if ((form as {newEmail?: string}).newEmail?.trim()) {
       const synced = await syncUserToTable({
@@ -191,7 +203,7 @@ export default function TravelportUsersPage() {
     let success = 0; let failed = 0; const failedRows: string[] = []
     for (const row of valid) {
       const { error } = await supabase.from('travelport_user').insert({ sign_on_id: row.sign_on_id || null, cid: row.cid || null, gtid: row.gtid || null, pcc: row.pcc || null, ota: row.ota })
-      if (error) { failed++; failedRows.push(`${row.sign_on_id || row.cid} — ${error.message}`) } else { success++ }
+      if (error) { failed++; failedRows.push(`${row.sign_on_id || row.cid} - ${error.message}`) } else { success++ }
     }
     setImporting(false); setImportResult({ success, failed, failedRows })
     if (success > 0) fetchAll()
@@ -204,70 +216,93 @@ export default function TravelportUsersPage() {
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
     const term = search.toLowerCase()
     const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active') === filterStatus
-    return ((r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term) || (r.initial ?? '').toLowerCase().includes(term)) && matchStatus
+    return (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term) || (r.initial ?? '').toLowerCase().includes(term) && matchStatus
   })
 
   const validRows = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
-  const columns = [
-    { key: 'sign_on_id', label: 'Sign-On ID', render: (row: TravelportUser) => <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{row.sign_on_id ?? '—'}</span> },
-    { key: 'cid', label: 'CID', render: (row: TravelportUser) => <span className="font-mono text-xs text-slate-600">{row.cid ?? '—'}</span> },
-    { key: 'gtid', label: 'GTID', render: (row: TravelportUser) => <span className="font-mono text-xs text-slate-600">{row.gtid ?? '—'}</span> },
-    { key: 'pcc', label: 'PCC', render: (row: TravelportUser) => <span className="font-mono text-xs text-slate-600">{row.pcc ?? '—'}</span> },
-    { key: 'ota', label: 'OTA', render: (row: TravelportUser) => <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${row.ota ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.ota ? 'Yes' : 'No'}</span> },
-    { key: 'status', label: 'Status', render: (row: TravelportUser) => {
-      const s = ((row as {status?: string}).status ?? 'active').toLowerCase()
-      const map: Record<string, string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', inactive:'bg-slate-100 text-slate-500 border-slate-200', suspended:'bg-amber-50 text-amber-700 border-amber-200', resigned:'bg-red-50 text-red-600 border-red-200' }
-      return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${map[s] ?? map.active}`}>{s}</span>
-    }},
-    { key: 'ota_client_id', label: 'OTA Client', render: (row: TravelportUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">—</span> } },
-    { key: 'user_id', label: 'Linked User', render: (row: TravelportUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">—</span> } },
-    {
-      key: 'modified_at', label: 'Last Modified',
-      render: (row: TravelportUser) => {
-        const r = row as TravelportUser & {modified_at?: string; modified_by?: string}
-        if (!r.modified_at) return <span className="text-slate-300 text-xs">—</span>
-        return (
-          <div>
-            <p className="text-xs text-slate-600">{new Date(r.modified_at).toLocaleDateString('en-MY')}</p>
-            {r.modified_by && <p className="text-xs text-slate-400">{r.modified_by}</p>}
-          </div>
-        )
-      }
-    },
-    { key: 'created_at', label: 'Created', render: (row: TravelportUser) => new Date(row.created_at).toLocaleDateString('en-MY') },
-  ]
+  const activeCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='active').length
+  const otaCount = records.filter(r=>r.ota).length
 
   return (
-    <div>
-      <PageHeader title="Travelport Users" description="Manage Travelport CID and GTID accounts"
-        action={<div className="flex items-center gap-2">
+    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
+      <div style={{background:'white',borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
+          <div>
+            <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Travelport Users</h1>
+            <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Manage Travelport CID and GTID accounts</p>
+          </div>
           {isAdmin && (
-          <button onClick={handleExport} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export xlsx</button>
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <button onClick={handleExport} disabled={filtered.length===0} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
+              <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
+              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Travelport User</button>
+            </div>
           )}
-          {isAdmin && <><input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import xlsx</button>
-          <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Travelport User</button></>}
-        </div>}
-      />
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input type="text" placeholder="Search Sign-On, CID, PCC, initial or name…" value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-72 px-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400" />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-400">
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
-          <option value="resigned">Resigned</option>
-        </select>
-        {!loading && <span className="text-xs text-slate-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}</span>}
+        </div>
       </div>
-      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
-        <DataTable columns={columns} data={filtered as unknown as Record<string, unknown>[]} onEdit={isAdmin ? r => openEdit(r as unknown as TravelportUser) : undefined} onDelete={isAdmin ? r => openDelete(r as unknown as TravelportUser) : undefined} isAdmin={isAdmin} emptyMessage="No Travelport users found." />
-      )}
+      <div style={{padding:'0 28px 28px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'14px',marginBottom:'24px'}}>
+          {[{label:'Total Users',value:records.length,sub:'registered',accent:false},{label:'Active',value:activeCount,sub:'currently active',accent:false},{label:'Inactive',value:records.length-activeCount,sub:'not active',accent:false},{label:'OTA Users',value:otaCount,sub:'OTA enabled',accent:true}].map((s,i)=>(
+            <div key={i} style={{background:s.accent?T.primary:'white',border:`1px solid ${s.accent?T.primary:T.border}`,borderRadius:T.radius,padding:'16px 18px'}}>
+              <div style={{fontSize:'11px',fontWeight:700,color:s.accent?'rgba(255,255,255,0.75)':T.textLight,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'6px'}}>{s.label}</div>
+              <div style={{fontSize:'26px',fontWeight:800,color:s.accent?'white':T.text,letterSpacing:'-0.03em',lineHeight:1}}>{s.value}</div>
+              <div style={{fontSize:'11px',color:s.accent?'rgba(255,255,255,0.65)':T.textLight,marginTop:'4px'}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <div style={{position:'relative',flex:1,minWidth:'240px'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search Sign-On, CID, PCC, initial or name..." value={search} onChange={e => setSearch(e.target.value)}
+              style={{width:'100%',padding:'8px 12px 8px 32px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:'white',color:T.text,outline:'none',boxSizing:'border-box'}} />
+          </div>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:'white',color:T.text,outline:'none',cursor:'pointer',minWidth:'140px'}}>
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+            <option value="resigned">Resigned</option>
+          </select>
+          <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} record{filtered.length!==1?'s':''}</span>
+        </div>
+        {loading ? <div style={{textAlign:'center',padding:'60px',color:T.textLight}}>Loading...</div> : (
+          <div style={{background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',background:T.surfaceAlt,borderBottom:`2px solid ${T.border}`}}>
+              {['Sign-On','CID','GTID','PCC','Initial','Linked User','Status','Actions'].map((h,i)=>(
+                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:T.primary,textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===7?'right':'left'}}>{h}</div>
+              ))}
+            </div>
+            {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Travelport users found.</div> :
+            filtered.map((row,i)=>{
+              const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
+              const sval = ((row as {status?:string}).status ?? 'active').toLowerCase()
+              const ss = STATUS_STYLE[sval] ?? STATUS_STYLE.active
+              return (
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
+                  onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.sign_on_id??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.cid??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.gtid??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,textTransform:'capitalize'}}>{sval}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px'}}>
+                    {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>
+                    <button onClick={()=>openDelete(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.danger,background:'white',border:'1px solid #fecaca',borderRadius:T.radius,cursor:'pointer'}}>Delete</button></>)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Travelport User' : 'Add Travelport User'}>
@@ -286,7 +321,7 @@ export default function TravelportUsersPage() {
           </div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
             <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
             </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
@@ -298,14 +333,14 @@ export default function TravelportUsersPage() {
             </select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}</select></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA
           {/* Create & link new user inline */}
           {!form.user_id && (
             <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet - fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                 <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
@@ -325,8 +360,8 @@ export default function TravelportUsersPage() {
             <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div></div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add User'}</button>
+            <button onClick={() => setModalOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}</button>
           </div>
         </div>
       </Modal>
@@ -336,8 +371,8 @@ export default function TravelportUsersPage() {
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Delete Travelport user <strong className="font-mono">{editing?.sign_on_id ?? editing?.cid}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
-            <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting…' : 'Delete'}</button>
+            <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
+            <button onClick={handleDelete} disabled={saving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.danger,color:"white",cursor:"pointer"}}>{saving ? 'Deleting...' : 'Delete'}</button>
           </div>
         </div>
       </Modal>
@@ -347,8 +382,8 @@ export default function TravelportUsersPage() {
         <div className="space-y-4">
           {importResult ? (
             <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-              {importResult.failed === 0 ? <p className="font-medium">✅ Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p> : (
-                <div className="space-y-1"><p className="font-medium">✅ {importResult.success} imported · ⚠️ {importResult.failed} skipped</p>
+              {importResult.failed === 0 ? <p className="font-medium"> Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p> : (
+                <div className="space-y-1"><p className="font-medium"> {importResult.success} imported   {importResult.failed} skipped</p>
                   {importResult.failedRows.map((r, i) => <p key={i} className="text-xs opacity-70 font-mono">{r}</p>)}</div>
               )}
             </div>
@@ -356,11 +391,11 @@ export default function TravelportUsersPage() {
             <>
               <div className="flex items-center justify-between">
                 <div><p className="text-sm text-slate-600">File: <span className="font-medium">{importFileName}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows — <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p></div>
+                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows - <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p></div>
                 <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500">
-                Required: <span className="font-mono font-medium text-slate-700">Sign-On ID</span> or <span className="font-mono font-medium text-slate-700">CID</span> · Optional: <span className="font-mono font-medium text-slate-700">GTID</span>, <span className="font-mono font-medium text-slate-700">PCC</span>, <span className="font-mono font-medium text-slate-700">OTA</span>
+                Required: <span className="font-mono font-medium text-slate-700">Sign-On ID</span> or <span className="font-mono font-medium text-slate-700">CID</span>  Optional: <span className="font-mono font-medium text-slate-700">GTID</span>, <span className="font-mono font-medium text-slate-700">PCC</span>, <span className="font-mono font-medium text-slate-700">OTA</span>
               </div>
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
@@ -371,26 +406,27 @@ export default function TravelportUsersPage() {
                     {importRows.map((row, i) => (
                       <tr key={i} className={`border-b border-slate-50 ${row._errors.length > 0 ? 'bg-red-50/60' : ''}`}>
                         <td className="px-3 py-2 text-slate-400">{row._row}</td>
-                        <td className="px-3 py-2 font-mono font-bold">{row.sign_on_id || '—'}</td>
-                        <td className="px-3 py-2 font-mono">{row.cid || '—'}</td>
-                        <td className="px-3 py-2 font-mono">{row.gtid || '—'}</td>
-                        <td className="px-3 py-2 font-mono">{row.pcc || '—'}</td>
+                        <td className="px-3 py-2 font-mono font-bold">{row.sign_on_id || '-'}</td>
+                        <td className="px-3 py-2 font-mono">{row.cid || '-'}</td>
+                        <td className="px-3 py-2 font-mono">{row.gtid || '-'}</td>
+                        <td className="px-3 py-2 font-mono">{row.pcc || '-'}</td>
                         <td className="px-3 py-2">{row.ota ? 'Yes' : 'No'}</td>
-                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium">✓ OK</span> : <span className="text-red-500">✗ {row._errors[0]}</span>}</td>
+                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium"> OK</span> : <span className="text-red-500"> {row._errors[0]}</span>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {invalidRows.length > 0 && <p className="text-xs text-slate-400">⚠️ {invalidRows.length} row{invalidRows.length !== 1 ? 's' : ''} with errors will be skipped.</p>}
+              {invalidRows.length > 0 && <p className="text-xs text-slate-400"> {invalidRows.length} row{invalidRows.length !== 1 ? 's' : ''} with errors will be skipped.</p>}
             </>
           )}
           <div className="flex gap-3 pt-1">
-            <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">{importResult ? 'Close' : 'Cancel'}</button>
-            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing…' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
+            <button onClick={closeImport} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>{importResult ? 'Close' : 'Cancel'}</button>
+            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{importing ? 'Importing...' : ('Import ' + validRows.length + ' Record' + (validRows.length !== 1 ? 's' : ''))}</button>}
           </div>
         </div>
       </Modal>
+      </div>
     </div>
   )
 }

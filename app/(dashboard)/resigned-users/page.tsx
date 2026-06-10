@@ -4,7 +4,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
 
-// ── Types ────────────────────────────────────────────────────
+const T = {
+  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
+  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
+  danger:'#dc2626', radius:'6px',
+}
+
+
+//  Types 
 interface ResignedUser {
   id: number
   source_gds: 'Amadeus' | 'Sabre' | 'Travelport'
@@ -54,11 +61,11 @@ export default function ResignedUsersPage() {
   const [search, setSearch]           = useState('')
   const [filterGDS, setFilterGDS]     = useState('all')
 
-  // Edit form — remarks only now
+  // Edit form  remarks only now
   const blankReuse = { remarks: '' }
   const [reuseForm, setReuseForm] = useState(blankReuse)
 
-  // ── Load ──
+  //  Load 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -80,7 +87,7 @@ export default function ResignedUsersPage() {
     setRecords((data as ResignedUser[]) ?? [])
   }, [])
 
-  // ── Filtered ──
+  //  Filtered 
   const filtered = records.filter(r => {
     const term = search.toLowerCase()
     const matchSearch = !term
@@ -96,7 +103,7 @@ export default function ResignedUsersPage() {
     return matchSearch && matchGDS
   })
 
-  // ── Open detail ──
+  //  Open detail 
   function openDetail(row: ResignedUser) {
     setSelected(row)
     setReuseForm({
@@ -106,7 +113,7 @@ export default function ResignedUsersPage() {
     setError('')
   }
 
-  // ── Save reuse update ──
+  //  Save reuse update 
   async function saveReuse() {
     if (!selected) return
     setSaving(true); setError('')
@@ -120,7 +127,7 @@ export default function ResignedUsersPage() {
     setTimeout(() => setSuccess(''), 3000)
   }
 
-  // ── Export ──
+  //  Export 
   function exportExcel() {
     const headers = ['GDS','Full Name','Initial','Email','Organisation','PCC','GDS Login/ID','Date Created in GDS','Date Resigned','Remarks']
     const rows = filtered.map(r => [
@@ -140,25 +147,25 @@ export default function ResignedUsersPage() {
     XLSX.writeFile(wb, `GDSHub_Resigned_Users_${new Date().toISOString().slice(0,10)}.xlsx`)
   }
 
-  // ── Helpers ──
-  const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' }) : '—'
+  //  Helpers 
+  const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' }) : ''
   const lbl = { fontSize:'11px', fontWeight:600, color:'#475569', textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'4px', display:'block' }
   const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:'white', color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
 
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',color:'#94a3b8',fontSize:'14px'}}>
-      Loading resigned users…
+      Loading resigned users
     </div>
   )
 
   return (
     <div style={{fontFamily:'Inter,system-ui,sans-serif'}}>
 
-      {/* ── Page Header ── */}
+      {/*  Page Header  */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'20px'}}>
         <div>
-          <h1 style={{fontSize:'26px',fontWeight:700,color:'#0f172a',margin:0}}>Resigned Users</h1>
-          <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Archive of GDS users who have resigned — track initial reuse history</p>
+          <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Resigned Users</h1>
+          <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Archive of GDS users who have resigned  track initial reuse history</p>
         </div>
         <button onClick={exportExcel} disabled={filtered.length === 0}
           style={{display:'flex',alignItems:'center',gap:'7px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
@@ -167,11 +174,11 @@ export default function ResignedUsersPage() {
         </button>
       </div>
 
-      {/* ── Toasts ── */}
+      {/*  Toasts  */}
       {error   && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{error}</div>}
       {success && <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#16a34a',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{success}</div>}
 
-      {/* ── Stats bar ── */}
+      {/*  Stats bar  */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'12px',marginBottom:'16px'}}>
         {[
           { label:'Total Resigned', value: records.length, color:'#0f172a', bg:'#f8fafc' },
@@ -181,14 +188,14 @@ export default function ResignedUsersPage() {
         ].map(s => (
           <div key={s.label} style={{background:s.bg,border:'1px solid #e2e8f0',borderRadius:'10px',padding:'14px 16px'}}>
             <div style={{fontSize:'22px',fontWeight:800,color:s.color}}>{s.value}</div>
-            <div style={{fontSize:'12px',color:'#64748b',marginTop:'2px'}}>{s.label}</div>
+            <div style={{fontSize:'16px',color:'#64748b',marginTop:'2px'}}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Filters ── */}
+      {/*  Filters  */}
       <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-        <input type="text" placeholder="Search name, initial, email, org, PCC…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search name, initial, email, org, PCC" value={search} onChange={e => setSearch(e.target.value)}
           style={{...inp(), width:'280px'}} />
         <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} style={inp({width:'140px'})}>
           <option value="all">All GDS</option>
@@ -205,9 +212,9 @@ export default function ResignedUsersPage() {
         )}
       </div>
 
-      {/* ── Table ── */}
+      {/*  Table  */}
       {loading ? (
-        <div style={{textAlign:'center',padding:'60px',color:'#94a3b8',fontSize:'14px'}}>Loading…</div>
+        <div style={{textAlign:'center',padding:'60px',color:'#94a3b8',fontSize:'14px'}}>Loading</div>
       ) : filtered.length === 0 ? (
         <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px',textAlign:'center',color:'#94a3b8'}}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
@@ -228,8 +235,8 @@ export default function ResignedUsersPage() {
               <tbody>
                 {filtered.map((r, i) => {
                   const gds = GDS_COLORS[r.source_gds]
-                  const loginId = r.amadeus_login ?? r.sabre_epr ?? r.travelport_sign_on_id ?? '—'
-                  const pcc = r.pcc ?? r.sabre_pcc ?? r.travelport_pcc ?? '—'
+                  const loginId = r.amadeus_login ?? r.sabre_epr ?? r.travelport_sign_on_id ?? ''
+                  const pcc = r.pcc ?? r.sabre_pcc ?? r.travelport_pcc ?? ''
                   return (
                     <tr key={r.id} style={{borderBottom: i < filtered.length-1 ? '1px solid #f1f5f9' : 'none'}}
                       onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
@@ -240,16 +247,16 @@ export default function ResignedUsersPage() {
                       <td style={{padding:'11px 14px'}}>
                         {r.initial
                           ? <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'14px',color:'#7c3aed',background:'#f3e8ff',padding:'2px 8px',borderRadius:'5px'}}>{r.initial}</span>
-                          : <span style={{color:'#cbd5e1'}}>—</span>}
+                          : <span style={{color:'#cbd5e1'}}></span>}
                       </td>
-                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'13px'}}>{r.full_name ?? '—'}</td>
-                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'12px'}}>{r.email ?? '—'}</td>
-                      <td style={{padding:'11px 14px',color:'#334155',fontSize:'13px'}}>{r.organisation ?? '—'}</td>
+                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'13px'}}>{r.full_name ?? ''}</td>
+                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'12px'}}>{r.email ?? ''}</td>
+                      <td style={{padding:'11px 14px',color:'#334155',fontSize:'13px'}}>{r.organisation ?? ''}</td>
                       <td style={{padding:'11px 14px'}}>
-                        <div style={{fontFamily:'monospace',fontSize:'12px',fontWeight:600,color:'#0f172a'}}>{pcc !== '—' ? pcc : ''}</div>
+                        <div style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#0f172a'}}>{pcc !== '' ? pcc : ''}</div>
                         <div style={{fontFamily:'monospace',fontSize:'11px',color:'#64748b'}}>{loginId}</div>
                       </td>
-                      <td style={{padding:'11px 14px',fontSize:'12px',color:'#64748b',whiteSpace:'nowrap'}}>{fmt(r.date_created_in_gds)}</td>
+                      <td style={{padding:'11px 14px',fontSize:'16px',color:'#64748b',whiteSpace:'nowrap'}}>{fmt(r.date_created_in_gds)}</td>
                       <td style={{padding:'11px 14px',fontSize:'12px',color:'#dc2626',fontWeight:600,whiteSpace:'nowrap'}}>{fmt(r.date_resigned)}</td>
                       <td style={{padding:'11px 14px'}}>
                         {isAdmin && (
@@ -268,9 +275,9 @@ export default function ResignedUsersPage() {
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════
+      {/* 
           DETAIL / EDIT MODAL
-      ════════════════════════════════════════════════════ */}
+       */}
       {showDetail && selected && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
           <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'620px',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
@@ -286,7 +293,7 @@ export default function ResignedUsersPage() {
                   {selected.source_gds}
                 </span>
               </div>
-              <button onClick={() => setShowDetail(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'22px',lineHeight:1}}>×</button>
+              <button onClick={() => setShowDetail(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'22px',lineHeight:1}}></button>
             </div>
 
             <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:'16px'}}>
@@ -296,29 +303,29 @@ export default function ResignedUsersPage() {
                 <div style={{fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'12px'}}>Snapshot at Time of Resignation</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                   {[
-                    ['Initial', selected.initial ?? '—'],
-                    ['Email', selected.email ?? '—'],
-                    ['Organisation', selected.organisation ?? '—'],
-                    ['OTA Client', selected.ota_client ?? '—'],
+                    ['Initial', selected.initial ?? ''],
+                    ['Email', selected.email ?? ''],
+                    ['Organisation', selected.organisation ?? ''],
+                    ['OTA Client', selected.ota_client ?? ''],
                     ['Date Created in GDS', fmt(selected.date_created_in_gds)],
                     ['Date Resigned', fmt(selected.date_resigned)],
                     ...(selected.source_gds === 'Amadeus' ? [
-                      ['Login', selected.amadeus_login ?? '—'],
-                      ['Sign-On ID', selected.amadeus_sign_on_id ?? '—'],
-                      ['Duty Code', selected.amadeus_duty_code ?? '—'],
-                      ['OID', selected.amadeus_oid ?? '—'],
+                      ['Login', selected.amadeus_login ?? ''],
+                      ['Sign-On ID', selected.amadeus_sign_on_id ?? ''],
+                      ['Duty Code', selected.amadeus_duty_code ?? ''],
+                      ['OID', selected.amadeus_oid ?? ''],
                     ] : selected.source_gds === 'Sabre' ? [
-                      ['EPR', selected.sabre_epr ?? '—'],
-                      ['PCC', selected.sabre_pcc ?? '—'],
+                      ['EPR', selected.sabre_epr ?? ''],
+                      ['PCC', selected.sabre_pcc ?? ''],
                     ] : [
-                      ['Sign-On ID', selected.travelport_sign_on_id ?? '—'],
-                      ['CID', selected.travelport_cid ?? '—'],
-                      ['GTID', selected.travelport_gtid ?? '—'],
-                      ['PCC', selected.travelport_pcc ?? '—'],
+                      ['Sign-On ID', selected.travelport_sign_on_id ?? ''],
+                      ['CID', selected.travelport_cid ?? ''],
+                      ['GTID', selected.travelport_gtid ?? ''],
+                      ['PCC', selected.travelport_pcc ?? ''],
                     ]) as [string, string][]
                   ].map(([k, v]) => (
                     <div key={k}>
-                      <div style={{fontSize:'11px',color:'#94a3b8',fontWeight:500}}>{k}</div>
+                      <div style={{fontSize:'14px',color:'#94a3b8',fontWeight:500}}>{k}</div>
                       <div style={{fontSize:'13px',fontWeight:600,color:'#334155',fontFamily: k.includes('Login')||k.includes('EPR')||k.includes('OID')||k.includes('PCC')||k.includes('CID') ? 'monospace' : 'inherit'}}>{v}</div>
                     </div>
                   ))}
@@ -331,7 +338,7 @@ export default function ResignedUsersPage() {
                   <div>
                     <label style={lbl}>Remarks</label>
                     <textarea value={reuseForm.remarks} onChange={e => setReuseForm(s => ({...s, remarks: e.target.value}))}
-                      placeholder="Any additional notes…" rows={3}
+                      placeholder="Any additional notes" rows={3}
                       style={{...inp(), resize:'vertical', fontFamily:'inherit'}} />
                   </div>
 
@@ -342,13 +349,13 @@ export default function ResignedUsersPage() {
 
             {/* Footer */}
             <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px',position:'sticky',bottom:0,background:'white'}}>
-              <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>
+              <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',color:'#475569',cursor:'pointer',fontWeight:500}}>
                 Close
               </button>
               {isAdmin && (
                 <button onClick={saveReuse} disabled={saving}
                   style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
-                  {saving ? 'Saving…' : 'Save Changes'}
+                  {saving ? 'Saving' : 'Save Changes'}
                 </button>
               )}
             </div>

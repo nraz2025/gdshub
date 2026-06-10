@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
-import PageHeader from '@/components/shared/PageHeader'
 import DataTable from '@/components/shared/DataTable'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
+
+const T = {
+  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
+  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
+  danger:'#dc2626', radius:'6px',
+}
+
 
 type PCCStatus = 'Active' | 'Pending' | 'Vacant'
 const PCC_STATUSES: PCCStatus[] = ['Active', 'Pending', 'Vacant']
@@ -147,7 +153,7 @@ export default function GDSInfoPage() {
     setLoading(false)
   }
 
-  // ── CRUD ──────────────────────────────────────────────────────
+  //  CRUD 
   function openAdd() {
     setEditing(null)
     setForm({ ...EMPTY, gds_id: gdsList[0]?.id })
@@ -193,7 +199,7 @@ export default function GDSInfoPage() {
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  // ── PCC ASSIGNED LOGIN POPUP ──────────────────────────────────
+  //  PCC ASSIGNED LOGIN POPUP 
   async function openLoginPopup(pcc: PCCList) {
     if (!pcc.ota_client_id) return
     setLoginPopupPCC(pcc)
@@ -215,10 +221,10 @@ export default function GDSInfoPage() {
     setLoginPopupLoading(false)
   }
 
-  // ── GDS FEATURE POPUP ─────────────────────────────────────────
+  //  GDS FEATURE POPUP 
   function openFeaturePopup(row: PCCList) {
     setFeaturePopup(row)
-    // Use pcc_features (direct PCC assignments) — independent of any profile
+    // Use pcc_features (direct PCC assignments)  independent of any profile
     const existing = new Set(((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).map(pf => pf.feature_id))
     setProfileFeatureIds(existing)
     setFeaturePopupOpen(true)
@@ -240,7 +246,7 @@ export default function GDSInfoPage() {
     fetchAll()
   }
 
-  // ── EXPORT ────────────────────────────────────────────────────
+  //  EXPORT 
   function handleExport() {
     const data = filtered.map((r, i) => {
       const gdsName = (r.gds as GDS)?.name ?? ''
@@ -317,7 +323,7 @@ export default function GDSInfoPage() {
     let success = 0; let failed = 0; const failedRows: string[] = []
     for (const row of valid) {
       const { error } = await supabase.from('pcc_list').insert({ gds_id: row._gds_id, pcc: row.pcc, status: row.status })
-      if (error) { failed++; failedRows.push(`${row.pcc} (${row.gds_name}) — ${error.message}`) } else { success++ }
+      if (error) { failed++; failedRows.push(`${row.pcc} (${row.gds_name})  ${error.message}`) } else { success++ }
     }
     setImporting(false); setImportResult({ success, failed, failedRows })
     if (success > 0) fetchAll()
@@ -325,7 +331,7 @@ export default function GDSInfoPage() {
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null); setDetectedHeaders([]) }
 
-  // ── FILTER ────────────────────────────────────────────────────
+  //  FILTER 
   const filtered = records.filter(r => {
     const pccGroup = r.client_group as {id:number;name:string} | null
     if (filterGroup && !pccGroup?.name?.toLowerCase().includes(filterGroup.toLowerCase())) return false
@@ -396,7 +402,7 @@ export default function GDSInfoPage() {
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
-  // Features for popup — only those matching the PCC's GDS
+  // Features for popup  only those matching the PCC's GDS
   const popupGdsId = featurePopup ? featurePopup.gds_id : null
   const availableFeatures = allFeatures.filter(f => f.gds_id === popupGdsId)
 
@@ -412,7 +418,7 @@ export default function GDSInfoPage() {
     return `${amt}${suffixes[cycle] ?? ''}`
   }
 
-  // ── COLUMNS ───────────────────────────────────────────────────
+  //  COLUMNS 
   const columns = [
     // 0. Checkbox
     {
@@ -435,21 +441,21 @@ export default function GDSInfoPage() {
         const org = row.organisation as Organisation
         return org
           ? <div><p className="text-sm text-slate-700 font-medium">{org.organisation}</p>{org.iata && <p className="text-xs text-slate-400 font-mono">{org.iata}</p>}</div>
-          : <span className="text-slate-300 text-xs">—</span>
+          : <span className="text-slate-300 text-xs"></span>
       }
     },
     // 2. GDS
     {
       key: 'gds', label: 'GDS', width: '120px',
       render: (row: PCCList) => {
-        const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? '—'
+        const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? ''
         return <span className={`font-medium rounded-full border text-center ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`} style={{display:'inline-block',width:'100px',fontSize:'12px',padding:'4px 0',textAlign:'center'}}>{name}</span>
       }
     },
     // 3. PCC
     {
       key: 'pcc', label: 'PCC', width: '120px',
-      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 rounded" style={{display:'inline-block',width:'100px',textAlign:'center',fontSize:'13px',padding:'4px 0',textTransform:"uppercase",letterSpacing:'0.04em'}}>{row.pcc}</span>
+      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800 bg-slate-100 rounded" style={{display:'inline-block',width:'100px',textAlign:'center',fontSize:'16px',padding:'4px 0',textTransform:"uppercase",letterSpacing:'0.04em'}}>{row.pcc}</span>
     },
     // 5. PCC Functionality
     {
@@ -461,24 +467,24 @@ export default function GDSInfoPage() {
           'Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626'
         }
         return val
-          ? <span style={{fontSize:'13px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
-          : <span style={{color:'#cbd5e1'}}>—</span>
+          ? <span style={{fontSize:'16px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
+          : <span style={{color:'#cbd5e1'}}></span>
       }
     },
-    // 4. PCC Assigned — badge + view logins link
+    // 4. PCC Assigned  badge + view logins link
     {
       key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
         return ota ? (
           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-            <span style={{fontSize:'13px',fontWeight:500,color:'#334155',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'0.02em'}}>{ota.company_name}</span>
+            <span style={{fontSize:'16px',fontWeight:500,color:'#334155',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'0.02em'}}>{ota.company_name}</span>
             <button onClick={() => openLoginPopup(row)}
-              style={{fontSize:'12px',color:'#3b82f6',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0,whiteSpace:'nowrap'}}>
+              style={{fontSize:'14px',color:'#3b82f6',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0,whiteSpace:'nowrap'}}>
               View IDs
             </button>
           </div>
-        ) : <span style={{color:'#cbd5e1'}}>—</span>
+        ) : <span style={{color:'#cbd5e1'}}></span>
       }
     },
     // 4b. Client Group
@@ -487,11 +493,11 @@ export default function GDSInfoPage() {
       render: (row: PCCList) => {
         const g = row.client_group as {id:number;name:string} | null
         return g
-          ? <span style={{fontSize:'13px',fontWeight:500,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.03em'}}>{g.name}</span>
-          : <span style={{color:'#cbd5e1'}}>—</span>
+          ? <span style={{fontSize:'16px',fontWeight:500,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.03em'}}>{g.name}</span>
+          : <span style={{color:'#cbd5e1'}}></span>
       }
     },
-    // 6. GDS Feature — clickable badge that opens popup
+    // 6. GDS Feature  clickable badge that opens popup
     {
       key: 'functionality_id', label: 'GDS Feature', width: '120px',
       render: (row: PCCList) => {
@@ -500,10 +506,10 @@ export default function GDSInfoPage() {
         return (
           <button onClick={() => openFeaturePopup(row)}
             style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
-            <span style={{fontSize:'13px',color: directCount > 0 ? '#334155' : '#94a3b8',fontWeight: directCount > 0 ? 500 : 400,textTransform:'uppercase',letterSpacing:'0.02em'}}>
+            <span style={{fontSize:'16px',color: directCount > 0 ? '#334155' : '#94a3b8',fontWeight: directCount > 0 ? 500 : 400,textTransform:'uppercase',letterSpacing:'0.02em'}}>
               {func ? func.name : 'No profile'}
             </span>
-            <span style={{fontSize:'11px',fontWeight:600,color: directCount > 0 ? '#2563eb' : '#94a3b8',
+            <span style={{fontSize:'14px',fontWeight:600,color: directCount > 0 ? '#2563eb' : '#94a3b8',
               background: directCount > 0 ? '#dbeafe' : '#f1f5f9',
               borderRadius:'20px',padding:'1px 7px'}}>
               {directCount}
@@ -535,7 +541,7 @@ export default function GDSInfoPage() {
     {
       key: 'remarks', label: 'Remarks', width: '120px',
       render: (row: PCCList) => {
-        if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
+        if (!row.remarks) return <span className="text-slate-300 text-xs"></span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
         return points.length > 1 ? (
           <ul className="list-disc list-inside space-y-0.5">
@@ -549,12 +555,12 @@ export default function GDSInfoPage() {
   ]
 
   return (
-    <div>
+    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
       {/* Page Header */}
-      <div className="flex items-start justify-between mb-5">
+      <div className="flex items-start justify-between mb-5" style={{background:'white',borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'0'}}>
         <div>
-          <h1 style={{fontSize:"28px",fontWeight:700,color:"#0f172a",lineHeight:"1.2"}}>GDS Info</h1>
-          <p style={{fontSize:"14px",color:"#64748b",marginTop:"4px"}}>Manage GDS, PCC, OTA clients and PCC functionality</p>
+          <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>GDS Info</h1>
+          <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Manage GDS, PCC, OTA clients and PCC functionality</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -693,12 +699,12 @@ export default function GDSInfoPage() {
         {!loading && (
           <span style={{fontSize:'12px',color:'#94a3b8',fontWeight:500,marginLeft:'auto'}}>
             {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-            {totalPages > 1 ? ' · Page ' + currentPage + ' of ' + totalPages : ''}
+            {totalPages > 1 ? '  Page ' + currentPage + ' of ' + totalPages : ''}
           </span>
         )}
       </div>
 
-      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading</div> : (
         <DataTable
           columns={columns}
           data={paginated as unknown as Record<string, unknown>[]}
@@ -709,7 +715,7 @@ export default function GDSInfoPage() {
         />
       )}
 
-      {/* ── Pagination ── */}
+      {/*  Pagination  */}
       {!loading && filtered.length > 0 && (
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"16px",background:"white",border:"1px solid #e2e8f0",borderRadius:"10px",padding:"10px 16px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",overflow:"hidden",position:"relative",zIndex:1}}>
           {/* Left: record count + page size */}
@@ -717,7 +723,7 @@ export default function GDSInfoPage() {
             <span style={{fontSize:"13px",fontWeight:600,color:"#334155"}}>
               {pageSize === "all"
                 ? <><span style={{color:"#0f172a"}}>{filtered.length}</span> records total</>
-                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}–{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
+                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
               }
             </span>
             <div style={{width:"1px",height:"18px",background:"#e2e8f0"}}/>
@@ -734,7 +740,7 @@ export default function GDSInfoPage() {
           <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageSize === "all"}
               style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
-              ‹
+              
             </button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
@@ -742,8 +748,8 @@ export default function GDSInfoPage() {
               const ellipsisBefore = page === 2 && currentPage > 4
               const ellipsisAfter = page === totalPages - 1 && currentPage < totalPages - 3
               if (!show) return null
-              if (ellipsisBefore) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
-              if (ellipsisAfter) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
+              if (ellipsisBefore) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}></span>
+              if (ellipsisAfter) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}></span>
               return (
                 <button key={page} onClick={() => setCurrentPage(page)}
                   style={{display:"flex",alignItems:"center",justifyContent:"center",minWidth:"32px",height:"32px",padding:"0 8px",borderRadius:"8px",border: currentPage===page ? "1px solid #3b82f6" : "1px solid #e2e8f0",background: currentPage===page ? "#3b82f6" : "white",color: currentPage===page ? "white" : "#475569",fontSize:"13px",fontWeight: currentPage===page ? 700 : 500,cursor:"pointer",transition:"all 0.15s",boxShadow: currentPage===page ? "0 2px 6px rgba(59,130,246,0.35)" : "none"}}>
@@ -754,20 +760,20 @@ export default function GDSInfoPage() {
 
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || pageSize === "all"}
               style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
-              ›
+              
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Add / Edit Modal ── */}
+      {/*  Add / Edit Modal  */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS Info' : 'Add GDS Info'}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">GDS <span className="text-red-500">*</span></label>
               <select value={form.gds_id ?? ''} onChange={e => setForm(f => ({ ...f, gds_id: Number(e.target.value), functionality_id: null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-                <option value="">— Select GDS —</option>
+                <option value=""> Select GDS </option>
                 {gdsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
@@ -785,28 +791,28 @@ export default function GDSInfoPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC Functionality</label>
             <select value={(form as Partial<PCCList>).pcc_functionality ?? ''} onChange={e => setForm(f => ({ ...f, pcc_functionality: e.target.value || null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value=""> None </option>
               {PCC_FUNCTIONALITY.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Client Group</label>
             <select value={(form as Partial<PCCList> & {client_group_id?:number|null}).client_group_id ?? ''} onChange={e => setForm(f => ({ ...f, client_group_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value=""> None </option>
               {clientGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation</label>
             <select value={form.org_id ?? ''} onChange={e => setForm(f => ({ ...f, org_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value=""> None </option>
               {orgList.map(o => <option key={o.id} value={o.id}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
             <select value={form.ota_client_id ?? ''} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">— None —</option>
+              <option value=""> None </option>
               {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
             </select>
           </div>
@@ -815,7 +821,7 @@ export default function GDSInfoPage() {
             <textarea
               value={(form as Partial<PCCList>).remarks ?? ''}
               onChange={e => setForm(f => ({ ...f, remarks: e.target.value || null }))}
-              placeholder="Additional notes or information…"
+              placeholder="Additional notes or information"
               rows={3}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
             />
@@ -823,23 +829,23 @@ export default function GDSInfoPage() {
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add GDS Info'}</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Saving' : editing ? 'Save Changes' : 'Add GDS Info'}</button>
           </div>
         </div>
       </Modal>
 
-      {/* ── Delete Modal ── */}
+      {/*  Delete Modal  */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete GDS Info" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-slate-600">Delete PCC <strong className="font-mono">{editing?.pcc}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
             <button onClick={() => setDeleteOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting…' : 'Delete'}</button>
+            <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{saving ? 'Deleting' : 'Delete'}</button>
           </div>
         </div>
       </Modal>
 
-      {/* ── GDS Feature Detail Popup ── */}
+      {/*  GDS Feature Detail Popup  */}
       <Modal
         open={featurePopupOpen}
         onClose={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }}
@@ -867,14 +873,14 @@ export default function GDSInfoPage() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Organisation</p>
-                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupOrg?.organisation ?? <span className="text-slate-300">—</span>}</p>
+                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupOrg?.organisation ?? <span className="text-slate-300"></span>}</p>
                   {popupOrg?.iata && <p className="text-xs text-slate-400 font-mono">{popupOrg.iata}</p>}
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">OTA Client</p>
                   {popupOta
                     ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full mt-0.5 inline-block">{popupOta.company_name}</span>
-                    : <p className="text-sm text-slate-300 mt-0.5">—</p>}
+                    : <p className="text-sm text-slate-300 mt-0.5"></p>}
                 </div>
 
               </div>
@@ -906,13 +912,13 @@ export default function GDSInfoPage() {
                       <div key={f.id} className={`flex items-center justify-between px-4 py-3 ${i < availableFeatures.length - 1 ? 'border-b border-slate-100' : ''} ${enabled ? 'bg-white' : 'bg-slate-50/50'}`}>
                         <div className="flex items-center gap-3">
                           <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${enabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                            {enabled ? '✓' : '✕'}
+                            {enabled ? '' : ''}
                           </span>
                           <div>
                             <p className={`text-sm ${enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{f.label}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
-                              {f.billing_cycle && costStr && <span className="text-xs text-slate-300">·</span>}
+                              {f.billing_cycle && costStr && <span className="text-xs text-slate-300"></span>}
                               {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
                             </div>
                           </div>
@@ -924,7 +930,7 @@ export default function GDSInfoPage() {
                             enabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                           }`}
                         >
-                          {enabled ? '− Remove' : '+ Add'}
+                          {enabled ? ' Remove' : '+ Add'}
                         </button>
                       </div>
                     )
@@ -942,12 +948,12 @@ export default function GDSInfoPage() {
                         const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
                         return (
                           <div key={f.id} className={`flex items-center gap-3 px-4 py-3 ${i < enabledFeatures.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex-shrink-0">✓</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex-shrink-0"></span>
                             <div>
                               <p className="text-sm text-slate-800 font-medium">{f.label}</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
-                                {f.billing_cycle && <span className="text-xs text-slate-300">·</span>}
+                                {f.billing_cycle && <span className="text-xs text-slate-300"></span>}
                                 {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
                               </div>
                             </div>
@@ -967,15 +973,15 @@ export default function GDSInfoPage() {
         )}
       </Modal>
 
-      {/* ── PCC Assigned Login Popup ── */}
+      {/*  PCC Assigned Login Popup  */}
       <Modal
         open={loginPopupOpen}
         onClose={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }}
-        title={`GDS Logins — ${(loginPopupPCC?.ota_client as OTAClient)?.company_name ?? ''}`}
+        title={`GDS Logins  ${(loginPopupPCC?.ota_client as OTAClient)?.company_name ?? ''}`}
         size="lg"
       >
         {loginPopupLoading ? (
-          <div className="text-center py-10 text-slate-400 text-sm">Loading logins…</div>
+          <div className="text-center py-10 text-slate-400 text-sm">Loading logins</div>
         ) : (
           <div className="space-y-4">
             {/* PCC context */}
@@ -1001,8 +1007,8 @@ export default function GDSInfoPage() {
                           {loginPopupData.sabre.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.sabre.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 text-xs">{(r as {users?:{email_address:string}|null}).users?.email_address??'—'}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{(r as {users?:{email_address:string}|null}).users?.email_address??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
                               <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>
                           ))}
@@ -1023,8 +1029,8 @@ export default function GDSInfoPage() {
                           {loginPopupData.amadeus.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.amadeus.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??'—'}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??'—'}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??''}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1043,9 +1049,9 @@ export default function GDSInfoPage() {
                         <tbody>
                           {loginPopupData.travelport.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.travelport.length-1?'border-b border-slate-50':''}>
-                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??'—'}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??'—'}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??'—'}</td>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1062,12 +1068,12 @@ export default function GDSInfoPage() {
         )}
       </Modal>
 
-      {/* ── Bulk Edit Modal ── */}
-      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`Bulk Edit GDS Features — ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''} selected`} size="md">
+      {/*  Bulk Edit Modal  */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`Bulk Edit GDS Features  ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''} selected`} size="md">
         <div className="space-y-4">
           {bulkResult ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-              <p className="text-sm text-emerald-700 font-medium">✅ {bulkResult}</p>
+              <p className="text-sm text-emerald-700 font-medium"> {bulkResult}</p>
             </div>
           ) : (
             <>
@@ -1082,7 +1088,7 @@ export default function GDSInfoPage() {
                           ? m === 'add' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-red-500 text-white border-red-500'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}>
-                      {m === 'add' ? '+ Add features to all selected' : '− Remove features from all selected'}
+                      {m === 'add' ? '+ Add features to all selected' : ' Remove features from all selected'}
                     </button>
                   ))}
                 </div>
@@ -1098,7 +1104,7 @@ export default function GDSInfoPage() {
                 </div>
               </div>
 
-              {/* Feature selection — grouped by GDS */}
+              {/* Feature selection  grouped by GDS */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Select features to {bulkMode} <span className="text-slate-400 font-normal">(click to toggle)</span>
@@ -1159,21 +1165,21 @@ export default function GDSInfoPage() {
             {!bulkResult && (
               <button onClick={handleBulkApply} disabled={bulkSaving || bulkFeatureIds.size === 0}
                 className={`flex-1 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-50 transition-colors ${bulkMode === 'add' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'}`}>
-                {bulkSaving ? 'Applying…' : `${bulkMode === 'add' ? 'Add' : 'Remove'} to ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''}`}
+                {bulkSaving ? 'Applying' : `${bulkMode === 'add' ? 'Add' : 'Remove'} to ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''}`}
               </button>
             )}
           </div>
         </div>
       </Modal>
 
-      {/* ── Import Modal ── */}
+      {/*  Import Modal  */}
       <Modal open={importOpen} onClose={closeImport} title="Import GDS Info" size="lg">
         <div className="space-y-4">
           {importResult ? (
             <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
               {importResult.failed === 0
-                ? <p className="font-medium">✅ Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p>
-                : <div className="space-y-1"><p className="font-medium">✅ {importResult.success} imported · ⚠️ {importResult.failed} skipped</p>
+                ? <p className="font-medium"> Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p>
+                : <div className="space-y-1"><p className="font-medium"> {importResult.success} imported   {importResult.failed} skipped</p>
                     {importResult.failedRows.map((r, i) => <p key={i} className="text-xs opacity-70 font-mono">{r}</p>)}</div>}
             </div>
           ) : (
@@ -1181,12 +1187,12 @@ export default function GDSInfoPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-600">File: <span className="font-medium">{importFileName}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows — <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{importRows.length} rows  <span className="text-emerald-600 font-medium">{validRows.length} valid</span>{invalidRows.length > 0 && <>, <span className="text-red-500 font-medium">{invalidRows.length} errors</span></>}</p>
                 </div>
                 <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500 space-y-1">
-                <div>Required: <span className="font-mono font-medium text-slate-700">GDS</span>, <span className="font-mono font-medium text-slate-700">PCC</span> · Optional: <span className="font-mono font-medium text-slate-700">Status</span></div>
+                <div>Required: <span className="font-mono font-medium text-slate-700">GDS</span>, <span className="font-mono font-medium text-slate-700">PCC</span>  Optional: <span className="font-mono font-medium text-slate-700">Status</span></div>
                 {detectedHeaders.length > 0 && <div>Detected: {detectedHeaders.map((h, i) => <span key={i} className="font-mono font-medium text-slate-700 bg-slate-200 px-1 rounded mr-1">{h}</span>)}</div>}
               </div>
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
@@ -1201,7 +1207,7 @@ export default function GDSInfoPage() {
                         <td className="px-3 py-2">{row.gds_name ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${GDS_COLORS[row.gds_name] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.gds_name}</span> : <span className="text-red-400 italic">empty</span>}</td>
                         <td className="px-3 py-2 font-mono font-semibold">{row.pcc || <span className="text-red-400 italic font-normal">empty</span>}</td>
                         <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{row.status}</span></td>
-                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium">✓ OK</span> : <span className="text-red-500">✗ {row._errors[0]}</span>}</td>
+                        <td className="px-3 py-2">{row._errors.length === 0 ? <span className="text-emerald-600 font-medium"> OK</span> : <span className="text-red-500"> {row._errors[0]}</span>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1211,7 +1217,7 @@ export default function GDSInfoPage() {
           )}
           <div className="flex gap-3 pt-1">
             <button onClick={closeImport} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">{importResult ? 'Close' : 'Cancel'}</button>
-            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing…' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
+            {!importResult && <button onClick={handleImportConfirm} disabled={importing || validRows.length === 0} className="flex-1 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">{importing ? 'Importing' : `Import ${validRows.length} Record${validRows.length !== 1 ? 's' : ''}`}</button>}
           </div>
         </div>
       </Modal>
