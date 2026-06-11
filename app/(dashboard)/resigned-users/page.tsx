@@ -5,10 +5,34 @@ import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 
 //  Types 
@@ -150,7 +174,7 @@ export default function ResignedUsersPage() {
   //  Helpers 
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' }) : ''
   const lbl = { fontSize:'11px', fontWeight:600, color:'#475569', textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'4px', display:'block' }
-  const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:'white', color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
+  const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:T.card, color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
 
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',color:'#94a3b8',fontSize:'14px'}}>
@@ -194,7 +218,7 @@ export default function ResignedUsersPage() {
       </div>
 
       {/*  Filters  */}
-      <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+      <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
         <input type="text" placeholder="Search name, initial, email, org, PCC" value={search} onChange={e => setSearch(e.target.value)}
           style={{...inp(), width:'280px'}} />
         <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} style={inp({width:'140px'})}>
@@ -206,22 +230,25 @@ export default function ResignedUsersPage() {
         <span style={{fontSize:'12px',color:'#94a3b8',marginLeft:'4px'}}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
         {(search || filterGDS !== 'all') && (
           <button onClick={() => { setSearch(''); setFilterGDS('all') }}
-            style={{display:'flex',alignItems:'center',justifyContent:'center',width:'32px',height:'32px',background:'white',border:'1px solid #e2e8f0',borderRadius:'7px',cursor:'pointer',color:'#64748b'}}>
+            style={{display:'flex',alignItems:'center',justifyContent:'center',width:'32px',height:'32px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'7px',cursor:'pointer',color:'#64748b'}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
         )}
       </div>
 
       {/*  Table  */}
-      {loading ? (
+            <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:'1px solid #e2e8f0', borderRadius:'6px', marginBottom:'12px'}}>
+        <span style={{fontSize:'13px', color:'#94a3b8'}}>Showing {filtered.length} record{filtered.length!==1?'s':''}</span>
+      </div>
+{loading ? (
         <div style={{textAlign:'center',padding:'60px',color:'#94a3b8',fontSize:'14px'}}>Loading</div>
       ) : filtered.length === 0 ? (
-        <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px',textAlign:'center',color:'#94a3b8'}}>
+        <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px',textAlign:'center',color:'#94a3b8'}}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
           <p style={{fontSize:'14px',margin:0}}>No resigned users found</p>
         </div>
       ) : (
-        <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+        <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
           {/* Mirror scrollbar */}
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',minWidth:'1000px'}}>
@@ -261,7 +288,7 @@ export default function ResignedUsersPage() {
                       <td style={{padding:'11px 14px'}}>
                         {isAdmin && (
                           <button onClick={() => openDetail(r)}
-                            style={{fontSize:'12px',padding:'4px 12px',borderRadius:'6px',border:'1px solid #e2e8f0',background:'white',color:'#475569',cursor:'pointer',fontWeight:500,whiteSpace:'nowrap'}}>
+                            style={{fontSize:'12px',padding:'4px 12px',borderRadius:'6px',border:'1px solid #e2e8f0',background:T.card,color:'#475569',cursor:'pointer',fontWeight:500,whiteSpace:'nowrap'}}>
                             View / Edit
                           </button>
                         )}
@@ -280,10 +307,10 @@ export default function ResignedUsersPage() {
        */}
       {showDetail && selected && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
-          <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'620px',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:T.card,borderRadius:'14px',width:'100%',maxWidth:'620px',maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
 
             {/* Header */}
-            <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:'white',zIndex:1}}>
+            <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:T.card,zIndex:1}}>
               <div>
                 <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>{selected.full_name ?? 'Resigned User'}</span>
                 <span style={{marginLeft:'10px',fontSize:'11px',fontWeight:700,padding:'2px 8px',borderRadius:'20px',
@@ -348,8 +375,8 @@ export default function ResignedUsersPage() {
             </div>
 
             {/* Footer */}
-            <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px',position:'sticky',bottom:0,background:'white'}}>
-              <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',color:'#475569',cursor:'pointer',fontWeight:500}}>
+            <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px',position:'sticky',bottom:0,background:T.card}}>
+              <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',color:'#475569',cursor:'pointer',fontWeight:500}}>
                 Close
               </button>
               {isAdmin && (

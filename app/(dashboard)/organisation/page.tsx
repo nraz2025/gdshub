@@ -21,18 +21,34 @@ const GDS_COLORS: Record<string, string> = {
 
 // Design tokens
 const T = {
-  primary:   '#2563eb',
-  primaryHov:'#1d4ed8',
-  surface:   '#f9f9ff',
-  surfaceAlt:'#eef2ff',
-  border:    '#dde3f0',
-  text:      '#0f1a3e',
-  textMid:   '#4b5a7a',
-  textLight: '#8a96b4',
-  success:   '#16a34a',
-  danger:    '#dc2626',
-  radius:    '4px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 export default function OrganisationPage() {
   const supabase = createClient()
@@ -188,7 +204,7 @@ export default function OrganisationPage() {
     <div style={{fontFamily:"'Hanken Grotesk', Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh', padding:'0'}}>
 
       {/* ── Page Header ── */}
-      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'22px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.02em'}}>Organisation Management</h1>
@@ -197,13 +213,13 @@ export default function OrganisationPage() {
           {isAdmin && (
             <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
               <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer', opacity:filtered.length===0?0.4:1}}>
+                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer', opacity:filtered.length===0?0.4:1}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export xlsx
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer'}}>
+                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
@@ -238,7 +254,7 @@ export default function OrganisationPage() {
         </div>
 
         {/* ── Search & filter bar ── */}
-        <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
           <div style={{position:'relative', flex:'1', minWidth:'220px'}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search organisation or IATA..." value={search}
@@ -259,10 +275,28 @@ export default function OrganisationPage() {
           )}
         </div>
 
+        {/* ── Top record bar ── */}
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, flexWrap:'wrap', gap:'10px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>
+            Showing {Math.min((currentPage-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(currentPage*PAGE_SIZE, filtered.length)} of {filtered.length} organisation{filtered.length!==1?'s':''}
+          </span>
+          {totalPages > 1 && (
+            <div style={{display:'flex', gap:'4px'}}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage===1}
+                style={{padding:'4px 10px', fontSize:'13px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>Previous</button>
+              {Array.from({length: totalPages}, (_,i) => i+1).map(p => (
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  style={{padding:'4px 10px', fontSize:'13px', fontWeight:700, border:`1px solid ${p===currentPage?T.primary:T.border}`, borderRadius:T.radius, background:p===currentPage?T.primary:'white', color:p===currentPage?'white':T.textMid, cursor:'pointer'}}>{p}</button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage===totalPages}
+                style={{padding:'4px 10px', fontSize:'13px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>Next</button>
+            </div>
+          )}
+        </div>
         {/* ── Data Table ── */}
-        <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 4px rgba(37,99,235,0.06)'}}>
+        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 4px rgba(37,99,235,0.06)'}}>
           {/* Table header */}
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`, padding:'0'}}>
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`, padding:'0'}}>
             {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
               <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 4 ? 'right' : 'left'}}>
                 {h}
@@ -315,11 +349,11 @@ export default function OrganisationPage() {
                   <div style={{padding:'13px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
                         Edit
                       </button>
                       <button onClick={() => openDelete(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:`1px solid #fecaca`, borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:`1px solid #fecaca`, borderRadius:T.radius, cursor:'pointer'}}>
                         Delete
                       </button>
                     </>)}
@@ -332,13 +366,13 @@ export default function OrganisationPage() {
 
         {/* ── Pagination ── */}
         {totalPages > 1 && (
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius}}>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius}}>
             <span style={{fontSize:'12px', color:T.textLight, fontWeight:500}}>
               Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
             </span>
             <div style={{display:'flex', gap:'4px'}}>
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
+                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
                 Previous
               </button>
               {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
@@ -348,7 +382,7 @@ export default function OrganisationPage() {
                 </button>
               ))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
+                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
                 Next
               </button>
             </div>

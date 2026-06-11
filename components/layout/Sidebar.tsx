@@ -102,7 +102,7 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-700/50">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 bg-[#10B981] rounded-lg flex items-center justify-center flex-shrink-0">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
           <span className="font-bold text-white text-base tracking-tight">GDSHub</span>
@@ -113,7 +113,7 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
       <div className="px-5 py-2.5 border-b border-slate-700/30">
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
           userRole === 'admin'   ? 'bg-amber-500/20 text-amber-400' :
-          userRole === 'manager' ? 'bg-blue-500/20 text-blue-400'   :
+          userRole === 'manager' ? 'bg-[#10B981]/20 text-blue-400'   :
                                    'bg-slate-500/20 text-slate-400'
         }`}>
           {userRole === 'admin' ? '⚙ Admin' : userRole === 'manager' ? '◈ Manager' : '◉ Viewer'}
@@ -128,7 +128,7 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
             <Link key={item.href} href={item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                active ? 'bg-blue-600 text-white font-medium' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                active ? 'bg-[#10B981] text-white font-medium' : 'text-slate-400 hover:text-white hover:bg-slate-800'
               )}>
               <span className="flex-shrink-0 opacity-80">{item.icon}</span>
               <span>{item.label}</span>

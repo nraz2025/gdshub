@@ -9,17 +9,34 @@ const GDS_OPTIONS: GDSName[] = ['Sabre', 'Amadeus', 'Travelport']
 const EMPTY: Partial<GDS> = { name: 'Sabre' }
 
 const T = {
-  primary:   '#2563eb',
-  primaryHov:'#1d4ed8',
-  surface:   '#f9f9ff',
-  surfaceAlt:'#eef2ff',
-  border:    '#dde3f0',
-  text:      '#0f1a3e',
-  textMid:   '#4b5a7a',
-  textLight: '#8a96b4',
-  danger:    '#dc2626',
-  radius:    '4px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 const GDS_STYLE: Record<string, { bg: string; color: string; border: string; dot: string }> = {
   Sabre:      { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', dot: '#3b82f6' },
@@ -88,7 +105,7 @@ export default function GDSPage() {
     <div style={{fontFamily:"'Hanken Grotesk', Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh'}}>
 
       {/* ── Page Header ── */}
-      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'22px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.02em'}}>GDS Platforms</h1>
@@ -106,17 +123,20 @@ export default function GDSPage() {
 
       <div style={{padding:'0 28px 28px'}}>
 
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} GDS platform{records.length!==1?'s':''}</span>
+        </div>
         {/* ── Table ── */}
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:T.textLight, fontSize:'14px'}}>Loading...</div>
         ) : records.length === 0 ? (
-          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
             No GDS platforms found. Click Add GDS to get started.
           </div>
         ) : (
-          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
             {/* Header — equal 3 columns */}
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`}}>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
               {['GDS Name', 'Created', 'Actions'].map((h, i) => (
                 <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 2 ? 'right' : 'left'}}>
                   {h}
@@ -143,11 +163,11 @@ export default function GDSPage() {
                   <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
                         Edit
                       </button>
                       <button onClick={() => openDelete(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>
                         Delete
                       </button>
                     </>)}
@@ -158,6 +178,9 @@ export default function GDSPage() {
           </div>
         )}
       </div>
+        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginTop:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} GDS platform{records.length!==1?'s':''}</span>
+        </div>
 
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS' : 'Add GDS'} size="sm">

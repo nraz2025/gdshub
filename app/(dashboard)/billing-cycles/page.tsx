@@ -11,10 +11,34 @@ interface BillingCycle {
 const EMPTY = { value: '', label: '', sort_order: 0 }
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 export default function BillingCyclesPage() {
   const supabase = createClient()
@@ -80,13 +104,13 @@ export default function BillingCyclesPage() {
     fetchAll()
   }
 
-  const inp = { width:'100%', padding:'8px 12px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.text, outline:'none', boxSizing:'border-box' as const }
+  const inp = { width:'100%', padding:'8px 12px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.text, outline:'none', boxSizing:'border-box' as const }
   const lbl = { display:'block', fontSize:'12px', fontWeight:600, color:T.textMid, marginBottom:'6px' } as const
 
   return (
     <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
       {/* Header */}
-      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
             <h1 style={{fontSize:'24px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.025em'}}>Billing Cycles</h1>
@@ -118,15 +142,18 @@ export default function BillingCyclesPage() {
         </div>
 
         {/* Table */}
+        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} billing cycle{records.length!==1?'s':''}</span>
+        </div>
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:T.textLight, fontSize:'14px'}}>Loading...</div>
         ) : (
-          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
             {records.length === 0 ? (
               <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>No billing cycles yet.</div>
             ) : (
               <>
-                <div style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`}}>
+                <div style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
                   {['Order','Label','Value (key)','Actions'].map((h,i) => (
                     <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i===3 ? 'right' : 'left'}}>{h}</div>
                   ))}
@@ -154,8 +181,8 @@ export default function BillingCyclesPage() {
                     </div>
                     <div style={{padding:'13px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                       {isAdmin && (<>
-                        <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
-                        <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
+                        <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
+                        <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
                       </>)}
                     </div>
                   </div>
@@ -165,6 +192,9 @@ export default function BillingCyclesPage() {
           </div>
         )}
       </div>
+        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginTop:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} billing cycle{records.length!==1?'s':''}</span>
+        </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Billing Cycle' : 'Add Billing Cycle'} size="sm">
         <div className="space-y-4">
@@ -178,7 +208,7 @@ export default function BillingCyclesPage() {
             <input type="number" value={form.sort_order} onChange={e => setForm(f=>({...f,sort_order:Number(e.target.value)}))} style={inp} /></div>
           {error && <p style={{fontSize:'13px', color:T.danger}}>{error}</p>}
           <div style={{display:'flex', gap:'10px', paddingTop:'4px'}}>
-            <button onClick={() => setModalOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer'}}>Cancel</button>
+            <button onClick={() => setModalOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer'}}>Cancel</button>
             <button onClick={handleSave} disabled={saving} style={{flex:1, padding:'9px', fontSize:'13px', fontWeight:700, border:'none', borderRadius:T.radius, background:T.primary, color:'white', cursor:'pointer', opacity:saving?0.6:1}}>
               {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add'}
             </button>
@@ -193,7 +223,7 @@ export default function BillingCyclesPage() {
             <p style={{fontSize:'13px', color:'#b45309'}}>Deleting <strong>{editing?.label}</strong> will affect any GDS features using this billing cycle.</p>
           </div>
           <div style={{display:'flex', gap:'10px'}}>
-            <button onClick={() => setDeleteOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer'}}>Cancel</button>
+            <button onClick={() => setDeleteOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer'}}>Cancel</button>
             <button onClick={handleDelete} disabled={saving} style={{flex:1, padding:'9px', fontSize:'13px', fontWeight:700, border:'none', borderRadius:T.radius, background:T.danger, color:'white', cursor:'pointer', opacity:saving?0.6:1}}>
               {saving ? 'Deleting...' : 'Delete'}
             </button>

@@ -8,10 +8,34 @@ import type { GDSFeature, GDS } from '@/types'
 
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 
 const GDS_COLORS: Record<string, { badge: string; row: string; btn: string }> = {
@@ -173,7 +197,7 @@ export default function GDSFunctionalityPage() {
   return (
     <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
       {/* Header */}
-      <div style={{background:'white',borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
+      <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>GDS Functionality</h1>
@@ -198,9 +222,9 @@ export default function GDSFunctionalityPage() {
           ))}
         </div>
         {/* Filter */}
-        <div style={{background:'white',border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
+        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
           <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)}
-            style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:'white',color:T.text,outline:'none',cursor:'pointer'}}>
+            style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',cursor:'pointer'}}>
             <option value="all">All GDS</option>
             {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
           </select>
@@ -290,7 +314,7 @@ export default function GDSFunctionalityPage() {
           </div>
           {addError && <p className="text-sm text-red-500">{addError}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setAddOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
+            <button onClick={() => setAddOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
             <button onClick={handleAdd} disabled={addSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{addSaving ? 'Adding' : 'Add Feature'}</button>
           </div>
         </div>
@@ -330,7 +354,7 @@ export default function GDSFunctionalityPage() {
           </div>
           {editError && <p className="text-sm text-red-500">{editError}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setEditOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
+            <button onClick={() => setEditOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
             <button onClick={handleEdit} disabled={editSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{editSaving ? 'Saving' : 'Save Changes'}</button>
           </div>
         </div>
@@ -346,7 +370,7 @@ export default function GDSFunctionalityPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:"white",color:T.textMid,cursor:"pointer"}}>Cancel</button>
+            <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
             <button onClick={handleDelete} disabled={deleteSaving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.danger,color:"white",cursor:"pointer"}}>{deleteSaving ? 'Deleting' : 'Delete'}</button>
           </div>
         </div>

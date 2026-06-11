@@ -5,62 +5,21 @@ import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
-
-
-//  Types 
-interface GDS { id: number; name: string }
-interface Organisation { id: number; organisation: string }
-
-interface ReportSnapshot {
-  id: number
-  report_name: string
-  report_month: number
-  report_year: number
-  date_from: string | null
-  date_to: string | null
-  gds_id: number | null
-  notes: string | null
-  status: 'draft' | 'final' | 'archived'
-  created_at: string
-  gds?: GDS
-}
-
-interface ReportMontlyCount {
-  id: number
-  snapshot_id: number
-  gds_name: string
-  pcc: string
-  organisation: string
-  total_users: number
-  active_users: number
-  inactive_users: number
-  ota_users: number
-  adjusted_count: number | null
-  count_note: string | null
-}
-
-interface ReportUserDetail {
-  id: number
-  snapshot_id: number
-  gds_name: string
-  pcc: string
-  organisation: string
-  first_name: string | null
-  last_name: string | null
-  initial: string | null
-  email: string | null
-  login_id: string | null
-  sign_on_id: string | null
-  duty_code: string | null
-  user_status: string | null
-  last_login_date: string | null
-  last_login_note: string | null
-}
-
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i)
@@ -380,7 +339,7 @@ export default function ReportingPage() {
   }
 
   //  Input style helper 
-  const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:'white', color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
+  const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:T.card, color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lbl = { fontSize:'11px', fontWeight:600, color:'#475569', textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'4px', display:'block' }
 
   if (loading) return (
@@ -414,7 +373,7 @@ export default function ReportingPage() {
       <div style={{display:'grid',gridTemplateColumns:'300px 1fr',gap:'16px',alignItems:'start'}}>
 
         {/*  Left: Snapshot list  */}
-        <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+        <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
           <div style={{padding:'12px 14px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc'}}>
             <span style={{fontSize:'12px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em'}}>Report Snapshots</span>
             <span style={{marginLeft:'8px',fontSize:'12px',color:'#94a3b8'}}>({snapshots.length})</span>
@@ -443,7 +402,7 @@ export default function ReportingPage() {
                       {snap.date_from && snap.date_to
                         ? `${snap.date_from}  ${snap.date_to}`
                         : snap.date_from && snap.date_to ? `${snap.date_from}  ${snap.date_to}` : `${MONTHS[snap.report_month - 1]} ${snap.report_year}`}
-                      {snap.gds && <span style={{marginLeft:'6px',padding:'1px 6px',borderRadius:'4px',background: GDS_COLORS[snap.gds.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600,color:'#334155'}}>{snap.gds.name}</span>}
+                      {snap.gds && <span style={{marginLeft:'6px',padding:'1px 6px',borderRadius:T.radiusSm,background: GDS_COLORS[snap.gds.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600,color:'#334155'}}>{snap.gds.name}</span>}
                     </div>
                   </div>
                 )
@@ -454,12 +413,12 @@ export default function ReportingPage() {
 
         {/*  Right: Detail panel  */}
         {!selected ? (
-          <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px 24px',textAlign:'center',color:'#94a3b8',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+          <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px 24px',textAlign:'center',color:'#94a3b8',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <p style={{fontSize:'14px',margin:0}}>Select a report from the left to view details</p>
           </div>
         ) : (
-          <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+          <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
 
             {/* Detail header */}
             <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
@@ -467,7 +426,7 @@ export default function ReportingPage() {
                 <div style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>{selected.report_name}</div>
                 <div style={{fontSize:'12px',color:'#64748b',marginTop:'2px'}}>
                   {selected.date_from && selected.date_to ? `${selected.date_from}  ${selected.date_to}` : `${MONTHS[selected.report_month - 1]} ${selected.report_year}`}
-                  {selected.gds && <span style={{marginLeft:'8px',padding:'1px 7px',borderRadius:'4px',background: GDS_COLORS[(selected.gds as GDS)?.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{(selected.gds as GDS)?.name}</span>}
+                  {selected.gds && <span style={{marginLeft:'8px',padding:'1px 7px',borderRadius:T.radiusSm,background: GDS_COLORS[(selected.gds as GDS)?.name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{(selected.gds as GDS)?.name}</span>}
                   {selected.notes && <span style={{marginLeft:'8px',color:'#94a3b8'}}> {selected.notes}</span>}
                 </div>
               </div>
@@ -475,7 +434,7 @@ export default function ReportingPage() {
                 {isAdmin && (
                   <>
                     <select value={selected.status} onChange={e => updateStatus(selected.id, e.target.value)}
-                      style={{padding:'5px 10px',fontSize:'12px',fontWeight:600,border:'1px solid #e2e8f0',borderRadius:'7px',background:'white',color:'#475569',outline:'none',cursor:'pointer'}}>
+                      style={{padding:'5px 10px',fontSize:'12px',fontWeight:600,border:'1px solid #e2e8f0',borderRadius:'7px',background:T.card,color:'#475569',outline:'none',cursor:'pointer'}}>
                       <option value="draft">Draft</option>
                       <option value="final">Final</option>
                       <option value="archived">Archived</option>
@@ -491,7 +450,7 @@ export default function ReportingPage() {
                       Export
                     </button>
                     <button onClick={() => deleteSnapshot(selected.id)}
-                      style={{padding:'6px 12px',background:'white',color:'#dc2626',border:'1px solid #fecaca',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+                      style={{padding:'6px 12px',background:T.card,color:'#dc2626',border:'1px solid #fecaca',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
                       Delete
                     </button>
                   </>
@@ -500,7 +459,7 @@ export default function ReportingPage() {
             </div>
 
             {/* Tabs */}
-            <div style={{display:'flex',borderBottom:'1px solid #e2e8f0',background:'white'}}>
+            <div style={{display:'flex',borderBottom:'1px solid #e2e8f0',background:T.card}}>
               {(['counts','users'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   style={{padding:'10px 20px',fontSize:'13px',fontWeight:600,border:'none',background:'none',cursor:'pointer',
@@ -545,7 +504,7 @@ export default function ReportingPage() {
                               onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
                               onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
                               <td style={{padding:'10px 12px'}}>
-                                <span style={{padding:'2px 8px',borderRadius:'4px',background: GDS_COLORS[c.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{c.gds_name}</span>
+                                <span style={{padding:'2px 8px',borderRadius:T.radiusSm,background: GDS_COLORS[c.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{c.gds_name}</span>
                               </td>
                               <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{c.pcc}</td>
                               <td style={{padding:'10px 12px',color:'#334155'}}>{c.organisation}</td>
@@ -605,7 +564,7 @@ export default function ReportingPage() {
                               onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
                               onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
                               <td style={{padding:'10px 12px'}}>
-                                <span style={{padding:'2px 8px',borderRadius:'4px',background: GDS_COLORS[u.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{u.gds_name}</span>
+                                <span style={{padding:'2px 8px',borderRadius:T.radiusSm,background: GDS_COLORS[u.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{u.gds_name}</span>
                               </td>
                               <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{u.pcc}</td>
                               <td style={{padding:'10px 12px',color:'#334155'}}>{u.organisation}</td>
@@ -640,7 +599,7 @@ export default function ReportingPage() {
        */}
       {showForm && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
-          <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'500px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:T.card,borderRadius:'14px',width:'100%',maxWidth:'500px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>New Report Snapshot</span>
               <button onClick={() => setShowForm(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
@@ -676,7 +635,7 @@ export default function ReportingPage() {
               </div>
             </div>
             <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px'}}>
-              <button onClick={() => setShowForm(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
+              <button onClick={() => setShowForm(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={createSnapshot} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
                 {saving ? 'Creating' : 'Create Report'}
@@ -691,7 +650,7 @@ export default function ReportingPage() {
        */}
       {showAddCount && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
-          <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'520px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:T.card,borderRadius:'14px',width:'100%',maxWidth:'520px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Add Count Row</span>
               <button onClick={() => setShowAddCount(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
@@ -734,7 +693,7 @@ export default function ReportingPage() {
               </div>
             </div>
             <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px'}}>
-              <button onClick={() => setShowAddCount(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
+              <button onClick={() => setShowAddCount(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={addCountRow} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
                 {saving ? 'Saving' : 'Add Row'}
@@ -749,7 +708,7 @@ export default function ReportingPage() {
        */}
       {showAddUser && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
-          <div style={{background:'white',borderRadius:'14px',width:'100%',maxWidth:'580px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+          <div style={{background:T.card,borderRadius:'14px',width:'100%',maxWidth:'580px',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             <div style={{padding:'18px 22px',borderBottom:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Add User Record</span>
               <button onClick={() => setShowAddUser(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:'20px',lineHeight:1}}></button>
@@ -826,7 +785,7 @@ export default function ReportingPage() {
               </div>
             </div>
             <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px'}}>
-              <button onClick={() => setShowAddUser(false)} style={{padding:'8px 16px',background:'white',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
+              <button onClick={() => setShowAddUser(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>Cancel</button>
               <button onClick={addUserRow} disabled={saving}
                 style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
                 {saving ? 'Saving' : 'Add User'}

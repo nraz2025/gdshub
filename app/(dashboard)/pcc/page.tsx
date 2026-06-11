@@ -9,10 +9,34 @@ import { getAuditFields } from '@/lib/audit'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 
 type PCCStatus = 'Active' | 'Pending' | 'Vacant'
@@ -480,7 +504,7 @@ export default function GDSInfoPage() {
           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
             <span style={{fontSize:'16px',fontWeight:500,color:'#334155',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'0.02em'}}>{ota.company_name}</span>
             <button onClick={() => openLoginPopup(row)}
-              style={{fontSize:'14px',color:'#3b82f6',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0,whiteSpace:'nowrap'}}>
+              style={{fontSize:'14px',color:'#10B981',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0,whiteSpace:'nowrap'}}>
               View IDs
             </button>
           </div>
@@ -557,7 +581,7 @@ export default function GDSInfoPage() {
   return (
     <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
       {/* Page Header */}
-      <div className="flex items-start justify-between mb-5" style={{background:'white',borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'0'}}>
+      <div className="flex items-start justify-between mb-5" style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'0'}}>
         <div>
           <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>GDS Info</h1>
           <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Manage GDS, PCC, OTA clients and PCC functionality</p>
@@ -601,7 +625,7 @@ export default function GDSInfoPage() {
             <div style={{position:"relative"}}>
               <input type="text" list="org-list" value={filterOrg} onChange={e => { setFilterOrg(e.target.value); resetPage() }}
                 placeholder="Search org..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
                 onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
               <datalist id="org-list">{orgList.map(o => <option key={o.id} value={o.organisation} />)}</datalist>
             </div>
@@ -613,7 +637,7 @@ export default function GDSInfoPage() {
             <div style={{position:"relative"}}>
               <input type="text" list="pcc-list" value={filterPCC} onChange={e => { setFilterPCC(e.target.value); resetPage() }}
                 placeholder="Code..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
                 onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
               <datalist id="pcc-list">{[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc} />)}</datalist>
             </div>
@@ -625,7 +649,7 @@ export default function GDSInfoPage() {
             <div style={{position:"relative"}}>
               <input type="text" list="ota-list" value={filterOTA} onChange={e => { setFilterOTA(e.target.value); resetPage() }}
                 placeholder="Assigned..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
                 onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
               <datalist id="ota-list">{otaClients.map(o => <option key={o.id} value={o.company_name} />)}</datalist>
             </div>
@@ -637,7 +661,7 @@ export default function GDSInfoPage() {
             <div style={{position:"relative"}}>
               <input type="text" list="group-list" value={filterGroup} onChange={e => { setFilterGroup(e.target.value); resetPage() }}
                 placeholder="Group..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}
+                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
                 onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
               <datalist id="group-list">{clientGroups.map(g => <option key={g.id} value={g.name} />)}</datalist>
             </div>
@@ -647,7 +671,7 @@ export default function GDSInfoPage() {
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
             <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>GDS</label>
             <select value={filterGDS} onChange={e => { setFilterGDS(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}>
               <option value="all">All GDS</option>
               {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
             </select>
@@ -657,7 +681,7 @@ export default function GDSInfoPage() {
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
             <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Status</label>
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:"white",color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}>
               <option value="all">All Status</option>
               {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -668,7 +692,7 @@ export default function GDSInfoPage() {
             <button
               onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup(''); resetPage() }}
               title="Reset filters"
-              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"34px",height:"34px",background:"white",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:"7px",cursor:"pointer",flexShrink:0}}>
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"34px",height:"34px",background:T.card,color:"#64748b",border:"1px solid #e2e8f0",borderRadius:"7px",cursor:"pointer",flexShrink:0}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
           </div>
@@ -717,7 +741,7 @@ export default function GDSInfoPage() {
 
       {/*  Pagination  */}
       {!loading && filtered.length > 0 && (
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"16px",background:"white",border:"1px solid #e2e8f0",borderRadius:"10px",padding:"10px 16px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",overflow:"hidden",position:"relative",zIndex:1}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"16px",background:T.card,border:"1px solid #e2e8f0",borderRadius:"10px",padding:"10px 16px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",overflow:"hidden",position:"relative",zIndex:1}}>
           {/* Left: record count + page size */}
           <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
             <span style={{fontSize:"13px",fontWeight:600,color:"#334155"}}>
@@ -739,7 +763,7 @@ export default function GDSInfoPage() {
           {/* Right: page buttons */}
           <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageSize === "all"}
-              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
               
             </button>
 
@@ -759,7 +783,7 @@ export default function GDSInfoPage() {
             })}
 
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || pageSize === "all"}
-              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:"white",color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
               
             </button>
           </div>

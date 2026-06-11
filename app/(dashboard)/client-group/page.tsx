@@ -13,10 +13,34 @@ interface ClientGroup {
 const EMPTY = { name: '', description: '' }
 
 const T = {
-  primary:'#2563eb', surface:'#f8fafc', surfaceAlt:'#f1f5f9',
-  border:'#e2e8f0', text:'#0f172a', textMid:'#475569', textLight:'#94a3b8',
-  danger:'#dc2626', radius:'6px',
+  primary:    '#10B981',
+  primaryDk:  '#059669',
+  secondary:  '#3B82F6',
+  surface:    '#F8FAFC',
+  surfaceAlt: '#F1F5F9',
+  card:       '#FFFFFF',
+  border:     '#E2E8F0',
+  text:       '#1E293B',
+  textMid:    '#64748B',
+  textLight:  '#94A3B8',
+  danger:     '#EF4444',
+  warning:    '#F59E0B',
+  radius:     '12px',
+  radiusSm:   '8px',
 }
+const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
+  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
+  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
+  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
+  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+}
+
+
 
 const AVATAR_COLORS = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#0891b2']
 
@@ -76,13 +100,13 @@ export default function ClientGroupPage() {
   const filtered = records.filter(r => r.name.toLowerCase().includes(search.toLowerCase()) || (r.description ?? '').toLowerCase().includes(search.toLowerCase()))
   const totalClients = records.reduce((s, r) => s + (r.client_count ?? 0), 0)
 
-  const inp = { width:'100%', padding:'8px 12px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.text, outline:'none', boxSizing:'border-box' as const }
+  const inp = { width:'100%', padding:'8px 12px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.text, outline:'none', boxSizing:'border-box' as const }
   const lbl = { display:'block', fontSize:'12px', fontWeight:600, color:T.textMid, marginBottom:'6px' } as const
 
   return (
     <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
       {/* Header */}
-      <div style={{background:'white', borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
             <h1 style={{fontSize:'24px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.025em'}}>Client Groups</h1>
@@ -121,7 +145,7 @@ export default function ClientGroupPage() {
         </div>
 
         {/* Search bar */}
-        <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px'}}>
+        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px'}}>
           <div style={{position:'relative', flex:1}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search groups..." value={search} onChange={e => setSearch(e.target.value)}
@@ -132,15 +156,18 @@ export default function ClientGroupPage() {
         </div>
 
         {/* Table */}
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} group{filtered.length!==1?'s':''}</span>
+        </div>
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:T.textLight}}>Loading...</div>
         ) : filtered.length === 0 ? (
-          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textLight}}>
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textLight}}>
             {search ? `No groups matching "${search}"` : 'No client groups yet. Click Add Group to create one.'}
           </div>
         ) : (
-          <div style={{background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
-            <div style={{display:'grid', gridTemplateColumns:'2fr 2fr 1fr 1fr 140px', background:T.surfaceAlt, borderBottom:`2px solid ${T.border}`}}>
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+            <div style={{display:'grid', gridTemplateColumns:'2fr 2fr 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
               {['Group Name','Description','Linked PCCs','Last Modified','Actions'].map((h,i) => (
                 <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign:i===4?'right':'left'}}>{h}</div>
               ))}
@@ -179,8 +206,8 @@ export default function ClientGroupPage() {
                   </div>
                   <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
-                      <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:'white', border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
-                      <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:'white', border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
+                      <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
+                      <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
                     </>)}
                   </div>
                 </div>
@@ -199,7 +226,7 @@ export default function ClientGroupPage() {
               style={{...inp, resize:'none', fontFamily:'Inter, system-ui, sans-serif'}} /></div>
           {error && <p style={{fontSize:'13px', color:T.danger}}>{error}</p>}
           <div style={{display:'flex', gap:'10px', paddingTop:'4px'}}>
-            <button onClick={() => setModalOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer'}}>Cancel</button>
+            <button onClick={() => setModalOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer'}}>Cancel</button>
             <button onClick={handleSave} disabled={saving} style={{flex:1, padding:'9px', fontSize:'13px', fontWeight:700, border:'none', borderRadius:T.radius, background:T.primary, color:'white', cursor:'pointer', opacity:saving?0.6:1}}>
               {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Group'}
             </button>
@@ -218,7 +245,7 @@ export default function ClientGroupPage() {
             <p style={{fontSize:'14px', color:T.textMid}}>Delete <strong style={{color:T.text}}>{editing?.name}</strong>? This cannot be undone.</p>
           )}
           <div style={{display:'flex', gap:'10px'}}>
-            <button onClick={() => setDeleteOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:'white', color:T.textMid, cursor:'pointer'}}>Cancel</button>
+            <button onClick={() => setDeleteOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer'}}>Cancel</button>
             <button onClick={handleDelete} disabled={saving} style={{flex:1, padding:'9px', fontSize:'13px', fontWeight:700, border:'none', borderRadius:T.radius, background:T.danger, color:'white', cursor:'pointer', opacity:saving?0.6:1}}>
               {saving ? 'Deleting...' : 'Delete'}
             </button>
