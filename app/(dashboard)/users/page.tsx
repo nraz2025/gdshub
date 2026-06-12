@@ -216,7 +216,7 @@ export default function UsersPage() {
     <div style={{fontFamily:"Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh'}}>
 
       {/* ── Page Header ── */}
-      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{background:T.card, borderBottom:'2px solid #6EE7B7', padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'24px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.025em'}}>Users</h1>
@@ -236,7 +236,7 @@ export default function UsersPage() {
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer', letterSpacing:'0.01em'}}>
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 22px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'17px', fontWeight:700, color:'white', cursor:'pointer', letterSpacing:'0.01em'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add User
               </button>
@@ -273,40 +273,40 @@ export default function UsersPage() {
         {/* ── Search & filter bar ── */}
         <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
           <div style={{position:'relative', flex:'1', minWidth:'240px'}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke='#10B981' strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search by name or email..." value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
-              style={{...inp, paddingLeft:'32px'}} />
+              style={{...inp, paddingLeft:'32px', fontSize:'17px', border:'1px solid #6EE7B7', borderRadius:'6px'}} />
           </div>
           <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
-            style={{...inp, width:'140px', cursor:'pointer'}}>
+            style={{...inp, width:'160px', cursor:'pointer', border:'1px solid #6EE7B7', borderRadius:'6px', background:'white'}}>
             <option value="all">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
           </select>
-          <span style={{fontSize:'12px', color:T.textLight, fontWeight:500, marginLeft:'4px'}}>
+          <span style={{fontSize:'13px', color:'#065F46', fontWeight:600, marginLeft:'4px'}}>
             {filtered.length} user{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}
           </span>
           {(search || filterStatus !== 'all') && (
             <button onClick={() => { setSearch(''); setFilterStatus('all'); setCurrentPage(1) }}
-              style={{padding:'6px 10px', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'12px', color:T.textMid, cursor:'pointer', fontWeight:500}}>
+              style={{padding:'6px 12px', background:'#ECFDF5', border:'1px solid #6EE7B7', borderRadius:'6px', fontSize:'13px', color:'#065F46', cursor:'pointer', fontWeight:600}}>
               Clear
             </button>
           )}
         </div>
 
         {/* ── Top record bar ── */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, flexWrap:'wrap', gap:'10px'}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', padding:'10px 16px', background:T.card, border:'1px solid #E2E8F0', borderRadius:'10px', flexWrap:'wrap', gap:'10px'}}>
           <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-            <span style={{fontSize:'13px', color:T.textLight}}>
+            <span style={{fontSize:'17px', color:'#065F46', fontWeight:600}}>
               {pageSize === 0
                 ? `Showing all ${filtered.length} users`
                 : `Showing ${Math.min((currentPage-1)*pageSize+1, filtered.length)}–${Math.min(currentPage*pageSize, filtered.length)} of ${filtered.length} users`}
             </span>
             <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-              <span style={{fontSize:'13px', color:T.textLight}}>Per page:</span>
+              <span style={{fontSize:'17px', color:'#065F46', fontWeight:600}}>Per page:</span>
               <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-                style={{padding:'3px 8px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', outline:'none'}}>
+                style={{padding:'6px 12px', fontSize:'17px', fontWeight:600, border:'1px solid #6EE7B7', borderRadius:'7px', background:'#F0FDF4', color:'#065F46', cursor:'pointer', outline:'none'}}>
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
@@ -318,14 +318,14 @@ export default function UsersPage() {
           {pageSize !== 0 && totalPages > 1 && (
             <div style={{display:'flex', gap:'4px'}}>
               <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage===1}
-                style={{padding:'4px 10px', fontSize:'13px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>Previous</button>
+                style={{padding:'6px 14px', fontSize:'15px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>Previous</button>
               {Array.from({length: Math.min(totalPages, 9)}, (_,i) => i+1).map(p => (
                 <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{padding:'4px 10px', fontSize:'13px', fontWeight:700, border:`1px solid ${p===currentPage ? T.primary : T.border}`, borderRadius:T.radius, background:p===currentPage?T.primary:'white', color:p===currentPage?'white':T.textMid, cursor:'pointer'}}>{p}</button>
+                  style={{padding:'5px 10px', fontSize:'15px', fontWeight:700, border:`1px solid ${p===currentPage ? '#10B981' : T.border}`, borderRadius:T.radius, background:p===currentPage?'#10B981':'white', color:p===currentPage?'white':'#475569', cursor:'pointer'}}>{p}</button>
               ))}
-              {totalPages > 9 && <span style={{padding:'4px 6px', fontSize:'13px', color:T.textLight}}>…{totalPages}</span>}
+              {totalPages > 9 && <span style={{padding:'5px 6px', fontSize:'15px', color:T.textLight}}>…{totalPages}</span>}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage===totalPages}
-                style={{padding:'4px 10px', fontSize:'13px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>Next</button>
+                style={{padding:'6px 14px', fontSize:'15px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>Next</button>
             </div>
           )}
         </div>
@@ -417,18 +417,18 @@ export default function UsersPage() {
         </div>
 
         {/* ── Pagination ── */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, flexWrap:'wrap', gap:'10px'}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:T.card, border:'1px solid #E2E8F0', borderRadius:'10px', flexWrap:'wrap', gap:'10px'}}>
           {/* Left: showing + per-page selector */}
           <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-            <span style={{fontSize:'12px', color:T.textLight}}>
+            <span style={{fontSize:'17px', color:'#065F46', fontWeight:600}}>
               {pageSize === 0
                 ? `Showing all ${filtered.length} users`
                 : `Showing ${Math.min((currentPage-1)*pageSize+1, filtered.length)}–${Math.min(currentPage*pageSize, filtered.length)} of ${filtered.length} users`}
             </span>
             <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-              <span style={{fontSize:'12px', color:T.textLight}}>Per page:</span>
+              <span style={{fontSize:'17px', color:'#065F46', fontWeight:600}}>Per page:</span>
               <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-                style={{padding:'3px 8px', fontSize:'12px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', outline:'none'}}>
+                style={{padding:'6px 12px', fontSize:'17px', fontWeight:600, border:'1px solid #6EE7B7', borderRadius:'7px', background:'#F0FDF4', color:'#065F46', cursor:'pointer', outline:'none'}}>
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
@@ -441,18 +441,18 @@ export default function UsersPage() {
           {pageSize !== 0 && totalPages > 1 && (
             <div style={{display:'flex', gap:'4px'}}>
               <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage===1}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
+                style={{padding:'6px 14px', fontSize:'15px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
                 Previous
               </button>
               {Array.from({length: Math.min(totalPages, 9)}, (_,i) => i+1).map(p => (
                 <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{padding:'5px 10px', fontSize:'12px', fontWeight:700, border:`1px solid ${p===currentPage ? T.primary : T.border}`, borderRadius:T.radius, background:p===currentPage?T.primary:'white', color:p===currentPage?'white':T.textMid, cursor:'pointer'}}>
+                  style={{padding:'5px 10px', fontSize:'15px', fontWeight:700, border:`1px solid ${p===currentPage ? '#10B981' : T.border}`, borderRadius:T.radius, background:p===currentPage?'#10B981':'white', color:p===currentPage?'white':'#475569', cursor:'pointer'}}>
                   {p}
                 </button>
               ))}
-              {totalPages > 9 && <span style={{padding:'5px 6px', fontSize:'12px', color:T.textLight}}>…{totalPages}</span>}
+              {totalPages > 9 && <span style={{padding:'5px 6px', fontSize:'15px', color:T.textLight}}>…{totalPages}</span>}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage===totalPages}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
+                style={{padding:'6px 14px', fontSize:'15px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
                 Next
               </button>
             </div>

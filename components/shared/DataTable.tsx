@@ -75,13 +75,13 @@ export default function DataTable<T extends Record<string, unknown>>({
         <div ref={scrollRef} onScroll={onTableScroll} className="overflow-x-auto">
           <table className="w-full" style={{minWidth:'1400px', borderCollapse:'collapse'}}>
             <thead>
-              <tr style={{borderBottom:'2px solid #e2e8f0', background:'#f1f5f9'}}>
+              <tr style={{borderBottom:'2px solid #6EE7B7', background:'#F0FDF4'}}>
                 {columns.map(col => (
                   <th key={col.key}
                     style={{
                       textAlign:'left', padding:'11px 16px',
-                      fontSize:'12px', fontWeight:700,
-                      color:'#4f46e5', textTransform:'uppercase',
+                      fontSize:'16px', fontWeight:800,
+                      color:'#065F46', textTransform:'uppercase',
                       letterSpacing:'0.07em', whiteSpace:'nowrap',
                       ...(col.width ? {width: col.width} : {})
                     }}>
@@ -89,7 +89,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                   </th>
                 ))}
                 {isAdmin && (onEdit || onDelete) && (
-                  <th style={{textAlign:'right', padding:'11px 16px', fontSize:'12px', fontWeight:700, color:'#4f46e5', textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                  <th style={{textAlign:'right', padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em'}}>
                     Actions
                   </th>
                 )}

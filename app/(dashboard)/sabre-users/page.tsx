@@ -361,7 +361,7 @@ export default function SabreUsersPage() {
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
-              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
+              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Sabre User</button>
             </div>
           )}
@@ -370,7 +370,7 @@ export default function SabreUsersPage() {
       <div style={{padding:'0 28px 28px'}}>
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'14px',marginBottom:'24px'}}>
           {[{label:'Total Users',value:records.length,sub:'registered',accent:false},{label:'Active',value:activeCount,sub:'currently active',accent:false},{label:'Inactive',value:records.length-activeCount,sub:'not active',accent:false},{label:'OTA Users',value:otaCount,sub:'OTA enabled',accent:true}].map((s,i)=>(
-            <div key={i} style={{background:s.accent?T.primary:'white',border:`1px solid ${s.accent?T.primary:T.border}`,borderRadius:T.radius,padding:'16px 18px'}}>
+            <div key={i} style={{background:s.accent?'#10B981':'white',border:`1px solid ${s.accent?T.primary:T.border}`,borderRadius:T.radius,padding:'16px 18px'}}>
               <div style={{fontSize:'11px',fontWeight:700,color:s.accent?'rgba(255,255,255,0.75)':T.textLight,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'6px'}}>{s.label}</div>
               <div style={{fontSize:'26px',fontWeight:800,color:s.accent?'white':T.text,letterSpacing:'-0.03em',lineHeight:1}}>{s.value}</div>
               <div style={{fontSize:'11px',color:s.accent?'rgba(255,255,255,0.65)':T.textLight,marginTop:'4px'}}>{s.sub}</div>
@@ -388,7 +388,7 @@ export default function SabreUsersPage() {
             <option value="all">All Status</option>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} record{filtered.length!==1?'s':''}</span>
+          <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} record{filtered.length!==1?'s':''}</span>
         </div>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
           <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} Sabre user{filtered.length!==1?'s':''}</span>
@@ -397,7 +397,7 @@ export default function SabreUsersPage() {
           <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 1fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
               {['EPR','PCC','Initial','OTA Client','Linked User','Status','Actions'].map((h,i)=>(
-                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:T.primary,textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===6?'right':'left'}}>{h}</div>
+                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===6?'right':'left'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Sabre users found.</div> :

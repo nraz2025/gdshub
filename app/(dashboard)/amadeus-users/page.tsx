@@ -313,7 +313,7 @@ export default function AmadeusUsersPage() {
           {isAdmin && <><input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
-          <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
+          <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Amadeus User</button></>}
           </div>
         </div>
@@ -330,7 +330,7 @@ export default function AmadeusUsersPage() {
           <option value="suspended">Suspended</option>
           <option value="resigned">Resigned</option>
         </select>
-        <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+        <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
           <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} Amadeus user{filtered.length!==1?'s':''}</span>

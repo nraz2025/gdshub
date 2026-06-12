@@ -260,7 +260,7 @@ export default function OTAClientPage() {
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
-              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
+              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Client</button>
             </div>
           )}
@@ -272,7 +272,7 @@ export default function OTAClientPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} style={{width:'100%',padding:'8px 12px 8px 32px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',boxSizing:'border-box'}} />
         </div>
-        <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} client{filtered.length!==1?'s':''}</span>
+        <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} client{filtered.length!==1?'s':''}</span>
       </div>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
           <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} client{filtered.length!==1?'s':''}</span>
@@ -281,7 +281,7 @@ export default function OTAClientPage() {
         <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
             {['Company','Sabre','Amadeus','Travelport','Created','Actions'].map((h,i)=>(
-              <div key={h} style={{padding:'10px 14px',fontSize:'16px',fontWeight:800,color:T.primary,textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===5?'right':'left'}}>{h}</div>
+              <div key={h} style={{padding:'10px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===5?'right':'left'}}>{h}</div>
             ))}
           </div>
           {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No clients found.</div> :

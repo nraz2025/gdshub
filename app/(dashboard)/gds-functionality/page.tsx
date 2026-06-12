@@ -57,13 +57,26 @@ function fmtCost(cost: number, currency: string, cycle: string, cycles: {value:s
   return cycleLabel && cycleLabel !== 'One-Time' ? `${amt} / ${cycleLabel}` : amt
 }
 
-interface FeatureWithGDS extends GDSFeature { gds?: GDS }
+interface PricingTier {
+  sort_order: number
+  tier: string
+  price: number
+  currency: string
+  unit: string
+  billing: string
+}
+
+interface FeatureWithGDS extends GDSFeature {
+  gds?: GDS
+  pricing_tiers?: PricingTier[] | null
+}
 
 //  ADD form: one name, multiple GDS 
 const ADD_EMPTY = { label: '', selectedGDS: new Set<number>() }
 
 //  EDIT form: single GDS entry 
 const EDIT_EMPTY = { label: '', cost: '0', currency: 'USD', billing_cycle: 'monthly' }
+const PRICING_TIER_EMPTY: PricingTier = { sort_order: 0, tier: '', price: 0, currency: 'MYR', unit: 'Per Customer', billing: 'Per month' }
 
 export default function GDSFunctionalityPage() {
   const supabase = createClient()
@@ -84,6 +97,8 @@ export default function GDSFunctionalityPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<FeatureWithGDS | null>(null)
   const [editForm, setEditForm] = useState(EDIT_EMPTY)
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([])
+  const [showPricingTiers, setShowPricingTiers] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -102,7 +117,7 @@ export default function GDSFunctionalityPage() {
       setIsAdmin(prof?.role === 'admin')
     }
     const [{ data: featureData }, { data: gdsData }, { data: cycleData }] = await Promise.all([
-      supabase.from('gds_features').select('*, gds:gds_id(id, name)').order('label'),
+      supabase.from('gds_features').select('*, gds:gds_id(id, name), pricing_tiers').order('label'),
       supabase.from('gds').select('*').order('name'),
       supabase.from('billing_cycles').select('*').order('sort_order'),
     ])
@@ -142,6 +157,8 @@ export default function GDSFunctionalityPage() {
   //  EDIT handlers (per individual GDS row) 
   function openEdit(f: FeatureWithGDS) {
     setEditTarget(f)
+    setPricingTiers(f.pricing_tiers ?? [])
+    setShowPricingTiers((f.pricing_tiers ?? []).length > 0)
     setEditForm({
       label:         f.label,
       cost:          f.cost != null ? String(f.cost) : '0',
@@ -164,7 +181,7 @@ export default function GDSFunctionalityPage() {
       ? editForm.label.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
       : editTarget.key
     const { error: err } = await supabase.from('gds_features')
-      .update({ label: editForm.label.trim(), key, cost: costValue, currency: editForm.currency, billing_cycle: editForm.billing_cycle })
+      .update({ label: editForm.label.trim(), key, cost: costValue, currency: editForm.currency, billing_cycle: editForm.billing_cycle, pricing_tiers: showPricingTiers && pricingTiers.length > 0 ? pricingTiers : null })
       .eq('id', editTarget.id)
     if (err) { setEditError(err.message); setEditSaving(false); return }
     setEditSaving(false); setEditOpen(false); fetchAll()
@@ -204,7 +221,7 @@ export default function GDSFunctionalityPage() {
             <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Master list of features available per GDS platform</p>
           </div>
           {isAdmin && (
-            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'13px',fontWeight:700,color:'white',cursor:'pointer'}}>
+            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Feature
             </button>
@@ -228,7 +245,7 @@ export default function GDSFunctionalityPage() {
             <option value="all">All GDS</option>
             {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
           </select>
-          {!loading && <span style={{fontSize:'12px',color:T.textLight,fontWeight:500}}>{filtered.length} feature{filtered.length !== 1 ? 's' : ''}</span>}
+          {!loading && <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} feature{filtered.length !== 1 ? 's' : ''}</span>}
         </div>
 
       {loading ? (
@@ -351,6 +368,49 @@ export default function GDSFunctionalityPage() {
               <option value=""> None </option>
               {billingCycles.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
+          </div>
+          {/* ── Pricing Tiers ── */}
+          <div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
+              <label className="block text-sm font-medium text-slate-700">Pricing Tiers</label>
+              <button type="button" onClick={() => setShowPricingTiers(v => !v)}
+                style={{fontSize:'12px', color:T.primary, background:'none', border:`1px solid ${T.border}`, borderRadius:'6px', padding:'3px 10px', cursor:'pointer', fontWeight:600}}>
+                {showPricingTiers ? 'Hide' : '+ Add Tiers'}
+              </button>
+            </div>
+            {showPricingTiers && (
+              <div style={{border:`1px solid ${T.border}`, borderRadius:'8px', overflow:'hidden'}}>
+                {/* Header */}
+                <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', background:'#F0FDF4', borderBottom:`1px solid #6EE7B7`, padding:'7px 10px'}}>
+                  {['Contracted Price Item','Currency','Market Price'].map(h => (
+                    <div key={h} style={{fontSize:'11px', fontWeight:700, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.05em'}}>{h}</div>
+                  ))}
+                </div>
+                {/* Rows */}
+                {pricingTiers.map((tier, i) => (
+                  <div key={i} style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:'4px', padding:'6px 10px', borderBottom:`1px solid ${T.border}`, alignItems:'center', background: i%2===0 ? 'white' : '#F8FAFC'}}>
+                    <input value={tier.tier} onChange={e => setPricingTiers(ts => ts.map((t,j) => j===i ? {...t, tier:e.target.value} : t))}
+                      style={{fontSize:'12px', padding:'4px 6px', border:`1px solid ${T.border}`, borderRadius:'4px', width:'100%', outline:'none'}} placeholder="e.g. Up to 5K/year" />
+                    <input value={tier.currency} onChange={e => setPricingTiers(ts => ts.map((t,j) => j===i ? {...t, currency:e.target.value} : t))}
+                      style={{fontSize:'12px', padding:'4px 6px', border:`1px solid ${T.border}`, borderRadius:'4px', width:'100%', outline:'none'}} placeholder="MYR" />
+                    <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
+                      <input type="number" value={tier.price} onChange={e => setPricingTiers(ts => ts.map((t,j) => j===i ? {...t, price:Number(e.target.value)} : t))}
+                        style={{fontSize:'12px', padding:'4px 6px', border:`1px solid ${T.border}`, borderRadius:'4px', flex:1, outline:'none'}} />
+                      <button type="button" onClick={() => setPricingTiers(ts => ts.filter((_,j) => j!==i))}
+                        style={{fontSize:'14px', color:'#EF4444', background:'none', border:'none', cursor:'pointer', padding:'0 2px', lineHeight:1}}>×</button>
+                    </div>
+                  </div>
+                ))}
+                {/* Add row button */}
+                <div style={{padding:'6px 10px', background:'white'}}>
+                  <button type="button"
+                    onClick={() => setPricingTiers(ts => [...ts, {...PRICING_TIER_EMPTY, sort_order: ts.length+1}])}
+                    style={{fontSize:'12px', color:T.primary, background:'none', border:`1px dashed ${T.primary}`, borderRadius:'6px', padding:'4px 12px', cursor:'pointer', width:'100%', fontWeight:600}}>
+                    + Add Row
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           {editError && <p className="text-sm text-red-500">{editError}</p>}
           <div className="flex gap-3 pt-2">

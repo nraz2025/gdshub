@@ -113,7 +113,7 @@ export default function ClientGroupPage() {
             <p style={{fontSize:'13px', color:T.textMid, marginTop:'3px'}}>Manage client group categories linked to PCC codes</p>
           </div>
           {isAdmin && (
-            <button onClick={openAdd} style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer'}}>
+            <button onClick={openAdd} style={{display:'flex', alignItems:'center', gap:'7px', padding:'10px 22px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'17px', fontWeight:700, color:'white', cursor:'pointer'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Group
             </button>
@@ -151,7 +151,7 @@ export default function ClientGroupPage() {
             <input type="text" placeholder="Search groups..." value={search} onChange={e => setSearch(e.target.value)}
               style={{...inp, paddingLeft:'32px'}} />
           </div>
-          <span style={{fontSize:'12px', color:T.textLight, fontWeight:500, whiteSpace:'nowrap'}}>{filtered.length} group{filtered.length!==1?'s':''}</span>
+          <span style={{fontSize:'17px', color:'#065F46', fontWeight:600, whiteSpace:'nowrap'}}>{filtered.length} group{filtered.length!==1?'s':''}</span>
           {search && <button onClick={() => setSearch('')} style={{padding:'6px 10px', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'12px', color:T.textMid, cursor:'pointer'}}>Clear</button>}
         </div>
 
@@ -169,7 +169,7 @@ export default function ClientGroupPage() {
           <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
             <div style={{display:'grid', gridTemplateColumns:'2fr 2fr 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
               {['Group Name','Description','Linked PCCs','Last Modified','Actions'].map((h,i) => (
-                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign:i===4?'right':'left'}}>{h}</div>
+                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:i===4?'right':'left'}}>{h}</div>
               ))}
             </div>
             {filtered.map((row, i) => {

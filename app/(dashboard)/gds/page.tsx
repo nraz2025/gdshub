@@ -113,7 +113,7 @@ export default function GDSPage() {
           </div>
           {isAdmin && (
             <button onClick={openAdd}
-              style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer'}}>
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'10px 22px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'17px', fontWeight:700, color:'white', cursor:'pointer'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add GDS
             </button>
@@ -123,9 +123,6 @@ export default function GDSPage() {
 
       <div style={{padding:'0 28px 28px'}}>
 
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} GDS platform{records.length!==1?'s':''}</span>
-        </div>
         {/* ── Table ── */}
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:T.textLight, fontSize:'14px'}}>Loading...</div>
@@ -178,10 +175,6 @@ export default function GDSPage() {
           </div>
         )}
       </div>
-        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginTop:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} GDS platform{records.length!==1?'s':''}</span>
-        </div>
-
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS' : 'Add GDS'} size="sm">
         <div className="space-y-4">

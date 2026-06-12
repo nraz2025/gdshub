@@ -112,6 +112,7 @@ export default function GDSInfoPage() {
   const [featurePopupOpen, setFeaturePopupOpen] = useState(false)
   const [profileFeatureIds, setProfileFeatureIds] = useState<Set<number>>(new Set())
   const [featureToggling, setFeatureToggling] = useState(false)
+  const [tierModalFeature, setTierModalFeature] = useState<{label:string; tiers:{sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]} | null>(null)
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -158,7 +159,7 @@ export default function GDSInfoPage() {
       supabase.from('organisation').select('*').order('organisation'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
-      supabase.from('gds_features').select('*').order('label'),
+      supabase.from('gds_features').select('*, pricing_tiers').order('label'),
     ])
     const sorted = (pccData ?? []).slice().sort((a, b) => {
       const orgA = (a.organisation as { organisation: string } | undefined)?.organisation ?? ''
@@ -273,27 +274,58 @@ export default function GDSInfoPage() {
   //  EXPORT 
   function handleExport() {
     const data = filtered.map((r, i) => {
-      const gdsName = (r.gds as GDS)?.name ?? ''
-      const org = r.organisation as Organisation
-      const ota = r.ota_client as OTAClient
-      const func = r.gds_functionality as GDSFunctionality
+      const gdsName   = (r.gds as GDS)?.name ?? ''
+      const org       = r.organisation as Organisation
+      const ota       = r.ota_client as OTAClient
+      const func      = r.gds_functionality as GDSFunctionality
+      const cg        = (r as PCCList & {client_group?: {name?:string}}).client_group
+      const pccFeats  = (r as PCCList & {pcc_features?: {gds_features?: {label?:string;cost?:number;currency?:string;billing_cycle?:string}}[]}).pcc_features ?? []
+      const featNames = pccFeats.map(pf => pf.gds_features?.label ?? '').filter(Boolean).join(', ')
+      const featCosts = pccFeats.map(pf => {
+        const f = pf.gds_features
+        if (!f) return ''
+        return f.cost ? `${f.currency ?? ''} ${f.cost} ${f.billing_cycle ?? ''}`.trim() : ''
+      }).filter(Boolean).join(', ')
       return {
-        'No.': i + 1,
-        'Organisation': org?.organisation ?? '',
-        'IATA': org?.iata ?? '',
-        'GDS': gdsName,
-        'PCC': r.pcc,
-        'Status': r.status ?? '',
-        'PCC Assigned': ota?.company_name ?? '',
-        'GDS Feature': func?.name ?? '',
-        'PCC Functionality': r.pcc_functionality ?? '',
-        'PCC Functionality': (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
-        'Remarks': r.remarks ?? '',
-        'Created': new Date(r.created_at).toLocaleDateString('en-MY'),
+        'No.':                  i + 1,
+        'GDS':                  gdsName,
+        'PCC Code':             r.pcc,
+        'Status':               r.status ?? '',
+        'Organisation':         org?.organisation ?? '',
+        'IATA':                 org?.iata ?? '',
+        'OTA Client':           ota?.company_name ?? '',
+        'Client Group':         cg?.name ?? '',
+        'GDS Functionality':    func?.name ?? '',
+        'PCC Functionality':    (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
+        'Enabled Features':     featNames,
+        'Feature Costs':        featCosts,
+        'Remarks':              r.remarks ?? '',
+        'Modified By':          (r as PCCList & {modified_by?: string}).modified_by ?? '',
+        'Modified Date':        (r as PCCList & {modified_at?: string}).modified_at
+                                  ? new Date((r as PCCList & {modified_at?: string}).modified_at!).toLocaleDateString('en-MY')
+                                  : '',
+        'Created Date':         new Date(r.created_at).toLocaleDateString('en-MY'),
       }
     })
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 15 }]
+    ws['!cols'] = [
+      { wch: 5  },  // No.
+      { wch: 14 },  // GDS
+      { wch: 14 },  // PCC Code
+      { wch: 12 },  // Status
+      { wch: 30 },  // Organisation
+      { wch: 12 },  // IATA
+      { wch: 25 },  // OTA Client
+      { wch: 20 },  // Client Group
+      { wch: 25 },  // GDS Functionality
+      { wch: 20 },  // PCC Functionality
+      { wch: 40 },  // Enabled Features
+      { wch: 40 },  // Feature Costs
+      { wch: 30 },  // Remarks
+      { wch: 25 },  // Modified By
+      { wch: 14 },  // Modified Date
+      { wch: 14 },  // Created Date
+    ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'GDS Info')
     XLSX.writeFile(wb, `GDSHub_GDS_Info_${new Date().toISOString().slice(0, 10)}.xlsx`)
@@ -531,7 +563,7 @@ export default function GDSInfoPage() {
           <button onClick={() => openFeaturePopup(row)}
             style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
             <span style={{fontSize:'16px',color: directCount > 0 ? '#334155' : '#94a3b8',fontWeight: directCount > 0 ? 500 : 400,textTransform:'uppercase',letterSpacing:'0.02em'}}>
-              {func ? func.name : 'No profile'}
+              {func ? func.name : directCount > 0 ? 'Assigned' : 'Unassigned'}
             </span>
             <span style={{fontSize:'14px',fontWeight:600,color: directCount > 0 ? '#2563eb' : '#94a3b8',
               background: directCount > 0 ? '#dbeafe' : '#f1f5f9',
@@ -565,7 +597,7 @@ export default function GDSInfoPage() {
     {
       key: 'remarks', label: 'Remarks', width: '120px',
       render: (row: PCCList) => {
-        if (!row.remarks) return <span className="text-slate-300 text-xs"></span>
+        if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
         return points.length > 1 ? (
           <ul className="list-disc list-inside space-y-0.5">
@@ -616,62 +648,62 @@ export default function GDSInfoPage() {
       </div>
 
       {/* Filters */}
-      <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:"10px",padding:"14px 16px",marginBottom:"16px"}}>
+      <div style={{background:"#F0FDF4",border:"2px solid #6EE7B7",borderRadius:"8px",padding:"14px 16px",marginBottom:"16px"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr auto",alignItems:"flex-end",gap:"10px",width:"100%"}}>
 
           {/* Organisation */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Organisation</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>Organisation</label>
             <div style={{position:"relative"}}>
               <input type="text" list="org-list" value={filterOrg} onChange={e => { setFilterOrg(e.target.value); resetPage() }}
                 placeholder="Search org..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
-                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+                style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#10B981")} onBlur={e => (e.currentTarget.style.borderColor = "#6EE7B7")} />
               <datalist id="org-list">{orgList.map(o => <option key={o.id} value={o.organisation} />)}</datalist>
             </div>
           </div>
 
           {/* PCC */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC</label>
             <div style={{position:"relative"}}>
               <input type="text" list="pcc-list" value={filterPCC} onChange={e => { setFilterPCC(e.target.value); resetPage() }}
                 placeholder="Code..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
-                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+                style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#10B981")} onBlur={e => (e.currentTarget.style.borderColor = "#6EE7B7")} />
               <datalist id="pcc-list">{[...new Set(records.map(r => r.pcc))].sort().map(pcc => <option key={pcc} value={pcc} />)}</datalist>
             </div>
           </div>
 
           {/* PCC Assigned */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC Assigned</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>PCC Assigned</label>
             <div style={{position:"relative"}}>
               <input type="text" list="ota-list" value={filterOTA} onChange={e => { setFilterOTA(e.target.value); resetPage() }}
                 placeholder="Assigned..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
-                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+                style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#10B981")} onBlur={e => (e.currentTarget.style.borderColor = "#6EE7B7")} />
               <datalist id="ota-list">{otaClients.map(o => <option key={o.id} value={o.company_name} />)}</datalist>
             </div>
           </div>
 
           {/* Client Group */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Client Group</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>Client Group</label>
             <div style={{position:"relative"}}>
               <input type="text" list="group-list" value={filterGroup} onChange={e => { setFilterGroup(e.target.value); resetPage() }}
                 placeholder="Group..."
-                style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}
-                onFocus={e => (e.currentTarget.style.borderColor = "#0f172a")} onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")} />
+                style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}
+                onFocus={e => (e.currentTarget.style.borderColor = "#10B981")} onBlur={e => (e.currentTarget.style.borderColor = "#6EE7B7")} />
               <datalist id="group-list">{clientGroups.map(g => <option key={g.id} value={g.name} />)}</datalist>
             </div>
           </div>
 
           {/* GDS */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>GDS</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>GDS</label>
             <select value={filterGDS} onChange={e => { setFilterGDS(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}>
               <option value="all">All GDS</option>
               {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
             </select>
@@ -679,9 +711,9 @@ export default function GDSInfoPage() {
 
           {/* Status */}
           <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
-            <label style={{fontSize:"12px",fontWeight:600,color:"#475569",textTransform:"uppercase",letterSpacing:"0.04em"}}>Status</label>
+            <label style={{fontSize:"15px",fontWeight:700,color:"#065F46",textTransform:"uppercase",letterSpacing:"0.04em"}}>Status</label>
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"7px 12px",fontSize:"13px",border:"1px solid #e2e8f0",borderRadius:"7px",background:T.card,color:"#334155",outline:"none",boxSizing:"border-box"}}>
+              style={{width:"100%",padding:"7px 12px",fontSize:"15px",border:"1px solid #6EE7B7",borderRadius:"6px",background:"white",color:"#1E293B",outline:"none",boxSizing:"border-box"}}>
               <option value="all">All Status</option>
               {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -692,13 +724,55 @@ export default function GDSInfoPage() {
             <button
               onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup(''); resetPage() }}
               title="Reset filters"
-              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"34px",height:"34px",background:T.card,color:"#64748b",border:"1px solid #e2e8f0",borderRadius:"7px",cursor:"pointer",flexShrink:0}}>
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"34px",height:"34px",background:"white",color:"#065F46",border:"1px solid #6EE7B7",borderRadius:"6px",cursor:"pointer",flexShrink:0}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
           </div>
 
         </div>
       </div>
+
+      {/* ── Top record bar ── */}
+      {!loading && filtered.length > 0 && (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px",background:T.card,border:"1px solid #e2e8f0",borderRadius:"10px",padding:"10px 16px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+            <span style={{fontSize:"13px",fontWeight:600,color:"#334155"}}>
+              {pageSize === "all"
+                ? <><span style={{color:"#0f172a"}}>{filtered.length}</span> records total</>
+                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}–{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
+              }
+            </span>
+            <div style={{width:"1px",height:"18px",background:"#e2e8f0"}}/>
+            <select value={String(pageSize)} onChange={e => { setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); setCurrentPage(1) }}
+              style={{padding:"5px 10px",fontSize:"12px",fontWeight:600,border:"1px solid #6EE7B7",borderRadius:"7px",background:"#F0FDF4",color:"#065F46",outline:"none",cursor:"pointer"}}>
+              <option value="25">25 / page</option>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageSize === "all"}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1}}>
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+              const show = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2
+              if (!show) return null
+              return (
+                <button key={page} onClick={() => setCurrentPage(page)}
+                  style={{display:"flex",alignItems:"center",justifyContent:"center",minWidth:"32px",height:"32px",padding:"0 8px",borderRadius:"8px",border: currentPage===page ? "1px solid #10B981" : "1px solid #e2e8f0",background: currentPage===page ? "#10B981" : "white",color: currentPage===page ? "white" : "#475569",fontSize:"13px",fontWeight: currentPage===page ? 700 : 500,cursor:"pointer"}}>
+                  {page}
+                </button>
+              )
+            })}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || pageSize === "all"}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1}}>
+              ›
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Select all + records count bar */}
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px',isolation:'isolate'}}>
@@ -747,12 +821,12 @@ export default function GDSInfoPage() {
             <span style={{fontSize:"13px",fontWeight:600,color:"#334155"}}>
               {pageSize === "all"
                 ? <><span style={{color:"#0f172a"}}>{filtered.length}</span> records total</>
-                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
+                : <><span style={{color:"#0f172a"}}>{((currentPage-1)*effectiveSize)+1}–{Math.min(currentPage*effectiveSize, filtered.length)}</span> <span style={{color:"#94a3b8",fontWeight:400}}>of</span> <span style={{color:"#0f172a"}}>{filtered.length}</span> records</>
               }
             </span>
             <div style={{width:"1px",height:"18px",background:"#e2e8f0"}}/>
             <select value={String(pageSize)} onChange={e => { setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); setCurrentPage(1) }}
-              style={{padding:"5px 10px",fontSize:"12px",fontWeight:600,border:"1px solid #6366f1",borderRadius:"7px",background:"#eef2ff",color:"#4338ca",outline:"none",cursor:"pointer"}}>
+              style={{padding:"5px 10px",fontSize:"12px",fontWeight:600,border:"1px solid #6EE7B7",borderRadius:"7px",background:"#F0FDF4",color:"#065F46",outline:"none",cursor:"pointer"}}>
               <option value="25">25 / page</option>
               <option value="50">50 / page</option>
               <option value="100">100 / page</option>
@@ -764,7 +838,7 @@ export default function GDSInfoPage() {
           <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageSize === "all"}
               style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===1||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
-              
+              ‹
             </button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
@@ -772,11 +846,11 @@ export default function GDSInfoPage() {
               const ellipsisBefore = page === 2 && currentPage > 4
               const ellipsisAfter = page === totalPages - 1 && currentPage < totalPages - 3
               if (!show) return null
-              if (ellipsisBefore) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}></span>
-              if (ellipsisAfter) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}></span>
+              if (ellipsisBefore) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
+              if (ellipsisAfter) return <span key={`e-${page}`} style={{padding:"0 4px",color:"#94a3b8",fontSize:"13px"}}>…</span>
               return (
                 <button key={page} onClick={() => setCurrentPage(page)}
-                  style={{display:"flex",alignItems:"center",justifyContent:"center",minWidth:"32px",height:"32px",padding:"0 8px",borderRadius:"8px",border: currentPage===page ? "1px solid #3b82f6" : "1px solid #e2e8f0",background: currentPage===page ? "#3b82f6" : "white",color: currentPage===page ? "white" : "#475569",fontSize:"13px",fontWeight: currentPage===page ? 700 : 500,cursor:"pointer",transition:"all 0.15s",boxShadow: currentPage===page ? "0 2px 6px rgba(59,130,246,0.35)" : "none"}}>
+                  style={{display:"flex",alignItems:"center",justifyContent:"center",minWidth:"32px",height:"32px",padding:"0 8px",borderRadius:"8px",border: currentPage===page ? "1px solid #10B981" : "1px solid #e2e8f0",background: currentPage===page ? "#10B981" : "white",color: currentPage===page ? "white" : "#475569",fontSize:"13px",fontWeight: currentPage===page ? 700 : 500,cursor:"pointer",transition:"all 0.15s",boxShadow: currentPage===page ? "0 2px 6px rgba(16,185,129,0.35)" : "none"}}>
                   {page}
                 </button>
               )
@@ -784,7 +858,7 @@ export default function GDSInfoPage() {
 
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || pageSize === "all"}
               style={{display:"flex",alignItems:"center",justifyContent:"center",width:"32px",height:"32px",borderRadius:"8px",border:"1px solid #e2e8f0",background:T.card,color:"#64748b",fontSize:"16px",cursor:"pointer",opacity:currentPage===totalPages||pageSize==="all"?0.35:1,transition:"all 0.15s"}}>
-              
+              ›
             </button>
           </div>
         </div>
@@ -947,6 +1021,15 @@ export default function GDSInfoPage() {
                             </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          {(f as {pricing_tiers?: unknown[]}).pricing_tiers && (f as {pricing_tiers?: unknown[]}).pricing_tiers!.length > 0 && (
+                            <button
+                              onClick={() => setTierModalFeature({label: f.label, tiers: (f as {pricing_tiers: {sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]}).pricing_tiers})}
+                              className="text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                               Tiers
+                            </button>
+                          )}
                         <button
                           onClick={() => toggleProfileFeature(f.id)}
                           disabled={featureToggling}
@@ -956,6 +1039,7 @@ export default function GDSInfoPage() {
                         >
                           {enabled ? ' Remove' : '+ Add'}
                         </button>
+                        </div>
                       </div>
                     )
                   })}
@@ -977,6 +1061,9 @@ export default function GDSInfoPage() {
                               <p className="text-sm text-slate-800 font-medium">{f.label}</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
+                                {(f as {pricing_tiers?: unknown[]}).pricing_tiers && (f as {pricing_tiers?: unknown[]}).pricing_tiers!.length > 0 && (
+                                  <button onClick={() => setTierModalFeature({label: f.label, tiers: (f as {pricing_tiers: {sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]}).pricing_tiers})} className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium"> Tiers</button>
+                                )}
                                 {f.billing_cycle && <span className="text-xs text-slate-300"></span>}
                                 {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
                               </div>
@@ -1245,6 +1332,37 @@ export default function GDSInfoPage() {
           </div>
         </div>
       </Modal>
+      {/* ── Pricing Tiers Modal ── */}
+      {tierModalFeature && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+          <div style={{background:'white',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'560px',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
+              <div>
+                <h3 style={{fontSize:'16px',fontWeight:700,color:'#1E293B',margin:0}}>{tierModalFeature.label}</h3>
+                <p style={{fontSize:'13px',color:'#64748B',marginTop:'2px'}}>Transaction Tier Pricing</p>
+              </div>
+              <button onClick={() => setTierModalFeature(null)} style={{background:'none',border:'none',fontSize:'20px',cursor:'pointer',color:'#94A3B8',lineHeight:1}}>×</button>
+            </div>
+            <div style={{border:'1px solid #E2E8F0',borderRadius:'10px',overflow:'hidden'}}>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',background:'#F0FDF4',borderBottom:'2px solid #6EE7B7',padding:'10px 14px'}}>
+                {['Contracted Price Item','Currency','Market Price'].map(h => (
+                  <div key={h} style={{fontSize:'11px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.06em'}}>{h}</div>
+                ))}
+              </div>
+              {tierModalFeature.tiers.sort((a,b) => a.sort_order - b.sort_order).map((pt, i) => (
+                <div key={i} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',padding:'10px 14px',borderBottom: i < tierModalFeature.tiers.length-1 ? '1px solid #F1F5F9' : 'none',background: i%2===0 ? 'white' : '#F8FAFC'}}>
+                  <span style={{fontSize:'14px',color:'#1E293B'}}>{pt.tier}</span>
+                  <span style={{fontSize:'14px',color:'#64748B'}}>{pt.currency}</span>
+                  <span style={{fontSize:'14px',fontWeight:600,color:'#10B981'}}>{pt.price === 0 ? '0.00' : pt.price.toLocaleString('en-MY', {minimumFractionDigits:2})}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px'}}>
+              <button onClick={() => setTierModalFeature(null)} style={{padding:'8px 20px',fontSize:'13px',fontWeight:600,border:'1px solid #E2E8F0',borderRadius:'8px',background:'white',color:'#64748B',cursor:'pointer'}}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
