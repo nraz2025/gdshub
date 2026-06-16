@@ -234,7 +234,7 @@ export default function OrganisationPage() {
           {/* Table header */}
           <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`, padding:'0'}}>
             {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 4 ? 'right' : 'left'}}>
+              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 4 ? 'right' : 'left', borderRight:'1px solid #d1fae5'}}>
                 {h}
               </div>
             ))}
@@ -256,20 +256,20 @@ export default function OrganisationPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = T.surfaceAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   {/* Organisation */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', gap:'10px'}}>
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', gap:'10px', borderRight:'1px solid #f1f5f9'}}>
                     <div style={{width:'32px', height:'32px', borderRadius:T.radius, background:T.surfaceAlt, border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
                       <span style={{fontSize:'12px', fontWeight:800, color:T.primary}}>{row.organisation.charAt(0)}</span>
                     </div>
                     <span style={{fontSize:'16px', fontWeight:700, color:T.text}}>{row.organisation}</span>
                   </div>
                   {/* IATA */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     {row.iata
                       ? <span style={{fontFamily:'monospace', fontSize:'16px', fontWeight:700, color:T.text, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center'}}>{row.iata}</span>
                       : <span style={{color:T.textLight, fontSize:'12px'}}>-</span>}
                   </div>
                   {/* Linked PCCs */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     {pccCount > 0
                       ? <button onClick={() => openPCCs(row)}
                           style={{fontSize:'16px', fontWeight:700, color:T.primary, background:'#ECFDF5', border:`1px solid #6EE7B7`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center', cursor:'pointer'}}>
@@ -278,11 +278,11 @@ export default function OrganisationPage() {
                       : <span style={{fontSize:'16px', color:T.textLight, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center'}}>None</span>}
                   </div>
                   {/* Created */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     <span style={{fontSize:'16px', color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span>
                   </div>
                   {/* Actions */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(row)}
                         style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>

@@ -135,7 +135,7 @@ export default function GDSPage() {
             {/* Header — equal 3 columns */}
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
               {['GDS Name', 'Created', 'Actions'].map((h, i) => (
-                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 2 ? 'right' : 'left'}}>
+                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', borderRight:'1px solid #d1fae5', textAlign: i === 2 ? 'right' : 'left'}}>
                   {h}
                 </div>
               ))}
@@ -148,16 +148,16 @@ export default function GDSPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = T.surfaceAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   {/* GDS Name — dot + name only, no badge */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', gap:'10px'}}>
+                  <div style={{padding:'14px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:'10px'}}>
                     <div style={{width:'8px', height:'8px', borderRadius:'50%', background:style.dot, flexShrink:0}} />
                     <span style={{fontSize:'16px', fontWeight:700, color:T.text}}>{row.name}</span>
                   </div>
                   {/* Created */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'14px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
                     <span style={{fontSize:'16px', color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span>
                   </div>
                   {/* Actions */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                  <div style={{padding:'14px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(row)}
                         style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>

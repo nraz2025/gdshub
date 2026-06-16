@@ -87,7 +87,7 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
               fontSize: '17px', fontWeight: active ? 600 : 400,
               textDecoration: 'none', transition: 'all 0.15s',
               background: active ? 'rgba(110,231,183,0.15)' : 'transparent',
-              color: active ? '#6EE7B7' : 'rgba(255,255,255,0.75)',
+              color: active ? '#6EE7B7' : 'rgba(14,15,19,0.75)',
               borderLeft: active ? '3px solid #6EE7B7' : '3px solid transparent',
             }}
             onMouseOver={e => { if (!active) { const el = e.currentTarget; el.style.background = 'rgba(110,231,183,0.08)'; el.style.color = 'rgba(255,255,255,0.95)' }}}

@@ -145,7 +145,7 @@ export default function ClientGroupPage() {
         </div>
 
         {/* Search bar */}
-        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px'}}>
+        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'12px 16px', borderRight:'1px solid #f1f5f9', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px'}}>
           <div style={{position:'relative', flex:1}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search groups..." value={search} onChange={e => setSearch(e.target.value)}
@@ -169,7 +169,7 @@ export default function ClientGroupPage() {
           <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
             <div style={{display:'grid', gridTemplateColumns:'2fr 2fr 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
               {['Group Name','Description','Linked PCCs','Last Modified','Actions'].map((h,i) => (
-                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:i===4?'right':'left'}}>{h}</div>
+                <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:i===4?'right':'left', borderRight:'1px solid #d1fae5'}}>{h}</div>
               ))}
             </div>
             {filtered.map((row, i) => {
@@ -237,7 +237,7 @@ export default function ClientGroupPage() {
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Client Group" size="sm">
         <div className="space-y-4">
           {(editing?.client_count ?? 0) > 0 ? (
-            <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px'}}>
+            <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px', borderRight:'1px solid #f1f5f9'}}>
               <p style={{fontSize:'13px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
               <p style={{fontSize:'13px', color:'#b45309'}}>This group has <strong>{editing?.client_count}</strong> linked PCC{(editing?.client_count??0)!==1?'s':''}. Deleting it will remove the group assignment but not the PCCs.</p>
             </div>

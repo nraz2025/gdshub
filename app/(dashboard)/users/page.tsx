@@ -334,7 +334,7 @@ export default function UsersPage() {
           {/* Header */}
           <div style={{display:'grid', gridTemplateColumns:'2.5fr 1fr 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
             {['User', 'Status', 'OTA Client', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:700, color:T.textMid, textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left'}}>
+              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:700, color:T.textMid, textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight:'1px solid #d1fae5'}}>
                 {h}
               </div>
             ))}
@@ -358,7 +358,7 @@ export default function UsersPage() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
                   {/* User — name + email stacked */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px'}}>
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', gap:'12px', borderRight:'1px solid #f1f5f9'}}>
                     <Avatar name={fullName} />
                     <div>
                       <div style={{fontSize:'16px', fontWeight:700, color:T.text}}>{fullName}</div>
@@ -367,7 +367,7 @@ export default function UsersPage() {
                   </div>
 
                   {/* Status */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     <span style={{display:'inline-flex', alignItems:'center', gap:'5px', fontSize:'16px', fontWeight:600, padding:'4px 10px', borderRadius:'20px',
                       background: isActive ? '#f0fdf4' : '#fef2f2',
                       color:      isActive ? '#166534' : '#dc2626',
@@ -378,7 +378,7 @@ export default function UsersPage() {
                   </div>
 
                   {/* OTA Client */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center'}}>
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     <span style={{fontSize:'16px', fontWeight:600, padding:'4px 10px', borderRadius:'20px',
                       background: u.ota_client ? '#eff6ff' : T.surfaceAlt,
                       color:      u.ota_client ? T.primary : T.textLight,
@@ -388,7 +388,7 @@ export default function UsersPage() {
                   </div>
 
                   {/* Created + last modified sub-text */}
-                  <div style={{padding:'14px 16px', display:'flex', flexDirection:'column', justifyContent:'center'}}>
+                  <div style={{padding:'14px 16px', display:'flex', flexDirection:'column', justifyContent:'center', borderRight:'1px solid #f1f5f9'}}>
                     <div style={{fontSize:'16px', color:T.textMid}}>{new Date(u.created_at).toLocaleDateString('en-MY')}</div>
                     {u.modified_at && (
                       <div style={{fontSize:'13px', color:T.textLight, marginTop:'2px'}}>
@@ -398,7 +398,7 @@ export default function UsersPage() {
                   </div>
 
                   {/* Actions */}
-                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                  <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', justifyContent:'flex-end', gap:'6px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(u)}
                         style={{padding:'5px 14px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>

@@ -83,13 +83,14 @@ export default function DataTable<T extends Record<string, unknown>>({
                       fontSize:'16px', fontWeight:800,
                       color:'#065F46', textTransform:'uppercase',
                       letterSpacing:'0.07em', whiteSpace:'nowrap',
+                      borderRight:'1px solid #d1fae5',
                       ...(col.width ? {width: col.width} : {})
                     }}>
                     {col.label}
                   </th>
                 ))}
                 {isAdmin && (onEdit || onDelete) && (
-                  <th style={{textAlign:'right', padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                  <th style={{textAlign:'right', padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', borderRight:'none'}}>
                     Actions
                   </th>
                 )}
@@ -122,6 +123,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                           whiteSpace:'nowrap',
                           textTransform:'uppercase' as const,
                           letterSpacing:'0.02em',
+                          borderRight:'1px solid #f1f5f9',
                           ...(col.width ? {width: col.width} : {})
                         }}>
                         {col.render ? col.render(row) : String(row[col.key] ?? '—')}

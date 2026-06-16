@@ -45,15 +45,7 @@ const SS: Record<string,{bg:string;color:string;border:string}> = {
   resigned:{bg:'#fef2f2',color:'#dc2626',border:'#fecaca'},
 }
 
-type EprCategory = 'PST' | 'AET' | 'OTA' | 'Vendor'
-const EPR_CATEGORIES: { label: string; value: EprCategory; min: number; max: number; color: string }[] = [
-  { label: 'PST',    value: 'PST',    min: 1000, max: 1999, color: '#3B82F6' },
-  { label: 'AET',    value: 'AET',    min: 2000, max: 2999, color: '#8B5CF6' },
-  { label: 'OTA',    value: 'OTA',    min: 3000, max: 3999, color: '#10B981' },
-  { label: 'Vendor', value: 'Vendor', min: 9950, max: 9999, color: '#F59E0B' },
-]
-
-const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active', category: '' as EprCategory | '',
+const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active',
 }
 
 interface ImportRow {
@@ -62,6 +54,36 @@ interface ImportRow {
 }
 
 
+// Sign-On ID prefix lookup helper
+function SignOnLookup({ prefix, records }: { prefix: string; records: AmadeusUser[] }) {
+  if (!prefix) return (
+    <p className="text-xs text-slate-400 mt-1">Type a number prefix to check existing IDs (e.g. 30, 40...)</p>
+  )
+  const matches = records
+    .map(r => r.sign_on_id ?? '')
+    .filter(Boolean)
+    .filter(s => s.replace(/[^0-9]/g, '').startsWith(prefix))
+    .sort((a, b) => parseInt(b.replace(/\D/g, ''), 10) - parseInt(a.replace(/\D/g, ''), 10))
+  if (matches.length === 0) return (
+    <p className="text-xs text-emerald-600 mt-1 font-medium">No existing IDs starting with {prefix}</p>
+  )
+  return (
+    <div style={{marginTop:'6px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'7px',padding:'8px 10px'}}>
+      <p style={{fontSize:'11px',fontWeight:600,color:'#475569',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.04em'}}>
+        Existing IDs starting with {prefix} - last used first
+      </p>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'4px',maxHeight:'80px',overflowY:'auto'}}>
+        {matches.map((s, i) => (
+          <span key={i} style={{fontFamily:'monospace',fontSize:'12px',fontWeight:600,padding:'2px 7px',borderRadius:'5px',
+            background: i === 0 ? '#fef9c3' : '#f1f5f9',
+            color: i === 0 ? '#854d0e' : '#475569',
+            border: i === 0 ? '1px solid #fef08a' : '1px solid #e2e8f0',
+          }}>{s}{i === 0 ? ' (last)' : ''}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function AmadeusUsersPage() {
   const supabase = createClient()
@@ -79,9 +101,6 @@ export default function AmadeusUsersPage() {
   const [editing, setEditing] = useState<AmadeusUser | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [nextEpr, setNextEpr] = useState<string | null>(null)
-  const [loadingEpr, setLoadingEpr] = useState(false)
-  const [nextSignOnNum, setNextSignOnNum] = useState<number | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
   const [importFileName, setImportFileName] = useState('')
@@ -108,47 +127,11 @@ export default function AmadeusUsersPage() {
     setLoading(false)
   }
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setNextEpr(null); setNextSignOnNum(null); setModalOpen(true) }
-
-  async function fetchNextEpr(category: EprCategory, initial?: string) {
-    const cat = EPR_CATEGORIES.find(c => c.value === category)
-    if (!cat) return
-    setLoadingEpr(true)
-
-    // Fetch ALL logins — filter numerically client-side (login can be text like AJIMMY)
-    const { data: loginData } = await supabase.from('amadeus_user').select('login')
-    const loginNums = (loginData ?? [])
-      .map(r => parseInt(r.login, 10))
-      .filter(n => !isNaN(n) && n >= cat.min && n <= cat.max)
-    const nextLogin = loginNums.length > 0 ? Math.max(...loginNums) + 1 : cat.min
-    const suggestedLogin = nextLogin <= cat.max ? String(nextLogin) : null
-    setNextEpr(suggestedLogin)
-
-    // Fetch ALL sign_on_ids — extract LEADING digits only (e.g. "4014JI" → 4014), filter in tier range
-    const { data: signOnData } = await supabase.from('amadeus_user')
-      .select('sign_on_id')
-      .not('sign_on_id', 'is', null)
-    const signOnNums = (signOnData ?? [])
-      .map(r => {
-        const match = (r.sign_on_id ?? '').match(/^(\d+)/)
-        return match ? parseInt(match[1], 10) : NaN
-      })
-      .filter(n => !isNaN(n) && n >= cat.min && n <= cat.max)
-    const nextSignOn = signOnNums.length > 0 ? Math.max(...signOnNums) + 1 : cat.min
-    const suggestedSignOnNum = nextSignOn <= cat.max ? nextSignOn : null
-    setNextSignOnNum(suggestedSignOnNum)
-
-    const ini = (initial ?? '').trim().toUpperCase()
-    setForm(f => ({
-      ...f,
-      sign_on_id: suggestedSignOnNum && ini ? `${suggestedSignOnNum}${ini}` : f.sign_on_id,
-    }))
-    setLoadingEpr(false)
-  }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
   function openEdit(row: AmadeusUser) {
     setEditing(row)
-    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active', category: (row as AmadeusUser & { category?: EprCategory }).category ?? '' })
-    setError(''); setSaving(false); setNextEpr(null); setNextSignOnNum(null); setModalOpen(true)
+    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active' })
+    setError(''); setSaving(false); setModalOpen(true)
   }
   function openDelete(row: AmadeusUser) { setEditing(row); setDeleteOpen(true) }
 
@@ -179,7 +162,7 @@ export default function AmadeusUsersPage() {
       if (synced) { resolvedUserId = synced }
     }
 
-    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active', category: (form as {category?: string}).category || null }
+    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active' }
     const { error: err } = editing
       ? await supabase.from('amadeus_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('amadeus_user').insert({ ...payload, ...audit })
@@ -354,9 +337,9 @@ export default function AmadeusUsersPage() {
         </div>
       {loading ? <div style={{textAlign:"center",padding:"60px",color:T.textLight}}>Loading...</div> : (
         <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 1fr 1fr 120px",background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
-            {['Login','Sign-On','Initial','Duty','OTA Client','OID','Status','Linked User','Actions'].map((h,i)=>(
-              <div key={h} style={{padding:"10px 14px",fontSize:"16px",fontWeight:800,color:T.primary,textTransform:"uppercase",letterSpacing:"0.07em",textAlign:i===8?"right":"left",borderRight:"1px solid #d1fae5"}}>{h}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr 120px",background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
+            {['Login','Sign-On','Initial','Duty','OTA Client','Status','Linked User','Actions'].map((h,i)=>(
+              <div key={h} style={{padding:"10px 14px",fontSize:"16px",fontWeight:800,color:T.primary,textTransform:"uppercase",letterSpacing:"0.07em",textAlign:i===7?"right":"left"}}>{h}</div>
             ))}
           </div>
           {filtered.length===0 ? <div style={{padding:"60px",textAlign:"center",color:T.textLight}}>No Amadeus users found.</div> :
@@ -366,17 +349,16 @@ export default function AmadeusUsersPage() {
             const sval = ((row as {status?:string}).status ?? "active").toLowerCase()
             const s = SS[sval] ?? SS.active
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 1fr 1fr 120px",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none"}}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr 120px",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none"}}
                 onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:T.text}}>{row.login}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.sign_on_id??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:"#7c3aed"}}>{row.initial??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.duty_code??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{ota ? <span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:"#f0fdf4",color:"#166534",border:"1px solid #bbf7d0"}}>{ota.company_name}</span> : <span style={{color:T.textLight}}>-</span>}</div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"13px",color:T.textMid}}>{row.oid??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:s.bg,color:s.color,border:`1px solid ${s.border}`,textTransform:"capitalize"}}>{sval}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{u ? <><div style={{fontSize:"16px",color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"13px",color:T.textLight}}>{u.email_address}</div></> : <span style={{color:T.textLight}}>-</span>}</div>
-                <div style={{padding:"13px 14px",display:"flex",justifyContent:"flex-end",gap:"6px",borderRight:"none"}}>
+                <div style={{padding:"13px 14px"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:T.text}}>{row.login}</span></div>
+                <div style={{padding:"13px 14px"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.sign_on_id??"-"}</span></div>
+                <div style={{padding:"13px 14px"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:"#7c3aed"}}>{row.initial??"-"}</span></div>
+                <div style={{padding:"13px 14px"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.duty_code??"-"}</span></div>
+                <div style={{padding:"13px 14px"}}>{ota ? <span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:"#f0fdf4",color:"#166534",border:"1px solid #bbf7d0"}}>{ota.company_name}</span> : <span style={{color:T.textLight}}>-</span>}</div>
+                <div style={{padding:"13px 14px"}}><span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:s.bg,color:s.color,border:`1px solid ${s.border}`,textTransform:"capitalize"}}>{sval}</span></div>
+                <div style={{padding:"13px 14px"}}>{u ? <><div style={{fontSize:"16px",color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"13px",color:T.textLight}}>{u.email_address}</div></> : <span style={{color:T.textLight}}>-</span>}</div>
+                <div style={{padding:"13px 14px",display:"flex",justifyContent:"flex-end",gap:"6px"}}>
                   {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:"pointer"}}>Edit</button>
                   <button onClick={()=>openDelete(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.danger,background:T.card,border:"1px solid #fecaca",borderRadius:T.radius,cursor:"pointer"}}>Delete</button></>)}
                 </div>
@@ -392,37 +374,43 @@ export default function AmadeusUsersPage() {
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Amadeus User' : 'Add Amadeus User'}>
         <div className="space-y-4">
-
-          {/* 1. Category selector — add only */}
-          {!editing && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-4 gap-2">
-                {EPR_CATEGORIES.map(cat => (
-                  <button key={cat.value} type="button"
-                    onClick={() => { setForm(f => ({ ...f, category: cat.value })); fetchNextEpr(cat.value, form.initial) }}
-                    style={{
-                      padding: '8px 4px', fontSize: '12px', fontWeight: 700, textAlign: 'center',
-                      border: `2px solid ${(form as {category?: string}).category === cat.value ? cat.color : '#E2E8F0'}`,
-                      borderRadius: '8px',
-                      background: (form as {category?: string}).category === cat.value ? cat.color + '18' : '#fff',
-                      color: (form as {category?: string}).category === cat.value ? cat.color : '#64748B',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '12px', fontWeight: 800 }}>{cat.label}</div>
-                    <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px' }}>{cat.min}–{cat.max}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 2. Or Create & Link a New User — add only, moved up */}
-          {!editing && (
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Login <span className="text-red-500">*</span></label>
+              <input type="text" value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} placeholder="e.g. JOHNSMITH" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
+              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. 4042GY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+              <SignOnLookup prefix={form.sign_on_id.replace(/[^0-9]/g, '').slice(0, 4)} records={records} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
+              <input type="text" value={form.initial} onChange={e => setForm(f => ({ ...f, initial: e.target.value.toUpperCase() }))} placeholder="e.g. JS" maxLength={5} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Duty Code</label>
+              <input type="text" value={form.duty_code} onChange={e => setForm(f => ({ ...f, duty_code: e.target.value.toUpperCase() }))} placeholder="e.g. TP" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+          </div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
+            <input type="text" value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY255W" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+              <option value="resigned">Resigned</option>
+            </select></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
+            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}</select></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA
+          {/* Create & link new user inline */}
+          {!form.user_id && (
             <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create &amp; link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet - fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                 <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
@@ -438,102 +426,8 @@ export default function AmadeusUsersPage() {
                 </div>
               </div>
             </div>
-          )}
-
-          {/* 3. Login + Sign-On ID */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Login <span className="text-red-500">*</span></label>
-              <input type="text" value={form.login}
-                onChange={e => setForm(f => ({ ...f, login: e.target.value }))}
-                placeholder={loadingEpr ? 'Loading...' : 'e.g. 1001'}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono"
-                readOnly={loadingEpr}
-              />
-              {!editing && (form as {category?: string}).category && !nextEpr && !loadingEpr && (
-                <p className="text-xs text-red-500 mt-1">Range full — no EPR available in this tier</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
-              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. 4042GY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-              {!editing && nextSignOnNum && (
-                <p className="text-xs text-emerald-600 mt-1 font-medium">
-                  ✓ Next: {nextSignOnNum}{form.initial ? form.initial.trim().toUpperCase() : <span className="text-slate-400"> + initial</span>}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* 4. Initial + Duty Code */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
-              <input type="text" value={form.initial}
-                onChange={e => {
-                  const ini = e.target.value.toUpperCase()
-                  setForm(f => ({
-                    ...f,
-                    initial: ini,
-                    ...(!editing && nextSignOnNum ? { sign_on_id: `${nextSignOnNum}${ini}` } : {}),
-                  }))
-                }}
-                placeholder="e.g. JS" maxLength={5} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Duty Code</label>
-              <input type="text" value={form.duty_code} onChange={e => setForm(f => ({ ...f, duty_code: e.target.value.toUpperCase() }))} placeholder="e.g. TP" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-            </div>
-          </div>
-
-          {/* 5. OID */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
-            <input type="text" value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY255W" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-          </div>
-
-          {/* 6. Status */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
-              <option value="resigned">Resigned</option>
-            </select>
-          </div>
-
-          {/* 7. OTA Client */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
-            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">- None -</option>
-              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
-            </select>
-          </div>
-
-          {/* 8. Linked User */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
-            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">- None -</option>
-              {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
-            </select>
-          </div>
-
-          {/* 9. OTA toggle */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
-            <div className="flex gap-4">
-              {[true, false].map(v => (
-                <label key={String(v)} className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" />
-                  <span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
+          )}</label>
+            <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div></div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>

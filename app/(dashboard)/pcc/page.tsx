@@ -492,7 +492,7 @@ export default function GDSInfoPage() {
     },
     // 1. Organisation
     {
-      key: 'organisation', label: 'Organisation',
+      key: 'organisation', label: 'Organisation', width: '220px',
       render: (row: PCCList) => {
         const org = row.organisation as Organisation
         return org

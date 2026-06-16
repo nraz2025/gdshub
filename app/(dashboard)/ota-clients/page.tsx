@@ -281,24 +281,24 @@ export default function OTAClientPage() {
         <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
             {['Company','Sabre','Amadeus','Travelport','Created','Actions'].map((h,i)=>(
-              <div key={h} style={{padding:'10px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===5?'right':'left'}}>{h}</div>
+              <div key={h} style={{padding:'10px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===5?'right':'left',borderRight:'1px solid #d1fae5'}}>{h}</div>
             ))}
           </div>
           {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No clients found.</div> :
           filtered.map((row,i)=>(
             <div key={row.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
               onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-              <div style={{padding:'14px',display:'flex',alignItems:'center',gap:'10px'}}>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9',gap:'10px',borderRight:'1px solid #f1f5f9'}}>
                 <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.primary,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                   <span style={{fontSize:'12px',fontWeight:700,color:'white'}}>{row.company_name.charAt(0).toUpperCase()}</span>
                 </div>
                 <span style={{fontSize:'16px',fontWeight:600,color:T.text}}>{row.company_name}</span>
               </div>
-              <div style={{padding:'14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#eff6ff',color:'#1d4ed8',border:'1px solid #bfdbfe'}}>{(row as {sabreCount?:number}).sabreCount||0}</span></div>
-              <div style={{padding:'14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#faf5ff',color:'#7c3aed',border:'1px solid #ddd6fe'}}>{(row as {amadeusCount?:number}).amadeusCount||0}</span></div>
-              <div style={{padding:'14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{(row as {travelportCount?:number}).travelportCount||0}</span></div>
-              <div style={{padding:'14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span></div>
-              <div style={{padding:'14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px'}}>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#eff6ff',color:'#1d4ed8',border:'1px solid #bfdbfe'}}>{(row as {sabreCount?:number}).sabreCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#faf5ff',color:'#7c3aed',border:'1px solid #ddd6fe'}}>{(row as {amadeusCount?:number}).amadeusCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{(row as {travelportCount?:number}).travelportCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9',justifyContent:'flex-end',gap:'6px'}}>
                 {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>
                 <button onClick={()=>openDelete(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.danger,background:T.card,border:'1px solid #fecaca',borderRadius:T.radius,cursor:'pointer'}}>Delete</button></>)}
               </div>

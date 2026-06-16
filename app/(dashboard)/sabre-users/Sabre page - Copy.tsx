@@ -46,20 +46,12 @@ const STATUS_COLORS: Record<string, string> = {
   Resigned:  'bg-red-50 text-red-600 border-red-200',
 }
 
-type EprCategory = 'PST' | 'AET' | 'OTA' | 'Vendor'
-const EPR_CATEGORIES: { label: string; value: EprCategory; min: number; max: number; color: string }[] = [
-  { label: 'PST',    value: 'PST',    min: 1000, max: 1999, color: '#3B82F6' },
-  { label: 'AET',    value: 'AET',    min: 2000, max: 2999, color: '#8B5CF6' },
-  { label: 'OTA',    value: 'OTA',    min: 3000, max: 3999, color: '#10B981' },
-  { label: 'Vendor', value: 'Vendor', min: 9950, max: 9999, color: '#F59E0B' },
-]
-
 const EMPTY = {
   epr: '', initial: '', status: 'Active' as SabreStatus,
   pcc: '', user_id: '', ota_client_id: '' as number | '',
   cta: '', pta: '', minicom: '',
   newEmail: '', newFirstName: '', newLastName: '',
-  category: '' as EprCategory | '',
+  newEmail: '', newFirstName: '', newLastName: '',
 }
 
 interface ImportRow {
@@ -84,8 +76,6 @@ export default function SabreUsersPage() {
   const [editing, setEditing] = useState<SabreUser | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [nextEpr, setNextEpr] = useState<string | null>(null)
-  const [loadingEpr, setLoadingEpr] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
   const [importFileName, setImportFileName] = useState('')
@@ -114,23 +104,7 @@ export default function SabreUsersPage() {
     setLoading(false)
   }
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setNextEpr(null); setModalOpen(true) }
-
-  async function fetchNextEpr(category: EprCategory) {
-    const cat = EPR_CATEGORIES.find(c => c.value === category)
-    if (!cat) return
-    setLoadingEpr(true)
-    // Fetch ALL eprs — filter numerically client-side (epr can be text like AB1)
-    const { data } = await supabase.from('sabre_user').select('epr')
-    const nums = (data ?? [])
-      .map(r => parseInt(r.epr, 10))
-      .filter(n => !isNaN(n) && n >= cat.min && n <= cat.max)
-    const next = nums.length > 0 ? Math.max(...nums) + 1 : cat.min
-    const suggested = next <= cat.max ? String(next) : null
-    setNextEpr(suggested)
-    // leave epr empty — user types manually; nextEpr shown as hint
-    setLoadingEpr(false)
-  }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
 
   function openEdit(row: SabreUser) {
     setEditing(row)
@@ -145,9 +119,8 @@ export default function SabreUsersPage() {
       pta: row.pta ?? '',
       minicom: row.minicom ?? '',
       newEmail: '', newFirstName: '', newLastName: '',
-      category: (row as SabreUser & { category?: EprCategory }).category ?? '',
     })
-    setError(''); setSaving(false); setNextEpr(null); setModalOpen(true)
+    setError(''); setSaving(false); setModalOpen(true)
   }
 
   function openDelete(row: SabreUser) { setEditing(row); setDeleteOpen(true) }
@@ -190,7 +163,6 @@ export default function SabreUsersPage() {
       cta:           form.cta.trim() || null,
       pta:           form.pta.trim() || null,
       minicom:       form.minicom.trim() || null,
-      category:      form.category || null,
     }
     const { error: err } = editing
       ? await supabase.from('sabre_user').update({ ...payload, ...audit }).eq('id', editing.id)
@@ -423,9 +395,9 @@ export default function SabreUsersPage() {
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:T.textLight}}>Loading...</div> : (
           <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 1fr 0.7fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
-              {['EPR','Initial','OTA Client','PCC','Linked User','Status','Actions'].map((h,i)=>(
-                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===6?'right':'left',borderRight:'1px solid #d1fae5'}}>{h}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 1fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
+              {['EPR','PCC','Initial','OTA Client','Linked User','Status','Actions'].map((h,i)=>(
+                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===6?'right':'left'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Sabre users found.</div> :
@@ -434,15 +406,15 @@ export default function SabreUsersPage() {
               const ota = row.ota_client as {company_name?:string}
               const ss = STATUS_STYLE[row.status] ?? STATUS_STYLE.Active
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 1fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 1fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.epr}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>{ota?<span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{ota.company_name}</span>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{row.status}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px',borderRight:'none'}}>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.epr}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}>{ota?<span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{ota.company_name}</span>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
+                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{row.status}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px'}}>
                     {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>
                     <button onClick={()=>openDelete(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.danger,background:T.card,border:'1px solid #fecaca',borderRadius:T.radius,cursor:'pointer'}}>Delete</button></>)}
                   </div>
@@ -454,37 +426,53 @@ export default function SabreUsersPage() {
       {/*  Add / Edit Modal  */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Sabre User' : 'Add Sabre User'}>
         <div className="space-y-4">
-
-          {/* 1. Category selector — add only */}
-          {!editing && (
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-4 gap-2">
-                {EPR_CATEGORIES.map(cat => (
-                  <button key={cat.value} type="button"
-                    onClick={() => { setForm(f => ({ ...f, category: cat.value })); fetchNextEpr(cat.value) }}
-                    style={{
-                      padding: '8px 4px', fontSize: '12px', fontWeight: 700, textAlign: 'center',
-                      border: `2px solid ${form.category === cat.value ? cat.color : '#E2E8F0'}`,
-                      borderRadius: '8px',
-                      background: form.category === cat.value ? cat.color + '18' : '#fff',
-                      color: form.category === cat.value ? cat.color : '#64748B',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '12px', fontWeight: 800 }}>{cat.label}</div>
-                    <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px' }}>{cat.min}–{cat.max}</div>
-                  </button>
-                ))}
-              </div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">EPR <span className="text-red-500">*</span></label>
+              <input type="text" value={form.epr} onChange={e => setForm(f => ({ ...f, epr: e.target.value.toUpperCase() }))} placeholder="e.g. AB1" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
+              <input type="text" value={form.initial} onChange={e => setForm(f => ({ ...f, initial: e.target.value.toUpperCase() }))} placeholder="e.g. AB" maxLength={5} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+            </div>
+          </div>
 
-          {/* 2. Or Create & Link a New User — add only, moved up */}
-          {!editing && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as SabreStatus }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
+              <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY217Z" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+            </div>
+          </div>
+
+          {/* OTA Client - from ota_client table */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select>
+          </div>
+
+          {/* Linked User - from users table */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
+            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} - {u.email_address}</option>)}
+            </select>
+          </div>
+
+          {/* Create & link new user inline */}
+          {!form.user_id && (
             <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create &amp; link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
+              <p className="text-xs text-slate-400">If the user does not exist yet - fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                 <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
@@ -502,64 +490,7 @@ export default function SabreUsersPage() {
             </div>
           )}
 
-          {/* 3. EPR + Initial */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">EPR <span className="text-red-500">*</span></label>
-              <input type="text" value={form.epr}
-                onChange={e => setForm(f => ({ ...f, epr: e.target.value.toUpperCase() }))}
-                placeholder={loadingEpr ? 'Loading...' : 'e.g. 1001'}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase"
-                readOnly={loadingEpr}
-              />
-              {!editing && nextEpr && (
-                <p className="text-xs text-emerald-600 mt-1 font-medium">✓ Next available: {nextEpr}</p>
-              )}
-              {!editing && form.category && !nextEpr && !loadingEpr && (
-                <p className="text-xs text-red-500 mt-1">Range full — no EPR available in this tier</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
-              <input type="text" value={form.initial} onChange={e => setForm(f => ({ ...f, initial: e.target.value.toUpperCase() }))} placeholder="e.g. AB" maxLength={5} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-            </div>
-          </div>
-
-          {/* 4. Status + PCC */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as SabreStatus }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
-              <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY217Z" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-            </div>
-          </div>
-
-          {/* 5. OTA Client */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
-            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">- None -</option>
-              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
-            </select>
-          </div>
-
-          {/* 6. Linked User — edit only (add uses Create & Link above) */}
-          {editing && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
-              <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-                <option value="">- None -</option>
-                {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} - {u.email_address}</option>)}
-              </select>
-            </div>
-          )}
-
-          {/* 7. CTA, PTA, Minicom */}
+          {/* CTA, PTA, Minicom - freetext license */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">CTA License</label>
             <input type="text" value={form.cta} onChange={e => setForm(f => ({ ...f, cta: e.target.value }))} placeholder="e.g. CTA-2024-001" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono" />

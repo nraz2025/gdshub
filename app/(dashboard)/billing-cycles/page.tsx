@@ -155,13 +155,13 @@ export default function BillingCyclesPage() {
               <>
                 <div style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
                   {['Order','Label','Value (key)','Actions'].map((h,i) => (
-                    <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i===3 ? 'right' : 'left'}}>{h}</div>
+                    <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i===3 ? 'right' : 'left', borderRight:'1px solid #d1fae5'}}>{h}</div>
                   ))}
                 </div>
                 {records.map((row, i) => (
                   <div key={row.id} style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', borderBottom: i < records.length-1 ? `1px solid ${T.border}` : 'none', transition:'background 0.1s'}}
                     onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                    <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
                       {isAdmin && (
                         <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
                           <button onClick={() => moveRow(row.id,'up')} disabled={i===0} style={{background:'none', border:'none', cursor:'pointer', padding:'1px', color: i===0 ? T.border : T.textLight, lineHeight:1}}>
@@ -173,13 +173,13 @@ export default function BillingCyclesPage() {
                         </div>
                       )}
                     </div>
-                    <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
                       <span style={{fontSize:'16px', fontWeight:600, color:T.text}}>{row.label}</span>
                     </div>
-                    <div style={{padding:'13px 16px', display:'flex', alignItems:'center'}}>
+                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
                       <span style={{fontFamily:'monospace', fontSize:'16px', fontWeight:600, padding:'3px 8px', borderRadius:T.radius, background:T.surfaceAlt, color:T.textMid, border:`1px solid ${T.border}`}}>{row.value}</span>
                     </div>
-                    <div style={{padding:'13px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                       {isAdmin && (<>
                         <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
                         <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
@@ -218,7 +218,7 @@ export default function BillingCyclesPage() {
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Billing Cycle" size="sm">
         <div className="space-y-4">
-          <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px'}}>
+          <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px', borderRight:'1px solid #f1f5f9'}}>
             <p style={{fontSize:'13px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
             <p style={{fontSize:'13px', color:'#b45309'}}>Deleting <strong>{editing?.label}</strong> will affect any GDS features using this billing cycle.</p>
           </div>

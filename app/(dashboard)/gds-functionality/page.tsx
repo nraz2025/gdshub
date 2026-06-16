@@ -383,7 +383,7 @@ export default function GDSFunctionalityPage() {
                 {/* Header */}
                 <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', background:'#F0FDF4', borderBottom:`1px solid #6EE7B7`, padding:'7px 10px'}}>
                   {['Contracted Price Item','Currency','Market Price'].map(h => (
-                    <div key={h} style={{fontSize:'11px', fontWeight:700, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.05em'}}>{h}</div>
+                    <div key={h} style={{fontSize:'11px', fontWeight:700, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.05em', borderRight:'1px solid #d1fae5'}}>{h}</div>
                   ))}
                 </div>
                 {/* Rows */}

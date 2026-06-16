@@ -294,7 +294,7 @@ export default function TravelportUsersPage() {
           <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
               {['Sign-On','CID','GTID','PCC','Initial','Linked User','Status','Actions'].map((h,i)=>(
-                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===7?'right':'left'}}>{h}</div>
+                <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===7?'right':'left',borderRight:'1px solid #d1fae5'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Travelport users found.</div> :
@@ -305,14 +305,14 @@ export default function TravelportUsersPage() {
               return (
                 <div key={row.id} style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.sign_on_id??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.cid??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.gtid??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,textTransform:'capitalize'}}>{sval}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px'}}>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.sign_on_id??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.cid??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.gtid??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,textTransform:'capitalize'}}>{sval}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px',borderRight:'none'}}>
                     {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>
                     <button onClick={()=>openDelete(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.danger,background:T.card,border:'1px solid #fecaca',borderRadius:T.radius,cursor:'pointer'}}>Delete</button></>)}
                   </div>
@@ -328,23 +328,51 @@ export default function TravelportUsersPage() {
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Travelport User' : 'Add Travelport User'}>
         <div className="space-y-4">
+
+          {/* 1. Create & Link a New User — top */}
+          <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create &amp; link a new user</p>
+            <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
+              <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
+                <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
+                <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Sign-On ID + CID */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
               <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. JS01" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">CID</label>
               <input type="text" value={form.cid} onChange={e => setForm(f => ({ ...f, cid: e.target.value.toUpperCase() }))} placeholder="e.g. CID123" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
           </div>
+
+          {/* 3. GTID + PCC */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">GTID</label>
               <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
               <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. K3MY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
           </div>
+
+          {/* 4. OTA Client */}
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
             <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">- None -</option>
               {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
             </select></div>
+
+          {/* 5. Status */}
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
             <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="active">Active</option>
@@ -352,33 +380,19 @@ export default function TravelportUsersPage() {
               <option value="suspended">Suspended</option>
               <option value="resigned">Resigned</option>
             </select></div>
+
+          {/* 6. Linked User */}
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">- None -</option>
-              {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}</select></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA
-          {/* Create & link new user inline */}
-          {!form.user_id && (
-            <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create & link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet - fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
-                <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
-                  <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-                  <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
-                </div>
-              </div>
-            </div>
-          )}</label>
-            <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div></div>
+              {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
+            </select></div>
+
+          {/* 7. OTA toggle */}
+          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
+            <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div>
+          </div>
+
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
