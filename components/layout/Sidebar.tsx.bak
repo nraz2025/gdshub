@@ -52,24 +52,25 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
     <aside style={{
       width: '224px', flexShrink: 0, display: 'flex', flexDirection: 'column',
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #14532D 0%, #166534 50%, #15803D 100%)',
+      background: '#0B0E14',
+      borderRight: '1px solid #1A2332',
     }}>
       {/* Logo */}
-      <div style={{padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
+      <div style={{padding: '20px 20px 16px', borderBottom: '1px solid #1A2332'}}>
         <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-          <div style={{width: '32px', height: '32px', background: '#10B981', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(16,185,129,0.4)'}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div style={{width: '32px', height: '32px', background: '#10E07F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(16,224,127,0.35)'}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0E14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
-          <span style={{fontWeight: 800, color: 'White', fontSize: '16px', letterSpacing: '-0.02em'}}>GDSHub</span>
+          <span style={{fontWeight: 800, color: '#E5E9F0', fontSize: '16px', letterSpacing: '-0.02em'}}>GDSHub</span>
         </div>
       </div>
 
       {/* Role badge */}
-      <div style={{padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)'}}>
+      <div style={{padding: '10px 20px', borderBottom: '1px solid #1A2332'}}>
         <span style={{
           fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px',
-          background: userRole === 'admin' ? 'rgba(251,191,36,0.2)' : userRole === 'manager' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.1)',
-          color: userRole === 'admin' ? '#FCD34D' : 'rgba(255,255,255,0.8)',
+          background: userRole === 'admin' ? 'rgba(251,191,36,0.15)' : userRole === 'manager' ? 'rgba(34,211,238,0.12)' : 'rgba(255,255,255,0.06)',
+          color: userRole === 'admin' ? '#FCD34D' : userRole === 'manager' ? '#22D3EE' : '#8B96A8',
           letterSpacing: '0.04em', textTransform: 'uppercase' as const,
         }}>
           {userRole === 'admin' ? 'Admin' : userRole === 'manager' ? 'Manager' : 'Viewer'}
@@ -84,25 +85,25 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
             <Link key={item.href} href={item.href} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '9px 12px', borderRadius: '8px',
-              fontSize: '17px', fontWeight: active ? 600 : 400,
+              fontSize: '16px', fontWeight: active ? 600 : 400,
               textDecoration: 'none', transition: 'all 0.15s',
-              background: active ? 'rgba(110,231,183,0.15)' : 'transparent',
-              color: active ? '#6EE7B7' : 'rgba(14,15,19,0.75)',
-              borderLeft: active ? '3px solid #6EE7B7' : '3px solid transparent',
+              background: active ? 'rgba(16,224,127,0.12)' : 'transparent',
+              color: active ? '#10E07F' : '#8B96A8',
+              borderLeft: active ? '3px solid #10E07F' : '3px solid transparent',
             }}
-            onMouseOver={e => { if (!active) { const el = e.currentTarget; el.style.background = 'rgba(110,231,183,0.08)'; el.style.color = 'rgba(255,255,255,0.95)' }}}
-            onMouseOut={e => { if (!active) { const el = e.currentTarget; el.style.background = 'transparent'; el.style.color = 'rgba(255,255,255,0.75)' }}}>
+            onMouseOver={e => { if (!active) { const el = e.currentTarget; el.style.background = 'rgba(16,224,127,0.06)'; el.style.color = '#C4CCDA' }}}
+            onMouseOut={e => { if (!active) { const el = e.currentTarget; el.style.background = 'transparent'; el.style.color = '#8B96A8' }}}>
               <span style={{flexShrink: 0, opacity: active ? 1 : 0.65}}>{item.icon}</span>
               <span>{item.label}</span>
-              {active && <span style={{marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#6EE7B7', flexShrink: 0}} />}
+              {active && <span style={{marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#10E07F', flexShrink: 0}} />}
             </Link>
           )
         })}
       </nav>
 
       {/* Footer */}
-      <div style={{padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.1)'}}>
-        <p style={{fontSize: '11px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.5'}}>
+      <div style={{padding: '12px 20px', borderTop: '1px solid #1A2332'}}>
+        <p style={{fontSize: '11px', color: '#5C6478', lineHeight: '1.5'}}>
           {userRole === 'admin'   && 'Full access to all modules'}
           {userRole === 'manager' && 'View & edit assigned modules'}
           {userRole === 'user'    && 'View-only access'}

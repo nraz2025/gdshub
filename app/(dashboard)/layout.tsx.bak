@@ -1,0 +1,58 @@
+import { createClient } from '@/lib/supabase/server'
+import Sidebar from '@/components/layout/Sidebar'
+import TopBar from '@/components/layout/TopBar'
+import IdleLogout from '@/components/shared/IdleLogout'
+import PublicTopBar from '@/components/layout/PublicTopBar'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // If not logged in — show public minimal layout (no sidebar)
+  if (!user) {
+    return (
+      <div className="min-h-screen" style={{background:'#f7f9fb'}}>
+        <PublicTopBar />
+        <main className="px-8 py-6">
+          {children}
+        </main>
+      </div>
+    )
+  }
+
+  // Logged in — full layout with sidebar
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = (profile?.role as string) ?? 'user'
+  const isAdmin = role === 'admin'
+
+  const { data: perms } = await supabase
+    .from('role_permissions')
+    .select('module, can_access, can_edit')
+    .eq('role', role)
+
+  const permMap: Record<string, { can_access: boolean; can_edit: boolean }> = {}
+  for (const p of perms ?? []) {
+    permMap[p.module] = { can_access: p.can_access, can_edit: p.can_edit }
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden" style={{background:'#0B0E14'}}>
+      <Sidebar isAdmin={isAdmin} role={role} permMap={permMap} />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <TopBar user={user} isAdmin={isAdmin} />
+        <IdleLogout />
+        <main className="flex-1 overflow-auto p-6" style={{background:'#0B0E14'}}>
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}

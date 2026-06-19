@@ -1,0 +1,49 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
+
+export default function TopBar({ user, isAdmin }: { user: User; isAdmin: boolean }) {
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  const initials = user.email?.slice(0, 2).toUpperCase() ?? 'U'
+
+  return (
+    <header className="h-14 flex items-center justify-between px-6 flex-shrink-0" style={{background:'#0F1420', borderBottom:'1px solid #1A2332'}}>
+      <div />
+      <div className="flex items-center gap-3">
+        {isAdmin && (
+          <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{background:'rgba(251,191,36,0.12)', color:'#FCD34D', border:'1px solid rgba(251,191,36,0.3)'}}>
+            Admin
+          </span>
+        )}
+        <span className="text-sm hidden sm:block" style={{color:'#8B96A8'}}>{user.email}</span>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold" style={{background:'#22D3EE', color:'#0B0E14'}}>
+          {initials}
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="text-sm transition-colors flex items-center gap-1.5"
+          style={{color:'#5C6478'}}
+          onMouseOver={e => (e.currentTarget.style.color = '#E5E9F0')}
+          onMouseOut={e => (e.currentTarget.style.color = '#5C6478')}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign out
+        </button>
+      </div>
+    </header>
+  )
+}
