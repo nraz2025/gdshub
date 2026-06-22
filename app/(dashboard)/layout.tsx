@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/layout/Sidebar'
+import ConditionalSidebar from '@/components/layout/ConditionalSidebar'
 import TopBar from '@/components/layout/TopBar'
 import IdleLogout from '@/components/shared/IdleLogout'
 import PublicTopBar from '@/components/layout/PublicTopBar'
@@ -44,8 +44,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isAdmin={isAdmin} role={role} permMap={permMap} />
+    <div className="flex h-screen overflow-hidden" style={{background:'#f1f5f9'}}>
+      <ConditionalSidebar isAdmin={isAdmin} role={role} permMap={permMap} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar user={user} isAdmin={isAdmin} />
         <IdleLogout />

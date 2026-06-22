@@ -112,6 +112,7 @@ export interface SabreUser {
   cta: string | null
   pta: string | null
   minicom: string | null
+  ota: boolean
   created_at: string
   updated_at: string
   users?: User

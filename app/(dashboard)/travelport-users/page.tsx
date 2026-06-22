@@ -128,6 +128,11 @@ export default function TravelportUsersPage() {
       : await supabase.from('travelport_user').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
 
+    // Keep the linked users.ota_client flag in sync with this record's OTA toggle
+    if (resolvedUserId) {
+      await supabase.from('users').update({ ota_client: form.ota }).eq('id', resolvedUserId)
+    }
+
     setSaving(false); setModalOpen(false); fetchAll()
   }
 
@@ -292,25 +297,26 @@ export default function TravelportUsersPage() {
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:T.textLight}}>Loading...</div> : (
           <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
-              {['Sign-On','CID','GTID','PCC','Initial','Linked User','Status','Actions'].map((h,i)=>(
+            <div style={{display:'grid',gridTemplateColumns:'0.7fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
+              {['PCC','Sign-On','Linked User','CID','GTID','OTA Client','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===7?'right':'left',borderRight:'1px solid #d1fae5'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Travelport users found.</div> :
             filtered.map((row,i)=>{
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
+              const ota = row.ota_client as {company_name?:string}
               const sval = ((row as {status?:string}).status ?? 'active').toLowerCase()
               const ss = STATUS_STYLE[sval] ?? STATUS_STYLE.active
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.7fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:T.text}}>{row.sign_on_id??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.cid??'-'}</span></div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',color:T.textMid}}>{row.gtid??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:700,color:'#7c3aed'}}>{(row as {initial?:string}).initial??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'16px',fontWeight:500,color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'13px',color:T.textLight}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>{ota?<span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{ota.company_name}</span>:<span style={{fontSize:'16px',color:T.textLight}}>-</span>}</div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,textTransform:'capitalize'}}>{sval}</span></div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'6px',borderRight:'none'}}>
                     {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>

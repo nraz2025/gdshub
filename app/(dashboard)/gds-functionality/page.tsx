@@ -50,11 +50,9 @@ const GDS_CHECK_COLORS: Record<string, string> = {
 interface BillingCycle { id: number; value: string; label: string; sort_order: number }
 const CURRENCIES = ['USD', 'MYR', 'EUR', 'GBP', 'SGD']
 
-function fmtCost(cost: number, currency: string, cycle: string, cycles: {value:string;label:string}[]) {
+function fmtCost(cost: number, currency: string) {
   if (!cost) return null
-  const amt = new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
-  const cycleLabel = cycles.find(c => c.value === cycle)?.label ?? ''
-  return cycleLabel && cycleLabel !== 'One-Time' ? `${amt} / ${cycleLabel}` : amt
+  return new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
 }
 
 interface PricingTier {
@@ -212,16 +210,19 @@ export default function GDSFunctionalityPage() {
   const tpCount = features.filter(r=>(r.gds as {name?:string})?.name==='Travelport').length
 
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
+    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:'#f1f5f9', minHeight:'100vh'}}>
       {/* Header */}
-      <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
+      <div style={{padding:'20px 28px',marginBottom:'0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>GDS Functionality</h1>
-            <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Master list of features available per GDS platform</p>
+            <h1 style={{fontSize:'24px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Functionality</h1>
+            <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Master list of features available per GDS platform</p>
           </div>
           {isAdmin && (
-            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
+            <button onClick={openAdd}
+              style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
+              onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Feature
             </button>
@@ -230,74 +231,102 @@ export default function GDSFunctionalityPage() {
       </div>
       <div style={{padding:'0 28px 28px'}}>
         {/* Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px',marginBottom:'24px'}}>
-          {[{label:'Sabre Features',value:sabreCount,bg:'#eff6ff',color:'#1d4ed8',border:'#bfdbfe'},{label:'Amadeus Features',value:amadeusCount,bg:'#faf5ff',color:'#7c3aed',border:'#ddd6fe'},{label:'Travelport Features',value:tpCount,bg:'#f0fdf4',color:'#166534',border:'#bbf7d0'}].map((s,i)=>(
-            <div key={i} style={{background: i===2?T.primary:'white',border:`1px solid ${i===2?T.primary:T.border}`,borderRadius:T.radius,padding:'16px 18px',boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
-              <div style={{fontSize:'11px',fontWeight:700,color:i===2?'rgba(255,255,255,0.75)':T.textLight,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'6px'}}>{s.label}</div>
-              <div style={{fontSize:'28px',fontWeight:800,color:i===2?'white':T.text,letterSpacing:'-0.03em',lineHeight:1}}>{s.value}</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px',marginBottom:'24px'}}>
+          {[{label:'Sabre Features',value:sabreCount},{label:'Amadeus Features',value:amadeusCount},{label:'Travelport Features',value:tpCount,highlighted:true}].map((s,i)=>(
+            <div key={i}
+              style={{
+                position:'relative', overflow:'hidden',
+                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
+                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
+                borderRadius:'12px', padding:'20px',
+                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
+                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+              }}
+              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
+              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
+              <div style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8',marginBottom:'8px'}}>{s.label}</div>
+              <div style={{fontSize:'32px',fontWeight:700,color: s.highlighted ? 'white' : '#1e293b',lineHeight:1}}>{s.value}</div>
             </div>
           ))}
         </div>
         {/* Filter */}
-        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'24px'}}>
           <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)}
-            style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',cursor:'pointer'}}>
+            style={{padding:'10px 32px 10px 14px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
             <option value="all">All GDS</option>
             {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
           </select>
-          {!loading && <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} feature{filtered.length !== 1 ? 's' : ''}</span>}
+          {!loading && <span style={{fontSize:'14px',color:'#64748b'}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> feature{filtered.length !== 1 ? 's' : ''}</span>}
         </div>
 
       {loading ? (
         <div className="text-center py-16 text-slate-400 text-sm">Loading</div>
       ) : (
-        <div className="space-y-6">
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', alignItems:'start', gap:'24px'}}>
           {grouped.map(({ gds, features: gdsFeatures }) => {
-            const colors = GDS_COLORS[gds.name] ?? { badge: 'bg-slate-100 text-slate-600 border-slate-200', row: 'border-slate-100', btn: 'bg-slate-500 hover:bg-slate-600' }
+            const badgeStyle: Record<string,{color:string;bg:string;border:string}> = {
+              Amadeus:    { color:'#a855f7', bg:'#f3e8ff', border:'#e9d5ff' },
+              Sabre:      { color:'#3b82f6', bg:'#eff6ff', border:'#dbeafe' },
+              Travelport: { color:'#10b981', bg:'#f0fdf4', border:'#bbf7d0' },
+            }
+            const b = badgeStyle[gds.name] ?? { color:'#64748b', bg:'#f1f5f9', border:'#e2e8f0' }
             return (
-              <div key={gds.id}>
-                {/* GDS section header */}
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${colors.badge}`}>{gds.name}</span>
-                  <span className="text-xs text-slate-400">{gdsFeatures.length} feature{gdsFeatures.length !== 1 ? 's' : ''}</span>
-                  <div className="flex-1 h-px bg-slate-100" />
+              <div key={gds.id} style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+                {/* GDS column header */}
+                <div style={{display:'flex', alignItems:'center', gap:'12px', padding:'16px 20px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc'}}>
+                  <span style={{display:'inline-flex', alignItems:'center', padding:'6px 14px', borderRadius:'9999px', fontSize:'12px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:b.color, background:b.bg, border:`1px solid ${b.border}`}}>{gds.name}</span>
+                  <span style={{fontSize:'13px', color:'#94a3b8'}}>{gdsFeatures.length} feature{gdsFeatures.length !== 1 ? 's' : ''}</span>
                 </div>
 
                 {gdsFeatures.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic pl-1 py-2">No features yet for {gds.name}.</p>
+                  <p style={{fontSize:'14px', color:'#94a3b8', fontStyle:'italic', padding:'20px'}}>No features yet for {gds.name}.</p>
                 ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <ul style={{listStyle:'none', padding:0, margin:0}}>
                     {gdsFeatures.map((f, i) => {
-                      const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string, billingCycles)
+                      const costStr = fmtCost(f.cost, f.currency)
                       const cycleLabel = billingCycles.find(c => c.value === f.billing_cycle)?.label ?? ''
+                      const isLast = i === gdsFeatures.length - 1
                       return (
-                        <div key={f.id} className={`flex items-center justify-between px-5 py-3.5 ${i < gdsFeatures.length - 1 ? `border-b ${colors.row}` : ''}`}>
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 text-slate-400 flex-shrink-0">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                        <li key={f.id} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', borderBottom: isLast ? 'none' : '1px solid #e2e8f0', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                          onMouseEnter={e => (e.currentTarget.style.background='#f8fafc')}
+                          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+                          {/* Feature info */}
+                          <div style={{display:'flex', alignItems:'center', gap:'14px', flex:1, minWidth:0}}>
+                            <span style={{width:'32px', height:'32px', borderRadius:'50%', background:'#f8fafc', border:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', flexShrink:0}}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                             </span>
-                            <div>
-                              <p className="text-sm font-medium text-slate-800">{f.label}</p>
-                              <p className="text-xs text-slate-400 font-mono">{f.key}</p>
+                            <div style={{minWidth:0}}>
+                              <div style={{fontSize:'14px', fontWeight:600, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{f.label}</div>
+                              <div style={{fontSize:'11px', color:'#94a3b8', fontFamily:'monospace'}}>{f.key}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-6 flex-shrink-0">
-                            <div className="text-right">
-                              {costStr
-                                ? <><p className="text-sm font-medium text-slate-700">{costStr}</p><p className="text-xs text-slate-400">{cycleLabel}</p></>
-                                : <p className="text-sm text-slate-300">No cost</p>}
-                            </div>
-                            {isAdmin && (
-                              <div className="flex gap-1.5">
-                                <button onClick={() => openEdit(f)} className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors font-medium">Edit</button>
-                                <button onClick={() => { setDeleteTarget(f); setDeleteOpen(true) }} className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors font-medium">Delete</button>
-                              </div>
-                            )}
+                          {/* Cost */}
+                          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'2px', marginRight:'16px', minWidth:'120px'}}>
+                            {costStr
+                              ? <><div style={{fontSize:'14px', fontWeight:600, color:'#1e293b', whiteSpace:'nowrap'}}>{costStr}</div><div style={{fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap'}}>{cycleLabel}</div></>
+                              : <div style={{fontSize:'14px', fontWeight:600, color:'#94a3b8'}}>No cost</div>}
                           </div>
-                        </div>
+                          {/* Actions */}
+                          {isAdmin && (
+                            <div style={{display:'flex', gap:'8px', flexShrink:0}}>
+                              <button onClick={() => openEdit(f)}
+                                style={{padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:500, cursor:'pointer', border:'1px solid #e2e8f0', background:'#ffffff', color:'#64748b', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
+                                Edit
+                              </button>
+                              <button onClick={() => { setDeleteTarget(f); setDeleteOpen(true) }}
+                                style={{padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:500, cursor:'pointer', border:'1px solid #fecaca', background:'#ffffff', color:'#ef4444', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                                onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
+                                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </li>
                       )
                     })}
-                  </div>
+                  </ul>
                 )}
               </div>
             )
@@ -383,7 +412,7 @@ export default function GDSFunctionalityPage() {
                 {/* Header */}
                 <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', background:'#F0FDF4', borderBottom:`1px solid #6EE7B7`, padding:'7px 10px'}}>
                   {['Contracted Price Item','Currency','Market Price'].map(h => (
-                    <div key={h} style={{fontSize:'11px', fontWeight:700, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.05em', borderRight:'1px solid #d1fae5'}}>{h}</div>
+                    <div key={h} style={{fontSize:'11px', fontWeight:700, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.05em'}}>{h}</div>
                   ))}
                 </div>
                 {/* Rows */}

@@ -2,14 +2,39 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StatCard from '@/components/shared/StatCard'
 import PageHeader from '@/components/shared/PageHeader'
+import { nav } from '@/components/layout/nav-items'
+import ModuleGrid from '@/components/shared/ModuleGrid'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  let role = 'user'
+  let isAdmin = false
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role === 'user') redirect('/pcc')
+    role = (profile?.role as string) ?? 'user'
+    isAdmin = role === 'admin'
+    if (role === 'user') redirect('/pcc')
   }
+
+  const { data: perms } = await supabase
+    .from('role_permissions')
+    .select('module, can_access, can_edit')
+    .eq('role', role)
+
+  const permMap: Record<string, { can_access: boolean; can_edit: boolean }> = {}
+  for (const p of perms ?? []) {
+    permMap[p.module] = { can_access: p.can_access, can_edit: p.can_edit }
+  }
+
+  // Same visibility rule as the Sidebar — only show modules this role can access
+  const visibleModules = nav.filter(item => {
+    if (item.module === 'dashboard') return false // don't show a tile linking to itself
+    if (Object.keys(permMap).length > 0) return permMap[item.module]?.can_access === true
+    if (isAdmin) return true
+    if (role === 'manager') return !['users', 'admin_panel'].includes(item.module)
+    return item.module === 'gds_info'
+  })
 
   const [users, sabre, amadeus, travelport, pcc, ota] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }),
@@ -72,26 +97,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick links */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <h2 className="font-semibold text-slate-800 mb-4">Quick Access</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Add User', href: '/users' },
-            { label: 'Add PCC', href: '/pcc' },
-            { label: 'OTA Clients', href: '/ota-clients' },
-            { label: 'GDS Assignments', href: '/gds-assigned' },
-          ].map(link => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-medium text-slate-600 hover:bg-blue-50 hover:border-blue-100 hover:text-blue-600 transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-      </div>
+      <ModuleGrid modules={visibleModules} />
     </div>
   )
 }

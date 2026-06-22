@@ -108,16 +108,19 @@ export default function BillingCyclesPage() {
   const lbl = { display:'block', fontSize:'12px', fontWeight:600, color:T.textMid, marginBottom:'6px' } as const
 
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:T.surface, minHeight:'100vh'}}>
+    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:'#f1f5f9', minHeight:'100vh'}}>
       {/* Header */}
-      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
+      <div style={{padding:'20px 28px', marginBottom:'0'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
-            <h1 style={{fontSize:'24px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.025em'}}>Billing Cycles</h1>
-            <p style={{fontSize:'13px', color:T.textMid, marginTop:'3px'}}>Manage dropdown values for GDS Functionality billing cycles</p>
+            <h1 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Billing Cycles</h1>
+            <p style={{fontSize:'14px', color:'#64748b', marginTop:'4px'}}>Manage dropdown values for GDS Functionality billing cycles</p>
           </div>
           {isAdmin && (
-            <button onClick={openAdd} style={{display:'flex', alignItems:'center', gap:'7px', padding:'8px 18px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'13px', fontWeight:700, color:'white', cursor:'pointer'}}>
+            <button onClick={openAdd}
+              style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
+              onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Billing Cycle
             </button>
@@ -127,62 +130,86 @@ export default function BillingCyclesPage() {
 
       <div style={{padding:'0 28px 28px'}}>
         {/* Stats */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'14px', marginBottom:'24px'}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'24px'}}>
           {[
             { label:'Total Cycles', value: records.length, sub:'configured' },
             { label:'First Cycle', value: records[0]?.label ?? '-', sub:'lowest order' },
-            { label:'Last Cycle', value: records[records.length-1]?.label ?? '-', sub:'highest order', accent:true },
+            { label:'Last Cycle', value: records[records.length-1]?.label ?? '-', sub:'highest order', highlighted:true },
           ].map((s,i) => (
-            <div key={i} style={{background: s.accent ? T.primary : 'white', border:`1px solid ${s.accent ? T.primary : T.border}`, borderRadius:T.radius, padding:'16px 18px', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
-              <div style={{fontSize:'11px', fontWeight:700, color: s.accent ? 'rgba(255,255,255,0.75)' : T.textLight, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:'6px'}}>{s.label}</div>
-              <div style={{fontSize:'22px', fontWeight:800, color: s.accent ? 'white' : T.text, letterSpacing:'-0.02em'}}>{s.value}</div>
-              <div style={{fontSize:'11px', color: s.accent ? 'rgba(255,255,255,0.65)' : T.textLight, marginTop:'4px'}}>{s.sub}</div>
+            <div key={i}
+              style={{
+                position:'relative', overflow:'hidden',
+                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
+                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
+                borderRadius:'12px', padding:'20px',
+                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
+                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+              }}
+              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
+              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
+              <div style={{fontSize:'11px', fontWeight:700, color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px'}}>{s.label}</div>
+              <div style={{fontSize:'24px', fontWeight:700, color: s.highlighted ? 'white' : '#1e293b', lineHeight:1, marginBottom:'4px'}}>{s.value}</div>
+              <div style={{fontSize:'12px', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
             </div>
           ))}
         </div>
 
-        {/* Table */}
-        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} billing cycle{records.length!==1?'s':''}</span>
+        {/* Table controls */}
+        <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
+          <span style={{fontSize:'14px', color:'#64748b', background:'#ffffff', padding:'10px 16px', borderRadius:'8px', border:'1px solid #e2e8f0'}}>
+            Showing <strong style={{color:'#1e293b'}}>{records.length} billing cycle{records.length!==1?'s':''}</strong>
+          </span>
         </div>
+
+        {/* Table */}
         {loading ? (
-          <div style={{textAlign:'center', padding:'60px', color:T.textLight, fontSize:'14px'}}>Loading...</div>
+          <div style={{textAlign:'center', padding:'60px', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
         ) : (
-          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+          <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
             {records.length === 0 ? (
-              <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>No billing cycles yet.</div>
+              <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>No billing cycles yet.</div>
             ) : (
               <>
-                <div style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`}}>
-                  {['Order','Label','Value (key)','Actions'].map((h,i) => (
-                    <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:T.primary, textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i===3 ? 'right' : 'left', borderRight:'1px solid #d1fae5'}}>{h}</div>
+                <div style={{display:'grid', gridTemplateColumns:'40px 1fr 1fr 140px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
+                  {['', 'Order/Label', 'Value (Key)', 'Actions'].map((h,i) => (
+                    <div key={h} style={{padding:'14px 20px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i===3 ? 'right' : 'left', borderRight: i<3 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
                   ))}
                 </div>
                 {records.map((row, i) => (
-                  <div key={row.id} style={{display:'grid', gridTemplateColumns:'60px 1fr 1fr 140px', borderBottom: i < records.length-1 ? `1px solid ${T.border}` : 'none', transition:'background 0.1s'}}
-                    onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
+                  <div key={row.id} style={{display:'grid', gridTemplateColumns:'40px 1fr 1fr 140px', borderBottom: i < records.length-1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                    onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                    <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                       {isAdmin && (
                         <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
-                          <button onClick={() => moveRow(row.id,'up')} disabled={i===0} style={{background:'none', border:'none', cursor:'pointer', padding:'1px', color: i===0 ? T.border : T.textLight, lineHeight:1}}>
+                          <button onClick={() => moveRow(row.id,'up')} disabled={i===0} style={{background:'none', border:'none', cursor:'pointer', padding:'1px', color: i===0 ? '#e2e8f0' : '#94a3b8', lineHeight:1}}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
                           </button>
-                          <button onClick={() => moveRow(row.id,'down')} disabled={i===records.length-1} style={{background:'none', border:'none', cursor:'pointer', padding:'1px', color: i===records.length-1 ? T.border : T.textLight, lineHeight:1}}>
+                          <button onClick={() => moveRow(row.id,'down')} disabled={i===records.length-1} style={{background:'none', border:'none', cursor:'pointer', padding:'1px', color: i===records.length-1 ? '#e2e8f0' : '#94a3b8', lineHeight:1}}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                           </button>
                         </div>
                       )}
                     </div>
-                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
-                      <span style={{fontSize:'16px', fontWeight:600, color:T.text}}>{row.label}</span>
+                    <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
+                      <span style={{fontSize:'14px', fontWeight:600, color:'#1e293b'}}>{row.label}</span>
                     </div>
-                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center'}}>
-                      <span style={{fontFamily:'monospace', fontSize:'16px', fontWeight:600, padding:'3px 8px', borderRadius:T.radius, background:T.surfaceAlt, color:T.textMid, border:`1px solid ${T.border}`}}>{row.value}</span>
+                    <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
+                      <span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:500, padding:'6px 14px', borderRadius:'8px', background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', letterSpacing:'0.02em'}}>{row.value}</span>
                     </div>
-                    <div style={{padding:'13px 16px', borderRight:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+                    <div style={{padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
                       {isAdmin && (<>
-                        <button onClick={() => openEdit(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>Edit</button>
-                        <button onClick={() => openDelete(row)} style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:'1px solid #fecaca', borderRadius:T.radius, cursor:'pointer'}}>Delete</button>
+                        <button onClick={() => openEdit(row)}
+                          style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                          onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                          onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
+                          Edit
+                        </button>
+                        <button onClick={() => openDelete(row)}
+                          style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                          onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
+                          onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
+                          Delete
+                        </button>
                       </>)}
                     </div>
                   </div>
@@ -192,9 +219,6 @@ export default function BillingCyclesPage() {
           </div>
         )}
       </div>
-        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginTop:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {records.length} billing cycle{records.length!==1?'s':''}</span>
-        </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Billing Cycle' : 'Add Billing Cycle'} size="sm">
         <div className="space-y-4">
@@ -218,7 +242,7 @@ export default function BillingCyclesPage() {
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Billing Cycle" size="sm">
         <div className="space-y-4">
-          <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px', borderRight:'1px solid #f1f5f9'}}>
+          <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px 14px'}}>
             <p style={{fontSize:'13px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
             <p style={{fontSize:'13px', color:'#b45309'}}>Deleting <strong>{editing?.label}</strong> will affect any GDS features using this billing cycle.</p>
           </div>

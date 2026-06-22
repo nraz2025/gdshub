@@ -20,6 +20,8 @@ export interface User {
   status: UserStatus
   created_at: string
   updated_at: string
+  modified_at: string | null
+  modified_by: string | null
 }
 
 // ── GDS ──────────────────────────────────────────────────────
@@ -32,7 +34,7 @@ export interface GDS {
   updated_at: string
 }
 
-// ── PCC List ─────────────────────────────────────────────────
+// ── GDS Info (formerly PCC List) ─────────────────────────────
 export type PCCStatus = 'Active' | 'Pending' | 'Vacant'
 
 export interface PCCList {
@@ -40,19 +42,36 @@ export interface PCCList {
   gds_id: number
   pcc: string
   status: PCCStatus
+  org_id: number | null
+  ota_client_id: number | null
+  functionality_id: number | null
+  pcc_functionality: string | null
+  client_group_id: number | null
+  remarks: string | null
   created_at: string
   updated_at: string
   gds?: GDS
+  organisation?: Organisation
+  ota_client?: OTAClient
+  gds_functionality?: GDSFunctionality
 }
 
+// Alias for clarity
+export type GDSInfo = PCCList
+
 // ── GDS Functionality ─────────────────────────────────────────
+export type BillingCycle = 'monthly' | 'yearly' | 'per_user' | 'per_transaction' | 'one_time'
+
 export interface GDSFeature {
   id: number
+  gds_id: number | null
   key: string
   label: string
   cost: number
   currency: string
+  billing_cycle: BillingCycle
   created_at: string
+  gds?: GDS
 }
 
 export interface GDSProfileFeature {
@@ -80,7 +99,7 @@ export interface GDSInformation {
 }
 
 // ── GDS User types ────────────────────────────────────────────
-export type SabreStatus = 'Active' | 'Inactive' | 'Suspended'
+export type SabreStatus = 'Active' | 'Vacant'
 
 export interface SabreUser {
   id: number
@@ -89,10 +108,15 @@ export interface SabreUser {
   status: SabreStatus
   pcc: string | null
   user_id: string | null
+  ota_client_id: number | null
+  cta: string | null
+  pta: string | null
+  minicom: string | null
   ota: boolean
   created_at: string
   updated_at: string
   users?: User
+  ota_client?: OTAClient
 }
 
 export interface AmadeusUser {
@@ -104,9 +128,11 @@ export interface AmadeusUser {
   oid: string | null
   user_id: string | null
   ota: boolean
+  ota_client_id: number | null
   created_at: string
   updated_at: string
   users?: User
+  ota_client?: OTAClient
 }
 
 export interface TravelportUser {
@@ -117,12 +143,13 @@ export interface TravelportUser {
   pcc: string | null
   user_id: string | null
   ota: boolean
+  ota_client_id: number | null
   created_at: string
   updated_at: string
   users?: User
+  ota_client?: OTAClient
 }
 
-// ── GDS Assigned User ─────────────────────────────────────────
 export interface GDSAssignedUser {
   id: number
   user_id: string
@@ -139,7 +166,6 @@ export interface GDSAssignedUser {
   travelport_user?: TravelportUser
 }
 
-// ── MidOffice Configuration ───────────────────────────────────
 export interface MidOfficeConfiguration {
   id: number
   auto_ticketing: boolean
@@ -155,9 +181,16 @@ export interface OTAClient {
   id: number
   company_name: string
   user_id: string | null
-  midoffice_id: number | null
   created_at: string
   updated_at: string
   users?: User
-  midoffice_configuration?: MidOfficeConfiguration
+}
+
+// ── Organisation ──────────────────────────────────────────────
+export interface Organisation {
+  id: number
+  organisation: string
+  iata: string | null
+  created_at: string
+  updated_at: string
 }

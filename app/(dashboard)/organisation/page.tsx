@@ -200,24 +200,30 @@ export default function OrganisationPage() {
       <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'24px', fontWeight:800, color:T.text, margin:0, letterSpacing:'-0.02em'}}>Organisation</h1>
-            <p style={{fontSize:'13px', color:T.textMid, marginTop:'3px'}}>Manage organisations and link them to PCC codes</p>
+            <h1 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Organisation</h1>
+            <p style={{fontSize:'14px', color:'#64748b', marginTop:'4px'}}>Manage organisations and link them to PCC codes</p>
           </div>
           {isAdmin && (
-            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
               <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer', opacity:filtered.length===0?0.4:1}}>
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'#1e293b', cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export xlsx
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, fontSize:'13px', fontWeight:600, color:T.textMid, cursor:'pointer'}}>
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'#1e293b', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 22px', background:T.primary, border:'none', borderRadius:T.radius, fontSize:'15px', fontWeight:700, color:'white', cursor:'pointer', letterSpacing:'0.01em'}}>
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
+                onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Organisation
               </button>
@@ -230,11 +236,11 @@ export default function OrganisationPage() {
 
 
                 {/* ── Data Table ── */}
-        <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden', boxShadow:'0 1px 4px rgba(37,99,235,0.06)'}}>
+        <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
           {/* Table header */}
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:'#F0FDF4', borderBottom:`2px solid #6EE7B7`, padding:'0'}}>
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'0'}}>
             {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', textAlign: i === 4 ? 'right' : 'left', borderRight:'1px solid #d1fae5'}}>
+              <div key={h} style={{padding:'14px 20px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
                 {h}
               </div>
             ))}
@@ -242,54 +248,69 @@ export default function OrganisationPage() {
 
           {/* Table body */}
           {loading ? (
-            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>Loading...</div>
+            <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
           ) : paginated.length === 0 ? (
-            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
+            <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>
               {search ? `No organisations match "${search}"` : 'No organisations yet.'}
             </div>
           ) : (
             paginated.map((row, i) => {
               const pccCount = linkedPCCs(row.id).length
+              const avatarPalette = [
+                'linear-gradient(135deg, #a855f7, #7c3aed)', // purple
+                'linear-gradient(135deg, #3b82f6, #2563eb)', // blue
+                'linear-gradient(135deg, #10b981, #059669)', // green
+                'linear-gradient(135deg, #f59e0b, #d97706)', // amber
+                'linear-gradient(135deg, #ec4899, #db2777)', // pink
+              ]
+              const avatarBg = avatarPalette[row.organisation.charCodeAt(0) % avatarPalette.length]
               return (
                 <div key={row.id}
-                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', borderBottom: i < paginated.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.1s'}}
-                  onMouseEnter={e => (e.currentTarget.style.background = T.surfaceAlt)}
+                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   {/* Organisation */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', gap:'10px', borderRight:'1px solid #f1f5f9'}}>
-                    <div style={{width:'32px', height:'32px', borderRadius:T.radius, background:T.surfaceAlt, border:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                      <span style={{fontSize:'12px', fontWeight:800, color:T.primary}}>{row.organisation.charAt(0)}</span>
+                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'14px', borderRight:'1px solid #f1f5f9'}}>
+                    <div style={{width:'36px', height:'36px', borderRadius:'50%', background:avatarBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                      <span style={{fontSize:'13px', fontWeight:600, color:'white'}}>{row.organisation.charAt(0).toUpperCase()}</span>
                     </div>
-                    <span style={{fontSize:'16px', fontWeight:700, color:T.text}}>{row.organisation}</span>
+                    <span style={{fontSize:'14px', fontWeight:600, color:'#1e293b'}}>{row.organisation}</span>
                   </div>
                   {/* IATA */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
+                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     {row.iata
-                      ? <span style={{fontFamily:'monospace', fontSize:'16px', fontWeight:700, color:T.text, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center'}}>{row.iata}</span>
-                      : <span style={{color:T.textLight, fontSize:'12px'}}>-</span>}
+                      ? <span style={{display:'inline-flex', alignItems:'center', justifyContent:'center', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', fontWeight:600, color:'#64748b', background:'#f8fafc', border:'1px solid #e2e8f0', fontFamily:'monospace', letterSpacing:'0.05em'}}>{row.iata}</span>
+                      : <span style={{color:'#cbd5e1', fontSize:'13px'}}>-</span>}
                   </div>
                   {/* Linked PCCs */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
+                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
                     {pccCount > 0
                       ? <button onClick={() => openPCCs(row)}
-                          style={{fontSize:'16px', fontWeight:700, color:T.primary, background:'#ECFDF5', border:`1px solid #6EE7B7`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center', cursor:'pointer'}}>
+                          style={{display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'6px', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', fontWeight:600, color:'#1a5f3c', background:'#f0fdf4', border:'1px solid #bbf7d0', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                          onMouseOver={e => { e.currentTarget.style.background='#dcfce7'; e.currentTarget.style.borderColor='#86efac'; e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                          onMouseOut={e => { e.currentTarget.style.background='#f0fdf4'; e.currentTarget.style.borderColor='#bbf7d0'; e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                           {pccCount} PCC{pccCount !== 1 ? 's' : ''}
                         </button>
-                      : <span style={{fontSize:'16px', color:T.textLight, background:T.surfaceAlt, border:`1px solid ${T.border}`, padding:'6px 0', borderRadius:'6px', width:'120px', display:'inline-block', textAlign:'center'}}>None</span>}
+                      : <span style={{display:'inline-flex', alignItems:'center', justifyContent:'center', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', color:'#94a3b8', background:'#f8fafc', border:'1px solid #e2e8f0'}}>None</span>}
                   </div>
                   {/* Created */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontSize:'16px', color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span>
+                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
+                    <span style={{fontSize:'14px', color:'#1e293b'}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</span>
                   </div>
                   {/* Actions */}
-                  <div style={{padding:'13px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9', justifyContent:'flex-end', gap:'6px'}}>
+                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.textMid, background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
                         Edit
                       </button>
                       <button onClick={() => openDelete(row)}
-                        style={{padding:'4px 12px', fontSize:'12px', fontWeight:600, color:T.danger, background:T.card, border:`1px solid #fecaca`, borderRadius:T.radius, cursor:'pointer'}}>
+                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
+                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
                         Delete
                       </button>
                     </>)}

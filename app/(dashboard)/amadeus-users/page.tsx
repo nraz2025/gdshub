@@ -45,11 +45,12 @@ const SS: Record<string,{bg:string;color:string;border:string}> = {
   resigned:{bg:'#fef2f2',color:'#dc2626',border:'#fecaca'},
 }
 
-type EprCategory = 'PST' | 'AET' | 'OTA' | 'Vendor'
+type EprCategory = 'PST' | 'AET' | 'OTA' | 'JHT' | 'Vendor'
 const EPR_CATEGORIES: { label: string; value: EprCategory; min: number; max: number; color: string }[] = [
   { label: 'PST',    value: 'PST',    min: 1000, max: 1999, color: '#3B82F6' },
   { label: 'AET',    value: 'AET',    min: 2000, max: 2999, color: '#8B5CF6' },
   { label: 'OTA',    value: 'OTA',    min: 3000, max: 3999, color: '#10B981' },
+  { label: 'JHT',    value: 'JHT',    min: 4000, max: 4999, color: '#EC4899' },
   { label: 'Vendor', value: 'Vendor', min: 9950, max: 9999, color: '#F59E0B' },
 ]
 
@@ -184,6 +185,11 @@ export default function AmadeusUsersPage() {
       ? await supabase.from('amadeus_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('amadeus_user').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
+
+    // Keep the linked users.ota_client flag in sync with this record's OTA toggle
+    if (resolvedUserId) {
+      await supabase.from('users').update({ ota_client: form.ota }).eq('id', resolvedUserId)
+    }
 
     setSaving(false); setModalOpen(false); fetchAll()
   }
@@ -354,8 +360,8 @@ export default function AmadeusUsersPage() {
         </div>
       {loading ? <div style={{textAlign:"center",padding:"60px",color:T.textLight}}>Loading...</div> : (
         <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 1fr 1fr 120px",background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
-            {['Login','Sign-On','Initial','Duty','OTA Client','OID','Status','Linked User','Actions'].map((h,i)=>(
+          <div style={{display:"grid",gridTemplateColumns:"0.8fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px",background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
+            {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA Client','Status','Actions'].map((h,i)=>(
               <div key={h} style={{padding:"10px 14px",fontSize:"16px",fontWeight:800,color:T.primary,textTransform:"uppercase",letterSpacing:"0.07em",textAlign:i===8?"right":"left",borderRight:"1px solid #d1fae5"}}>{h}</div>
             ))}
           </div>
@@ -366,16 +372,16 @@ export default function AmadeusUsersPage() {
             const sval = ((row as {status?:string}).status ?? "active").toLowerCase()
             const s = SS[sval] ?? SS.active
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 1fr 1fr 120px",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none"}}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"0.8fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none"}}
                 onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"13px",color:T.textMid}}>{row.oid??"-"}</span></div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:T.text}}>{row.login}</span></div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.sign_on_id??"-"}</span></div>
+                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{u ? <><div style={{fontSize:"16px",color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"13px",color:T.textLight}}>{u.email_address}</div></> : <span style={{color:T.textLight}}>-</span>}</div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:"#7c3aed"}}>{row.initial??"-"}</span></div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.duty_code??"-"}</span></div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{ota ? <span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:"#f0fdf4",color:"#166534",border:"1px solid #bbf7d0"}}>{ota.company_name}</span> : <span style={{color:T.textLight}}>-</span>}</div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"13px",color:T.textMid}}>{row.oid??"-"}</span></div>
                 <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:s.bg,color:s.color,border:`1px solid ${s.border}`,textTransform:"capitalize"}}>{sval}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{u ? <><div style={{fontSize:"16px",color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"13px",color:T.textLight}}>{u.email_address}</div></> : <span style={{color:T.textLight}}>-</span>}</div>
                 <div style={{padding:"13px 14px",display:"flex",justifyContent:"flex-end",gap:"6px",borderRight:"none"}}>
                   {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:"pointer"}}>Edit</button>
                   <button onClick={()=>openDelete(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.danger,background:T.card,border:"1px solid #fecaca",borderRadius:T.radius,cursor:"pointer"}}>Delete</button></>)}
@@ -397,7 +403,7 @@ export default function AmadeusUsersPage() {
           {!editing && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-4 gap-2">
+              <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'8px'}}>
                 {EPR_CATEGORIES.map(cat => (
                   <button key={cat.value} type="button"
                     onClick={() => { setForm(f => ({ ...f, category: cat.value })); fetchNextEpr(cat.value, form.initial) }}
@@ -408,10 +414,11 @@ export default function AmadeusUsersPage() {
                       background: (form as {category?: string}).category === cat.value ? cat.color + '18' : '#fff',
                       color: (form as {category?: string}).category === cat.value ? cat.color : '#64748B',
                       cursor: 'pointer', transition: 'all 0.15s',
+                      minWidth: 0,
                     }}
                   >
-                    <div style={{ fontSize: '12px', fontWeight: 800 }}>{cat.label}</div>
-                    <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px' }}>{cat.min}–{cat.max}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
+                    <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap' }}>{cat.min}–{cat.max}</div>
                   </button>
                 ))}
               </div>

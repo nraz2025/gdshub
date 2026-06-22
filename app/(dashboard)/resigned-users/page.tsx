@@ -57,6 +57,9 @@ interface ResignedUser {
   organisation_id: number | null
   pcc: string | null
   ota_client: string | null
+  cta: string | null
+  pta: string | null
+  minicom: string | null
   date_created_in_gds: string
   date_resigned: string
   remarks: string | null
@@ -254,7 +257,7 @@ export default function ResignedUsersPage() {
             <table style={{width:'100%',borderCollapse:'collapse',minWidth:'1000px'}}>
               <thead>
                 <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
-                  {['GDS','Initial','Full Name','Email','Organisation','PCC / Login','Date Created','Date Resigned',''].map(h => (
+                  {['GDS','PCC / Login','Full Name','Email','Initial','CTA','PTA','Minicom','Date Created','Date Resigned',''].map(h => (
                     <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -272,17 +275,19 @@ export default function ResignedUsersPage() {
                         <span style={{fontSize:'11px',fontWeight:700,padding:'3px 9px',borderRadius:'20px',background:gds.bg,color:gds.color,border:`1px solid ${gds.border}`}}>{r.source_gds}</span>
                       </td>
                       <td style={{padding:'11px 14px'}}>
+                        <div style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#0f172a'}}>{pcc !== '' ? pcc : ''}</div>
+                        <div style={{fontFamily:'monospace',fontSize:'11px',color:'#64748b'}}>{loginId}</div>
+                      </td>
+                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'13px'}}>{r.full_name ?? ''}</td>
+                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'12px'}}>{r.email ?? ''}</td>
+                      <td style={{padding:'11px 14px'}}>
                         {r.initial
                           ? <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'14px',color:'#7c3aed',background:'#f3e8ff',padding:'2px 8px',borderRadius:'5px'}}>{r.initial}</span>
                           : <span style={{color:'#cbd5e1'}}></span>}
                       </td>
-                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'13px'}}>{r.full_name ?? ''}</td>
-                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'12px'}}>{r.email ?? ''}</td>
-                      <td style={{padding:'11px 14px',color:'#334155',fontSize:'13px'}}>{r.organisation ?? ''}</td>
-                      <td style={{padding:'11px 14px'}}>
-                        <div style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#0f172a'}}>{pcc !== '' ? pcc : ''}</div>
-                        <div style={{fontFamily:'monospace',fontSize:'11px',color:'#64748b'}}>{loginId}</div>
-                      </td>
+                      <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.cta ?? ''}</span></td>
+                      <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.pta ?? ''}</span></td>
+                      <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.minicom ?? ''}</span></td>
                       <td style={{padding:'11px 14px',fontSize:'16px',color:'#64748b',whiteSpace:'nowrap'}}>{fmt(r.date_created_in_gds)}</td>
                       <td style={{padding:'11px 14px',fontSize:'12px',color:'#dc2626',fontWeight:600,whiteSpace:'nowrap'}}>{fmt(r.date_resigned)}</td>
                       <td style={{padding:'11px 14px'}}>
