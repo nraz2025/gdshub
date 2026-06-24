@@ -204,7 +204,10 @@ export default function UsersPage() {
 
   const filtered = users.filter(u => {
     const term = search.toLowerCase()
-    const matchSearch = `${u.first_name} ${u.last_name}`.toLowerCase().includes(term) || u.email_address.toLowerCase().includes(term)
+    const otaText = u.ota_client ? 'yes' : 'no'
+    const matchSearch = `${u.first_name} ${u.last_name}`.toLowerCase().includes(term)
+      || u.email_address.toLowerCase().includes(term)
+      || otaText.includes(term)
     const matchStatus = filterStatus === 'all' || (u.status ?? 'Active') === filterStatus
     return matchSearch && matchStatus
   })
@@ -299,7 +302,7 @@ export default function UsersPage() {
         <div style={{display:'flex', alignItems:'center', gap:'16px', marginBottom:'20px', flexWrap:'wrap'}}>
           <div style={{position:'relative', flex:'1', minWidth:'280px'}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke='#94a3b8' strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'16px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search by name or email..." value={search}
+            <input type="text" placeholder="Search by name, email or OTA status..." value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
               style={{width:'100%', padding:'12px 16px 12px 44px', fontSize:'14px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', outline:'none', boxSizing:'border-box', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
               onFocus={e => { e.target.style.borderColor='#2d8a5e'; e.target.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }}
@@ -323,7 +326,7 @@ export default function UsersPage() {
         </div>
 
         {/* ── Top record bar ── */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', flexWrap:'wrap', gap:'12px'}}>
+        <div style={{display:'flex', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'16px'}}>
           <div style={{fontSize:'14px', color:'#64748b'}}>
             {pageSize === 0
               ? <>Showing <strong style={{color:'#1e293b'}}>all {filtered.length}</strong> users</>

@@ -129,38 +129,6 @@ export default function BillingCyclesPage() {
       </div>
 
       <div style={{padding:'0 28px 28px'}}>
-        {/* Stats */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'24px'}}>
-          {[
-            { label:'Total Cycles', value: records.length, sub:'configured' },
-            { label:'First Cycle', value: records[0]?.label ?? '-', sub:'lowest order' },
-            { label:'Last Cycle', value: records[records.length-1]?.label ?? '-', sub:'highest order', highlighted:true },
-          ].map((s,i) => (
-            <div key={i}
-              style={{
-                position:'relative', overflow:'hidden',
-                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
-                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
-                borderRadius:'12px', padding:'20px',
-                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
-                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-              }}
-              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
-              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
-              <div style={{fontSize:'11px', fontWeight:700, color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px'}}>{s.label}</div>
-              <div style={{fontSize:'24px', fontWeight:700, color: s.highlighted ? 'white' : '#1e293b', lineHeight:1, marginBottom:'4px'}}>{s.value}</div>
-              <div style={{fontSize:'12px', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Table controls */}
-        <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
-          <span style={{fontSize:'14px', color:'#64748b', background:'#ffffff', padding:'10px 16px', borderRadius:'8px', border:'1px solid #e2e8f0'}}>
-            Showing <strong style={{color:'#1e293b'}}>{records.length} billing cycle{records.length!==1?'s':''}</strong>
-          </span>
-        </div>
-
         {/* Table */}
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>

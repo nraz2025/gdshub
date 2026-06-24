@@ -77,7 +77,6 @@ export default function SabreUsersPage() {
   const [resignedUsers, setResignedUsers] = useState<{id:string;full_name:string|null;initial:string|null;email:string|null;sabre_epr:string|null;sabre_pcc:string|null;pcc:string|null;ota_client:string|null;cta:string|null;pta:string|null;minicom:string|null;date_created_in_gds:string|null;date_resigned:string|null}[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
-  const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -105,23 +104,18 @@ export default function SabreUsersPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const { data: sabreGds } = await supabase.from('gds').select('id').eq('name', 'Sabre').maybeSingle()
-    const [{ data: sabreData }, { data: usersData }, { data: otaData }, { data: resignedData }, { data: pccData }] = await Promise.all([
+    const [{ data: sabreData }, { data: usersData }, { data: otaData }, { data: resignedData }] = await Promise.all([
       supabase.from('sabre_user')
         .select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)')
         .order('epr'),
       supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('resigned_user').select('*').eq('source_gds', 'Sabre').order('date_resigned', { ascending: false }),
-      sabreGds?.id
-        ? supabase.from('pcc_list').select('pcc, ota_client:ota_client_id(company_name)').eq('gds_id', sabreGds.id).order('pcc')
-        : Promise.resolve({ data: [] as {pcc:string; ota_client?: {company_name?:string} | null}[] }),
     ])
     setRecords(sabreData ?? [])
     setUsersList(usersData ?? [])
     setOtaClients(otaData ?? [])
     setResignedUsers(resignedData ?? [])
-    setPccList((pccData as unknown as {pcc:string; ota_client?: {company_name?:string} | null}[]) ?? [])
     setLoading(false)
   }
 
@@ -371,14 +365,6 @@ export default function SabreUsersPage() {
     return v !== '' && initialCounts[v] > 1
   }
 
-  // PCC -> OTA Client name lookup, sourced from GDS Info (pcc_list)
-  const pccOtaMap: Record<string, string> = {}
-  pccList.forEach(p => {
-    const name = (p.ota_client as {company_name?:string} | null)?.company_name
-    if (p.pcc && name) pccOtaMap[p.pcc.toUpperCase()] = name
-  })
-  const getPccAssigned = (pcc?: string | null) => pcc ? pccOtaMap[pcc.toUpperCase()] : undefined
-
   // Build sets of CTA/PTA/Minicom values currently in use on active sabre_user records
   const activeCtaSet     = new Set(records.map(r => (r.cta ?? '').trim().toUpperCase()).filter(v => v !== ''))
   const activePtaSet     = new Set(records.map(r => (r.pta ?? '').trim().toUpperCase()).filter(v => v !== ''))
@@ -520,23 +506,20 @@ export default function SabreUsersPage() {
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
           <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 0.6fr 0.8fr 120px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
-              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i)=>(
+            <div style={{display:'grid',gridTemplateColumns:'0.7fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 120px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA Client','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'14px 16px',fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===9?'right':'left',borderRight: i<9 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Sabre users found.</div> :
             filtered.map((row,i)=>{
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
+              const ota = row.ota_client as {company_name?:string}
               const ss = STATUS_STYLE[row.status] ?? STATUS_STYLE.Active
-              const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 0.6fr 0.8fr 120px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.7fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                  <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:600,padding:'4px 10px',borderRadius:'8px',background:'#f8fafc',border:'1px solid #e2e8f0',color:'#64748b',letterSpacing:'0.05em',display:'inline-block',width:'fit-content'}}>{row.pcc??'-'}</span>
-                    {pccAssigned && <span style={{fontSize:'11px',color:'#94a3b8'}}>{pccAssigned}</span>}
-                  </div>
+                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:600,padding:'6px 14px',borderRadius:'8px',background:'#f8fafc',border:'1px solid #e2e8f0',color:'#64748b',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'14px',fontWeight:600,color:'#1e293b'}}>{row.epr}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'14px',fontWeight:600,color:'#1e293b'}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'12px',color:'#94a3b8'}}>{u.email_address}</div></>:<span style={{fontSize:'14px',color:'#94a3b8'}}>-</span>}</div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
@@ -559,9 +542,7 @@ export default function SabreUsersPage() {
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',letterSpacing:'0.05em'}}>{row.cta??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',letterSpacing:'0.05em'}}>{row.pta??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',letterSpacing:'0.05em'}}>{row.minicom??'-'}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontSize:'12px',fontWeight:600,padding:'4px 10px',borderRadius:'9999px',background:(row as {ota?:boolean}).ota?'#f0fdf4':'#f1f5f9',color:(row as {ota?:boolean}).ota?'#16a34a':'#94a3b8',border:`1px solid ${(row as {ota?:boolean}).ota?'#bbf7d0':'#e2e8f0'}`}}>{(row as {ota?:boolean}).ota?'Yes':'No'}</span>
-                  </div>
+                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>{ota?<span style={{fontSize:'13px',fontWeight:500,color:'#1e293b'}}>{ota.company_name}</span>:<span style={{fontSize:'14px',color:'#cbd5e1'}}>-</span>}</div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,padding:'6px 14px',borderRadius:'9999px',background:row.status==='Active'?'#f0fdf4':ss.bg,color:row.status==='Active'?'#16a34a':ss.color,border:`1px solid ${row.status==='Active'?'#bbf7d0':ss.border}`}}><span style={{width:'6px',height:'6px',borderRadius:'50%',background:row.status==='Active'?'#22c55e':ss.color,flexShrink:0}}/>{row.status}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
                     {isAdmin&&(<>
@@ -698,14 +679,20 @@ export default function SabreUsersPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
-              <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
-                <option value="">- Select PCC -</option>
-                {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
-              </select>
+              <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY217Z" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
             </div>
           </div>
 
-          {/* 5. OTA toggle */}
+          {/* 5. OTA Client */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select>
+          </div>
+
+          {/* 5b. OTA toggle */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
             <div className="flex gap-4">

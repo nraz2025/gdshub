@@ -13,6 +13,17 @@ interface ImportRow {
   _row: number; _errors: string[]
 }
 
+interface OrgContract {
+  id: number
+  organisation_id: number
+  year: number
+  label: string
+  file_name: string
+  file_path: string
+  file_size: number | null
+  created_at: string
+}
+
 const GDS_COLORS: Record<string, string> = {
   Amadeus:    'bg-purple-50 text-purple-700 border-purple-200',
   Sabre:      'bg-sky-50 text-sky-700 border-sky-200',
@@ -68,6 +79,15 @@ export default function OrganisationPage() {
   const [selectedOrg, setSelectedOrg] = useState<Organisation | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
+  // Contracts tab state
+  const [modalTab, setModalTab] = useState<'details' | 'contracts'>('details')
+  const [contracts, setContracts] = useState<OrgContract[]>([])
+  const [contractsLoading, setContractsLoading] = useState(false)
+  const [uploadYear, setUploadYear] = useState(new Date().getFullYear())
+  const [uploadLabel, setUploadLabel] = useState('Main Contract')
+  const [uploading, setUploading] = useState(false)
+  const [contractError, setContractError] = useState('')
+  const contractFileInputRef = useRef<HTMLInputElement>(null)
   const [importFileName, setImportFileName] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; failed: number; failedRows: string[] } | null>(null)
@@ -106,10 +126,65 @@ export default function OrganisationPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
-  function openEdit(row: Organisation) { setEditing(row); setForm({ organisation: row.organisation, iata: row.iata ?? '' }); setError(''); setSaving(false); setModalOpen(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalTab('details'); setContracts([]); setModalOpen(true) }
+  function openEdit(row: Organisation) { setEditing(row); setForm({ organisation: row.organisation, iata: row.iata ?? '' }); setError(''); setSaving(false); setModalTab('details'); setModalOpen(true); fetchContracts(row.id) }
   function openDelete(row: Organisation) { setEditing(row); setDeleteOpen(true) }
   function openPCCs(row: Organisation) { setSelectedOrg(row); setPccOpen(true) }
+
+  async function fetchContracts(orgId: number) {
+    setContractsLoading(true)
+    const { data } = await supabase.from('org_contracts').select('*').eq('organisation_id', orgId).order('year', { ascending: false }).order('created_at', { ascending: false })
+    setContracts((data as OrgContract[]) ?? [])
+    setContractsLoading(false)
+  }
+
+  async function handleContractUpload(file: File) {
+    if (!editing) return
+    setContractError('')
+    const allowedExt = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    if (!allowedExt.includes(ext)) { setContractError('Only PDF, Word (doc/docx) or images (jpg/png) are allowed.'); return }
+    if (file.size > 20 * 1024 * 1024) { setContractError('File must be under 20MB.'); return }
+
+    setUploading(true)
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${editing.id}/${uploadYear}/${Date.now()}_${safeName}`
+    const { error: uploadErr } = await supabase.storage.from('org-contracts').upload(path, file)
+    if (uploadErr) { setContractError(uploadErr.message); setUploading(false); return }
+
+    const { error: insertErr } = await supabase.from('org_contracts').insert({
+      organisation_id: editing.id,
+      year: uploadYear,
+      label: uploadLabel.trim() || 'Contract',
+      file_name: file.name,
+      file_path: path,
+      file_size: file.size,
+    })
+    if (insertErr) { setContractError(insertErr.message); setUploading(false); return }
+
+    setUploadLabel('Main Contract')
+    setUploading(false)
+    fetchContracts(editing.id)
+  }
+
+  async function handleContractDownload(c: OrgContract) {
+    const { data } = await supabase.storage.from('org-contracts').createSignedUrl(c.file_path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  async function handleContractDelete(c: OrgContract) {
+    if (!editing) return
+    await supabase.storage.from('org-contracts').remove([c.file_path])
+    await supabase.from('org_contracts').delete().eq('id', c.id)
+    fetchContracts(editing.id)
+  }
+
+  // Group contracts by year, newest year first
+  const contractsByYear = contracts.reduce((acc, c) => {
+    (acc[c.year] = acc[c.year] ?? []).push(c)
+    return acc
+  }, {} as Record<number, OrgContract[]>)
+  const contractYears = Object.keys(contractsByYear).map(Number).sort((a, b) => b - a)
 
   async function handleSave() {
     setSaving(true); setError('')
@@ -238,7 +313,7 @@ export default function OrganisationPage() {
                 {/* ── Data Table ── */}
         <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
           {/* Table header */}
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'0'}}>
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 160px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'0'}}>
             {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
               <div key={h} style={{padding:'14px 20px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
                 {h}
@@ -266,7 +341,7 @@ export default function OrganisationPage() {
               const avatarBg = avatarPalette[row.organisation.charCodeAt(0) % avatarPalette.length]
               return (
                 <div key={row.id}
-                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 120px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 160px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   {/* Organisation */}
@@ -348,22 +423,121 @@ export default function OrganisationPage() {
       </div>
 
       {/* ── Add/Edit Modal ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Organisation' : 'Add Organisation'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Organisation' : 'Add Organisation'} size="md">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation Name <span className="text-red-500">*</span></label>
-            <input type="text" value={form.organisation} onChange={e => setForm(f => ({ ...f, organisation: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">IATA Code</label>
-            <input type="text" value={form.iata} onChange={e => setForm(f => ({ ...f, iata: e.target.value.toUpperCase() }))} placeholder="e.g. 12345678" maxLength={20} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
-            <p className="text-xs text-slate-400 mt-1">Optional - 8-digit IATA accreditation number</p>
-          </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50">{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Organisation'}</button>
-          </div>
+          {/* Tabs — Contracts tab only shown when editing an existing organisation */}
+          {editing && (
+            <div style={{display:'flex', gap:'4px', borderBottom:'1px solid #e2e8f0', marginBottom:'4px'}}>
+              {(['details', 'contracts'] as const).map(tab => (
+                <button key={tab} onClick={() => setModalTab(tab)}
+                  style={{
+                    padding:'8px 16px', fontSize:'13px', fontWeight:600, cursor:'pointer',
+                    border:'none', background:'none',
+                    color: modalTab === tab ? '#1a5f3c' : '#94a3b8',
+                    borderBottom: modalTab === tab ? '2px solid #1a5f3c' : '2px solid transparent',
+                    marginBottom:'-1px',
+                  }}>
+                  {tab === 'details' ? 'Details' : `Contracts${contracts.length ? ` (${contracts.length})` : ''}`}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {modalTab === 'details' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation Name <span className="text-red-500">*</span></label>
+                <input type="text" value={form.organisation} onChange={e => setForm(f => ({ ...f, organisation: e.target.value }))} placeholder="e.g. PST Travel Services Sdn Bhd" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">IATA Code</label>
+                <input type="text" value={form.iata} onChange={e => setForm(f => ({ ...f, iata: e.target.value.toUpperCase() }))} placeholder="e.g. 12345678" maxLength={20} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+                <p className="text-xs text-slate-400 mt-1">Optional - 8-digit IATA accreditation number</p>
+              </div>
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50">{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Organisation'}</button>
+              </div>
+            </>
+          )}
+
+          {modalTab === 'contracts' && editing && (
+            <div className="space-y-4">
+              {/* Upload row */}
+              <div style={{background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'14px'}}>
+                <p style={{fontSize:'12px', fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'10px'}}>Upload New Contract</p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Year</label>
+                    <input type="number" value={uploadYear} onChange={e => setUploadYear(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Label</label>
+                    <input type="text" value={uploadLabel} onChange={e => setUploadLabel(e.target.value)} placeholder="e.g. Main Contract, Addendum 1"
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                  </div>
+                </div>
+                <input ref={contractFileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleContractUpload(f); e.target.value = '' }} />
+                <button onClick={() => contractFileInputRef.current?.click()} disabled={uploading}
+                  style={{display:'flex', alignItems:'center', gap:'8px', padding:'8px 16px', background:'#1a5f3c', border:'none', borderRadius:'8px', fontSize:'13px', fontWeight:600, color:'white', cursor:'pointer', opacity: uploading ? 0.6 : 1}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  {uploading ? 'Uploading...' : 'Choose File & Upload'}
+                </button>
+                <p className="text-xs text-slate-400 mt-2">PDF, Word (.doc/.docx) or images (.jpg/.png), max 20MB. You can add multiple files to the same year — e.g. a main contract plus an addendum.</p>
+                {contractError && <p className="text-sm text-red-500 mt-2">{contractError}</p>}
+              </div>
+
+              {/* List grouped by year */}
+              {contractsLoading ? (
+                <p className="text-sm text-slate-400 text-center py-4">Loading contracts...</p>
+              ) : contractYears.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">No contracts uploaded yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {contractYears.map(year => (
+                    <div key={year} style={{border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'hidden'}}>
+                      <div style={{background:'#f0fdf4', padding:'8px 14px', borderBottom:'1px solid #bbf7d0'}}>
+                        <span style={{fontSize:'13px', fontWeight:700, color:'#1a5f3c'}}>{year}</span>
+                        <span style={{fontSize:'12px', color:'#64748b', marginLeft:'8px'}}>{contractsByYear[year].length} file{contractsByYear[year].length !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div>
+                        {contractsByYear[year].map((c, i) => (
+                          <div key={c.id} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderBottom: i < contractsByYear[year].length - 1 ? '1px solid #f1f5f9' : 'none'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px', minWidth:0}}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              <div style={{minWidth:0}}>
+                                <div style={{fontSize:'13px', fontWeight:600, color:'#1e293b'}}>{c.label}</div>
+                                <div style={{fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{c.file_name}</div>
+                              </div>
+                            </div>
+                            <div style={{display:'flex', gap:'6px', flexShrink:0}}>
+                              <button onClick={() => handleContractDownload(c)}
+                                style={{padding:'4px 10px', fontSize:'12px', fontWeight:500, color:'#1a5f3c', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'6px', cursor:'pointer'}}>
+                                View
+                              </button>
+                              {isAdmin && (
+                                <button onClick={() => handleContractDelete(c)}
+                                  style={{padding:'4px 10px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#fff', border:'1px solid #fecaca', borderRadius:'6px', cursor:'pointer'}}>
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Close</button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

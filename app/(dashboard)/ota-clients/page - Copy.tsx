@@ -246,85 +246,64 @@ export default function OTAClientPage() {
   ]
 
   return (
-    <div style={{fontFamily:'Inter,system-ui,sans-serif',background:'#f1f5f9',minHeight:'100vh'}}>
-      <div style={{padding:'20px 28px',marginBottom:'0'}}>
+    <div style={{fontFamily:'Inter,system-ui,sans-serif',background:T.surface,minHeight:'100vh'}}>
+      <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:'20px 28px',marginBottom:'24px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'24px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>Client</h1>
-            <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Manage OTA clients and their GDS user assignments</p>
+            <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Client</h1>
+            <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Manage OTA clients and their GDS user assignments</p>
           </div>
           {isAdmin && (
-            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <button onClick={handleExport} disabled={filtered.length===0}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <button onClick={handleExport} disabled={filtered.length===0} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+              <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
-              <button onClick={openAdd}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-                onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+              <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Client</button>
             </div>
           )}
         </div>
       </div>
       <div style={{padding:'0 28px 28px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'20px',flexWrap:'wrap'}}>
-        <div style={{position:'relative',flex:1,minWidth:'280px'}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'16px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)}
-            style={{width:'100%',padding:'12px 16px 12px 44px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',boxSizing:'border-box',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-            onFocus={e => { e.currentTarget.style.borderColor='#2d8a5e'; e.currentTarget.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }} onBlur={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.boxShadow='none' }} />
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
+        <div style={{position:'relative',flex:1}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} style={{width:'100%',padding:'8px 12px 8px 32px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',boxSizing:'border-box'}} />
         </div>
-        <span style={{fontSize:'14px',color:'#64748b',fontWeight:500,whiteSpace:'nowrap'}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> client{filtered.length!==1?'s':''}</span>
+        <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} client{filtered.length!==1?'s':''}</span>
       </div>
-      {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
-        <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 120px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
-            {['Company','Created','Actions'].map((h,i)=>(
-              <div key={h} style={{padding:'14px 16px',fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===2?'right':'left',borderRight: i<2 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
+          <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} client{filtered.length!==1?'s':''}</span>
+        </div>
+      {loading ? <div style={{textAlign:'center',padding:'60px',color:T.textLight}}>Loading...</div> : (
+        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden',boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 120px',background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
+            {['Company','Sabre','Amadeus','Travelport','Created','Actions'].map((h,i)=>(
+              <div key={h} style={{padding:'10px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',textAlign:i===5?'right':'left',borderRight:'1px solid #d1fae5'}}>{h}</div>
             ))}
           </div>
-          {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:'#94a3b8'}}>No clients found.</div> :
-          filtered.map((row,i)=>{
-            const avatarColors = ['#0d9488','#16a34a','#2563eb','#9333ea','#d97706','#db2777']
-            const avatarColor = avatarColors[row.company_name.charCodeAt(0) % avatarColors.length]
-            return (
-            <div key={row.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 120px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-              <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:'10px',borderRight:'1px solid #f1f5f9'}}>
-                <div style={{width:'28px',height:'28px',borderRadius:'50%',background:avatarColor,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                  <span style={{fontSize:'12px',fontWeight:600,color:'white'}}>{row.company_name.charAt(0).toUpperCase()}</span>
+          {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No clients found.</div> :
+          filtered.map((row,i)=>(
+            <div key={row.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr 120px',borderBottom:i<filtered.length-1?`1px solid ${T.border}`:'none',transition:'background 0.1s'}}
+              onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9',gap:'10px',borderRight:'1px solid #f1f5f9'}}>
+                <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.primary,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <span style={{fontSize:'12px',fontWeight:700,color:'white'}}>{row.company_name.charAt(0).toUpperCase()}</span>
                 </div>
-                <span style={{fontSize:'14px',fontWeight:600,color:'#1e293b'}}>{row.company_name}</span>
+                <span style={{fontSize:'16px',fontWeight:600,color:T.text}}>{row.company_name}</span>
               </div>
-              <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'14px',color:'#1e293b'}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</span></div>
-              <div style={{padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
-                {isAdmin&&(<>
-                  <button onClick={()=>openEdit(row)}
-                    style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#64748b',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                    onMouseOver={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.color='#1e293b';e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'}}
-                    onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.color='#64748b';e.currentTarget.style.boxShadow='none'}}>
-                    Edit
-                  </button>
-                  <button onClick={()=>openDelete(row)}
-                    style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#ef4444',background:'#ffffff',border:'1px solid #fecaca',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                    onMouseOver={e=>{e.currentTarget.style.background='#fef2f2';e.currentTarget.style.borderColor='#ef4444'}}
-                    onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.borderColor='#fecaca'}}>
-                    Delete
-                  </button>
-                </>)}
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#eff6ff',color:'#1d4ed8',border:'1px solid #bfdbfe'}}>{(row as {sabreCount?:number}).sabreCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#faf5ff',color:'#7c3aed',border:'1px solid #ddd6fe'}}>{(row as {amadeusCount?:number}).amadeusCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',fontWeight:600,padding:'3px 8px',borderRadius:'20px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>{(row as {travelportCount?:number}).travelportCount||0}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:'16px',color:T.textMid}}>{new Date(row.created_at).toLocaleDateString('en-MY')}</span></div>
+              <div style={{padding:'14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9',justifyContent:'flex-end',gap:'6px'}}>
+                {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:'pointer'}}>Edit</button>
+                <button onClick={()=>openDelete(row)} style={{padding:'4px 10px',fontSize:'12px',fontWeight:600,color:T.danger,background:T.card,border:'1px solid #fecaca',borderRadius:T.radius,cursor:'pointer'}}>Delete</button></>)}
               </div>
             </div>
-            )
-          })}
+          ))}
         </div>
       )}
 

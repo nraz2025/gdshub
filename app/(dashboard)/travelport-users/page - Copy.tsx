@@ -51,7 +51,6 @@ export default function TravelportUsersPage() {
   const [records, setRecords] = useState<TravelportUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
-  const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -77,19 +76,14 @@ export default function TravelportUsersPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const { data: tpGds } = await supabase.from('gds').select('id').eq('name', 'Travelport').maybeSingle()
-    const [{ data: tpData }, { data: usersData }, { data: otaData }, { data: pccData }] = await Promise.all([
+    const [{ data: tpData }, { data: usersData }, { data: otaData }] = await Promise.all([
       supabase.from('travelport_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('sign_on_id'),
       supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
-      tpGds?.id
-        ? supabase.from('pcc_list').select('pcc, ota_client:ota_client_id(company_name)').eq('gds_id', tpGds.id).order('pcc')
-        : Promise.resolve({ data: [] as {pcc:string; ota_client?: {company_name?:string} | null}[] }),
     ])
     setRecords(tpData ?? [])
     setUsersList(usersData ?? [])
     setOtaClients(otaData ?? [])
-    setPccList((pccData as unknown as {pcc:string; ota_client?: {company_name?:string} | null}[]) ?? [])
     setLoading(false)
   }
 
@@ -250,14 +244,6 @@ export default function TravelportUsersPage() {
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null) }
 
-  // PCC -> OTA Client name lookup, sourced from GDS Info (pcc_list, Travelport only)
-  const pccOtaMap: Record<string, string> = {}
-  pccList.forEach(p => {
-    const name = (p.ota_client as {company_name?:string} | null)?.company_name
-    if (p.pcc && name) pccOtaMap[p.pcc.toUpperCase()] = name
-  })
-  const getPccAssigned = (pcc?: string | null) => pcc ? pccOtaMap[pcc.toUpperCase()] : undefined
-
   const filtered = records.filter(r => {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
@@ -344,31 +330,26 @@ export default function TravelportUsersPage() {
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
           <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.6fr 0.6fr 0.8fr 120px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
-              {['PCC','Sign-On','Linked User','CID','GTID','OTA','Status','Actions'].map((h,i)=>(
+            <div style={{display:'grid',gridTemplateColumns:'0.7fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+              {['PCC','Sign-On','Linked User','CID','GTID','OTA Client','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'14px 16px',fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===7?'right':'left',borderRight: i<7 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:'#94a3b8'}}>No Travelport users found.</div> :
             filtered.map((row,i)=>{
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
+              const ota = row.ota_client as {company_name?:string}
               const sval = ((row as {status?:string}).status ?? 'active').toLowerCase()
               const ss = STATUS_STYLE[sval] ?? STATUS_STYLE.active
-              const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.6fr 0.6fr 0.8fr 120px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.7fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                  <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span>
-                    {pccAssigned && <span style={{fontSize:'11px',color:'#94a3b8'}}>{pccAssigned}</span>}
-                  </div>
+                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',letterSpacing:'0.05em'}}>{row.sign_on_id??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'14px',fontWeight:600,color:'#1e293b'}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'12px',color:'#94a3b8'}}>{u.email_address}</div></>:<span style={{fontSize:'14px',color:'#94a3b8'}}>-</span>}</div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.cid??'-'}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.gtid??'-'}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontSize:'12px',fontWeight:600,padding:'4px 10px',borderRadius:'9999px',background:row.ota?'#f0fdf4':'#f1f5f9',color:row.ota?'#16a34a':'#94a3b8',border:`1px solid ${row.ota?'#bbf7d0':'#e2e8f0'}`}}>{row.ota?'Yes':'No'}</span>
-                  </div>
+                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>{ota?<span style={{display:'inline-flex',alignItems:'center',padding:'6px 14px',borderRadius:'9999px',fontSize:'12px',fontWeight:600,color:'#1a5f3c',background:'#f0fdf4',border:'1px solid #bbf7d0',whiteSpace:'nowrap'}}>{ota.company_name}</span>:<span style={{color:'#94a3b8'}}>-</span>}</div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,padding:'6px 14px',borderRadius:'9999px',background:sval==='active'?'#f0fdf4':ss.bg,color:sval==='active'?'#16a34a':ss.color,border:`1px solid ${sval==='active'?'#bbf7d0':ss.border}`,textTransform:'capitalize'}}><span style={{width:'6px',height:'6px',borderRadius:'50%',background:sval==='active'?'#22c55e':ss.color,flexShrink:0}}/>{sval}</span></div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
                     {isAdmin&&(<>
@@ -430,13 +411,17 @@ export default function TravelportUsersPage() {
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">GTID</label>
               <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
             <div><label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
-              <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
-                <option value="">- Select PCC -</option>
-                {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
-              </select></div>
+              <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value.toUpperCase() }))} placeholder="e.g. K3MY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
           </div>
 
-          {/* 4. Status */}
+          {/* 4. OTA Client */}
+          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
+            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+              <option value="">- None -</option>
+              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select></div>
+
+          {/* 5. Status */}
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
             <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="active">Active</option>
@@ -445,14 +430,14 @@ export default function TravelportUsersPage() {
               <option value="resigned">Resigned</option>
             </select></div>
 
-          {/* 5. Linked User */}
+          {/* 6. Linked User */}
           <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value="">- None -</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
             </select></div>
 
-          {/* 6. OTA toggle */}
+          {/* 7. OTA toggle */}
           <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
             <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div>
           </div>

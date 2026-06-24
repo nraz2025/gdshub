@@ -80,9 +80,11 @@ export default function ResignedUsersPage() {
   const [records, setRecords]     = useState<ResignedUser[]>([])
   const [selected, setSelected]   = useState<ResignedUser | null>(null)
   const [saving, setSaving]       = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [error, setError]         = useState('')
   const [success, setSuccess]     = useState('')
   const [showDetail, setShowDetail] = useState(false)
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
 
   // Filters
   const [search, setSearch]           = useState('')
@@ -152,6 +154,80 @@ export default function ResignedUsersPage() {
     setSuccess('Record updated.'); setShowDetail(false)
     await load(); setSaving(false)
     setTimeout(() => setSuccess(''), 3000)
+  }
+
+  //  Restore — recreate GDS record, reactivate user, remove from resigned_user 
+  async function restoreUser() {
+    if (!selected) return
+    setRestoring(true); setError('')
+
+    // 1. Resolve OTA Client name back to an id (if one was recorded)
+    let otaClientId: number | null = null
+    if (selected.ota_client) {
+      const { data: otaRow } = await supabase.from('ota_client').select('id').eq('company_name', selected.ota_client).maybeSingle()
+      otaClientId = otaRow?.id ?? null
+    }
+
+    // 2. Resolve / reactivate the linked person in users table
+    let userId: string | null = null
+    if (selected.email) {
+      const { data: userRow } = await supabase.from('users').select('id').eq('email_address', selected.email).maybeSingle()
+      if (userRow?.id) {
+        userId = userRow.id
+        await supabase.from('users').update({ status: 'Active' }).eq('id', userId)
+      }
+    }
+
+    // 3. Recreate the GDS user record from the snapshot
+    let insertError: string | null = null
+    if (selected.source_gds === 'Amadeus') {
+      const { error: e } = await supabase.from('amadeus_user').insert({
+        login:        selected.amadeus_login,
+        sign_on_id:   selected.amadeus_sign_on_id,
+        duty_code:    selected.amadeus_duty_code,
+        oid:          selected.amadeus_oid,
+        initial:      selected.initial,
+        user_id:      userId,
+        ota_client_id: otaClientId,
+        status:       'active',
+      })
+      insertError = e?.message ?? null
+    } else if (selected.source_gds === 'Sabre') {
+      const { error: e } = await supabase.from('sabre_user').insert({
+        epr:           selected.sabre_epr,
+        pcc:           selected.sabre_pcc,
+        initial:       selected.initial,
+        cta:           selected.cta,
+        pta:           selected.pta,
+        minicom:       selected.minicom,
+        user_id:       userId,
+        ota_client_id: otaClientId,
+        status:        'Active',
+      })
+      insertError = e?.message ?? null
+    } else if (selected.source_gds === 'Travelport') {
+      const { error: e } = await supabase.from('travelport_user').insert({
+        sign_on_id:    selected.travelport_sign_on_id,
+        cid:           selected.travelport_cid,
+        gtid:          selected.travelport_gtid,
+        pcc:           selected.travelport_pcc,
+        initial:       selected.initial,
+        user_id:       userId,
+        ota_client_id: otaClientId,
+        status:        'active',
+      })
+      insertError = e?.message ?? null
+    }
+
+    if (insertError) { setError(insertError); setRestoring(false); return }
+
+    // 4. Remove from resigned_user now that it's been restored
+    await supabase.from('resigned_user').delete().eq('id', selected.id)
+
+    setSuccess(`${selected.full_name ?? 'User'} restored to ${selected.source_gds}.`)
+    setShowRestoreConfirm(false); setShowDetail(false)
+    await load(); setRestoring(false)
+    setTimeout(() => setSuccess(''), 4000)
   }
 
   //  Export 
@@ -380,16 +456,47 @@ export default function ResignedUsersPage() {
             </div>
 
             {/* Footer */}
-            <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'flex-end',gap:'8px',position:'sticky',bottom:0,background:T.card}}>
-              <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',color:'#475569',cursor:'pointer',fontWeight:500}}>
-                Close
-              </button>
+            <div style={{padding:'14px 22px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',bottom:0,background:T.card}}>
               {isAdmin && (
-                <button onClick={saveReuse} disabled={saving}
-                  style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
-                  {saving ? 'Saving' : 'Save Changes'}
+                <button onClick={() => setShowRestoreConfirm(true)}
+                  style={{padding:'8px 16px',background:'#f0fdf4',color:'#16a34a',border:'1px solid #bbf7d0',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+                  ↩ Restore User
                 </button>
               )}
+              <div style={{display:'flex',gap:'8px'}}>
+                <button onClick={() => setShowDetail(false)} style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',color:'#475569',cursor:'pointer',fontWeight:500}}>
+                  Close
+                </button>
+                {isAdmin && (
+                  <button onClick={saveReuse} disabled={saving}
+                    style={{padding:'8px 20px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:saving?0.6:1}}>
+                    {saving ? 'Saving' : 'Save Changes'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore confirmation */}
+      {showRestoreConfirm && selected && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:60,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+          <div style={{background:T.card,borderRadius:'14px',width:'100%',maxWidth:'420px',padding:'24px',boxShadow:'0 20px 60px rgba(0,0,0,0.25)'}}>
+            <div style={{fontSize:'16px',fontWeight:700,color:'#0f172a',marginBottom:'8px'}}>Restore {selected.full_name}?</div>
+            <p style={{fontSize:'13px',color:'#64748b',lineHeight:1.5,marginBottom:'16px'}}>
+              This will recreate their {selected.source_gds} account using the saved snapshot, set their status back to <strong>Active</strong> in Users, and remove this record from Resigned Users.
+            </p>
+            {error && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{error}</div>}
+            <div style={{display:'flex',justifyContent:'flex-end',gap:'8px'}}>
+              <button onClick={() => setShowRestoreConfirm(false)} disabled={restoring}
+                style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>
+                Cancel
+              </button>
+              <button onClick={restoreUser} disabled={restoring}
+                style={{padding:'8px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:restoring?0.6:1}}>
+                {restoring ? 'Restoring…' : 'Yes, Restore'}
+              </button>
             </div>
           </div>
         </div>

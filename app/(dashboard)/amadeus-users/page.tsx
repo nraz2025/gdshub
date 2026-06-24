@@ -70,6 +70,7 @@ export default function AmadeusUsersPage() {
   const [records, setRecords] = useState<AmadeusUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
+  const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -98,14 +99,19 @@ export default function AmadeusUsersPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const [{ data: amData }, { data: usersData }, { data: otaData }] = await Promise.all([
+    const { data: amGds } = await supabase.from('gds').select('id').eq('name', 'Amadeus').maybeSingle()
+    const [{ data: amData }, { data: usersData }, { data: otaData }, { data: pccData }] = await Promise.all([
       supabase.from('amadeus_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('login'),
       supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
+      amGds?.id
+        ? supabase.from('pcc_list').select('pcc, ota_client:ota_client_id(company_name)').eq('gds_id', amGds.id).order('pcc')
+        : Promise.resolve({ data: [] as {pcc:string; ota_client?: {company_name?:string} | null}[] }),
     ])
     setRecords(amData ?? [])
     setUsersList(usersData ?? [])
     setOtaClients(otaData ?? [])
+    setPccList((pccData as unknown as {pcc:string; ota_client?: {company_name?:string} | null}[]) ?? [])
     setLoading(false)
   }
 
@@ -210,6 +216,23 @@ export default function AmadeusUsersPage() {
       date_resigned: new Date().toISOString().slice(0, 10),
     })
     await supabase.from('amadeus_user').delete().eq('id', editing.id)
+
+    // If this person has no OTHER active Sabre/Amadeus/Travelport account, mark them Inactive in Users
+    if (u?.email_address) {
+      const userRow = await supabase.from('users').select('id').eq('email_address', u.email_address).maybeSingle()
+      const userId = userRow.data?.id
+      if (userId) {
+        const [{ count: sabreCount }, { count: amadeusCount }, { count: tpCount }] = await Promise.all([
+          supabase.from('sabre_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('amadeus_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('travelport_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+        ])
+        const hasOtherActiveAccount = (sabreCount ?? 0) > 0 || (amadeusCount ?? 0) > 0 || (tpCount ?? 0) > 0
+        if (!hasOtherActiveAccount) {
+          await supabase.from('users').update({ status: 'Inactive' }).eq('id', userId)
+        }
+      }
+    }
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
@@ -279,6 +302,14 @@ export default function AmadeusUsersPage() {
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null) }
 
+  // OID -> OTA Client name lookup, sourced from GDS Info (pcc_list, Amadeus only)
+  const pccOtaMap: Record<string, string> = {}
+  pccList.forEach(p => {
+    const name = (p.ota_client as {company_name?:string} | null)?.company_name
+    if (p.pcc && name) pccOtaMap[p.pcc.toUpperCase()] = name
+  })
+  const getPccAssigned = (oid?: string | null) => oid ? pccOtaMap[oid.toUpperCase()] : undefined
+
   const filtered = records.filter(r => {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
@@ -321,79 +352,107 @@ export default function AmadeusUsersPage() {
   ]
 
   return (
-    <div style={{fontFamily:'Inter,system-ui,sans-serif',background:T.surface,minHeight:'100vh'}}>
-      <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:"20px 28px",marginBottom:"24px"}}>
+    <div style={{fontFamily:'Inter,system-ui,sans-serif',background:'#f1f5f9',minHeight:'100vh'}}>
+      <div style={{padding:"20px 28px",marginBottom:"0"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"12px"}}>
           <div>
-            <h1 style={{fontSize:"24px",fontWeight:800,color:T.text,margin:0,letterSpacing:"-0.025em"}}>Amadeus Users</h1>
-            <p style={{fontSize:"13px",color:T.textMid,marginTop:"3px"}}>Manage Amadeus login accounts</p>
+            <h1 style={{fontSize:"24px",fontWeight:700,color:'#1e293b',margin:0,letterSpacing:"-0.02em"}}>Amadeus Users</h1>
+            <p style={{fontSize:"14px",color:'#64748b',marginTop:"4px"}}>Manage Amadeus login accounts</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center" style={{gap:'12px'}}>
           {isAdmin && (
-          <button onClick={handleExport} disabled={filtered.length === 0} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
+          <button onClick={handleExport} disabled={filtered.length === 0}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+            onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
           )}
           {isAdmin && <><input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
-          <button onClick={() => fileInputRef.current?.click()} style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 14px',background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,fontSize:'13px',fontWeight:500,color:T.textMid,cursor:'pointer'}}>
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+            onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
-          <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'7px',padding:'10px 22px',background:T.primary,border:'none',borderRadius:T.radius,fontSize:'17px',fontWeight:700,color:'white',cursor:'pointer'}}>
+          <button onClick={openAdd}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
+            onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Amadeus User</button></>}
           </div>
         </div>
       </div>
-      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-        <div style={{position:'relative',flex:1}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Search login, OID, initial or name..." value={search} onChange={e => setSearch(e.target.value)} style={{width:'100%',padding:'8px 12px 8px 32px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',boxSizing:'border-box'}} />
+      <div style={{padding:'0 28px 28px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'20px',flexWrap:'wrap'}}>
+        <div style={{position:'relative',flex:1,minWidth:'280px'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'16px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search login, OID, initial or name..." value={search} onChange={e => setSearch(e.target.value)}
+            style={{width:'100%',padding:'12px 16px 12px 44px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',boxSizing:'border-box',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            onFocus={e => { e.currentTarget.style.borderColor='#2d8a5e'; e.currentTarget.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }} onBlur={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.boxShadow='none' }} />
         </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{padding:'8px 12px',fontSize:'13px',border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.text,outline:'none',cursor:'pointer',minWidth:'140px'}}>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{padding:'12px 40px 12px 16px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',minWidth:'140px',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 16px center'}}>
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
           <option value="suspended">Suspended</option>
           <option value="resigned">Resigned</option>
         </select>
-        <span style={{fontSize:'17px',color:'#065F46',fontWeight:600}}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+        <span style={{fontSize:'14px',color:'#64748b',fontWeight:500}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginBottom:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} Amadeus user{filtered.length!==1?'s':''}</span>
+        <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
+          <span style={{fontSize:'14px', color:'#64748b'}}>Showing <strong style={{color:'#1e293b'}}>{filtered.length} Amadeus user{filtered.length!==1?'s':''}</strong></span>
         </div>
-      {loading ? <div style={{textAlign:"center",padding:"60px",color:T.textLight}}>Loading...</div> : (
-        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"0.8fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px",background:'#F0FDF4',borderBottom:`2px solid #6EE7B7`}}>
-            {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA Client','Status','Actions'].map((h,i)=>(
-              <div key={h} style={{padding:"10px 14px",fontSize:"16px",fontWeight:800,color:T.primary,textTransform:"uppercase",letterSpacing:"0.07em",textAlign:i===8?"right":"left",borderRight:"1px solid #d1fae5"}}>{h}</div>
+      {loading ? <div style={{textAlign:"center",padding:"60px",color:'#94a3b8'}}>Loading...</div> : (
+        <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:"hidden",boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+          <div style={{display:"grid",gridTemplateColumns:"0.9fr 1fr 1fr 1fr 0.6fr 0.7fr 0.6fr 0.8fr 120px",background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+            {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Status','Actions'].map((h,i)=>(
+              <div key={h} style={{padding:"14px 16px",fontSize:"12px",fontWeight:700,color:'#94a3b8',textTransform:"uppercase",letterSpacing:"0.05em",textAlign:i===8?"right":"left",borderRight: i<8 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
             ))}
           </div>
-          {filtered.length===0 ? <div style={{padding:"60px",textAlign:"center",color:T.textLight}}>No Amadeus users found.</div> :
+          {filtered.length===0 ? <div style={{padding:"60px",textAlign:"center",color:'#94a3b8'}}>No Amadeus users found.</div> :
           filtered.map((row,i)=>{
             const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
-            const ota = row.ota_client as {company_name?:string}
             const sval = ((row as {status?:string}).status ?? "active").toLowerCase()
             const s = SS[sval] ?? SS.active
+            const pccAssigned = getPccAssigned(row.oid)
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"0.8fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr 0.8fr 120px",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none"}}
-                onMouseEnter={e=>(e.currentTarget.style.background=T.surfaceAlt)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"13px",color:T.textMid}}>{row.oid??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:T.text}}>{row.login}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.sign_on_id??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{u ? <><div style={{fontSize:"16px",color:T.text}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"13px",color:T.textLight}}>{u.email_address}</div></> : <span style={{color:T.textLight}}>-</span>}</div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",fontWeight:700,color:"#7c3aed"}}>{row.initial??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontFamily:"monospace",fontSize:"16px",color:T.textMid}}>{row.duty_code??"-"}</span></div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}>{ota ? <span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:"#f0fdf4",color:"#166534",border:"1px solid #bbf7d0"}}>{ota.company_name}</span> : <span style={{color:T.textLight}}>-</span>}</div>
-                <div style={{padding:"13px 14px",borderRight:"1px solid #f1f5f9"}}><span style={{fontSize:"16px",fontWeight:600,padding:"3px 8px",borderRadius:"20px",background:s.bg,color:s.color,border:`1px solid ${s.border}`,textTransform:"capitalize"}}>{sval}</span></div>
-                <div style={{padding:"13px 14px",display:"flex",justifyContent:"flex-end",gap:"6px",borderRight:"none"}}>
-                  {isAdmin&&(<><button onClick={()=>openEdit(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.textMid,background:T.card,border:`1px solid ${T.border}`,borderRadius:T.radius,cursor:"pointer"}}>Edit</button>
-                  <button onClick={()=>openDelete(row)} style={{padding:"4px 10px",fontSize:"12px",fontWeight:600,color:T.danger,background:T.card,border:"1px solid #fecaca",borderRadius:T.radius,cursor:"pointer"}}>Delete</button></>)}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"0.9fr 1fr 1fr 1fr 0.6fr 0.7fr 0.6fr 0.8fr 120px",borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                <div style={{padding:"14px 16px",display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
+                  <span style={{fontFamily:"monospace",fontSize:"13px",color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.oid??"-"}</span>
+                  {pccAssigned && <span style={{fontSize:'11px',color:'#94a3b8'}}>{pccAssigned}</span>}
+                </div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}><span style={{fontSize:"13px",fontWeight:600,color:'#1e293b',textTransform:'uppercase',letterSpacing:'0.03em'}}>{row.login}</span></div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:"monospace",fontSize:"13px",color:'#64748b',letterSpacing:'0.05em'}}>{row.sign_on_id??"-"}</span></div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}>{u ? <><div style={{fontSize:"14px",fontWeight:600,color:'#1e293b'}}>{u.first_name} {u.last_name}</div><div style={{fontSize:"12px",color:'#94a3b8'}}>{u.email_address}</div></> : <span style={{color:'#94a3b8'}}>-</span>}</div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}>{row.initial ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'28px',height:'28px',borderRadius:'8px',fontSize:'12px',fontWeight:600,textTransform:'uppercase',color:'#a855f7',background:'#f3e8ff',border:'1px solid #e9d5ff'}}>{row.initial}</span> : <span style={{color:'#cbd5e1'}}>-</span>}</div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:"monospace",fontSize:"13px",fontWeight:600,color:'#64748b'}}>{row.duty_code??"-"}</span></div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}>
+                  <span style={{fontSize:'12px',fontWeight:600,padding:'4px 10px',borderRadius:'9999px',background:row.ota?'#f0fdf4':'#f1f5f9',color:row.ota?'#16a34a':'#94a3b8',border:`1px solid ${row.ota?'#bbf7d0':'#e2e8f0'}`}}>{row.ota?'Yes':'No'}</span>
+                </div>
+                <div style={{padding:"14px 16px",borderRight:'1px solid #f1f5f9'}}><span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:"12px",fontWeight:600,padding:"6px 14px",borderRadius:"9999px",background:sval==='active'?'#f0fdf4':s.bg,color:sval==='active'?'#16a34a':s.color,border:`1px solid ${sval==='active'?'#bbf7d0':s.border}`,textTransform:"capitalize"}}><span style={{width:'6px',height:'6px',borderRadius:'50%',background:sval==='active'?'#22c55e':s.color,flexShrink:0}}/>{sval}</span></div>
+                <div style={{padding:"14px 16px",display:"flex",alignItems:'center',justifyContent:"flex-end",gap:"8px"}}>
+                  {isAdmin&&(<>
+                    <button onClick={()=>openEdit(row)}
+                      style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#64748b',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                      onMouseOver={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.color='#1e293b';e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'}}
+                      onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.color='#64748b';e.currentTarget.style.boxShadow='none'}}>
+                      Edit
+                    </button>
+                    <button onClick={()=>openDelete(row)}
+                      style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#ef4444',background:'#ffffff',border:'1px solid #fecaca',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                      onMouseOver={e=>{e.currentTarget.style.background='#fef2f2';e.currentTarget.style.borderColor='#ef4444'}}
+                      onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.borderColor='#fecaca'}}>
+                      Delete
+                    </button>
+                  </>)}
                 </div>
               </div>
             )
           })}
         </div>
       )}
-        <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, marginTop:'12px'}}>
-          <span style={{fontSize:'13px', color:T.textLight}}>Showing {filtered.length} Amadeus user{filtered.length!==1?'s':''}</span>
-        </div>
+      </div>
 
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Amadeus User' : 'Add Amadeus User'}>
@@ -496,7 +555,10 @@ export default function AmadeusUsersPage() {
           {/* 5. OID */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
-            <input type="text" value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value.toUpperCase() }))} placeholder="e.g. KULMY255W" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+            <select value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
+              <option value="">- Select OID -</option>
+              {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
+            </select>
           </div>
 
           {/* 6. Status */}
@@ -510,16 +572,7 @@ export default function AmadeusUsersPage() {
             </select>
           </div>
 
-          {/* 7. OTA Client */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
-            <select value={form.ota_client_id} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : '' }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value="">- None -</option>
-              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
-            </select>
-          </div>
-
-          {/* 8. Linked User */}
+          {/* 7. Linked User */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
             <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
@@ -528,7 +581,7 @@ export default function AmadeusUsersPage() {
             </select>
           </div>
 
-          {/* 9. OTA toggle */}
+          {/* 8. OTA toggle */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
             <div className="flex gap-4">
