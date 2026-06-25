@@ -9,7 +9,7 @@ export interface Profile {
 }
 
 // ── Users ────────────────────────────────────────────────────
-export type UserStatus = 'Active' | 'Inactive'
+export type UserStatus = 'Active' | 'Inactive' | 'Suspended'
 
 export interface User {
   id: string
@@ -25,7 +25,7 @@ export interface User {
 }
 
 // ── GDS ──────────────────────────────────────────────────────
-export type GDSName = 'Sabre' | 'Amadeus' | 'Travelport'
+export type GDSName = string
 
 export interface GDS {
   id: number

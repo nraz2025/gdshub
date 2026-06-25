@@ -208,8 +208,8 @@ export default function GDSPage() {
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete GDS" size="md">
         <div className="space-y-4">
           <div style={{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:T.radius, padding:'12px'}}>
-            <p style={{fontSize:'16px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
-            <p style={{fontSize:'16px', color:'#b45309'}}>
+            <p style={{fontSize:'13px', fontWeight:700, color:'#92400e', marginBottom:'4px'}}>Warning</p>
+            <p style={{fontSize:'13px', color:'#b45309'}}>
               Deleting <strong>{editing?.name}</strong> will also remove all linked PCC records and assignments.
             </p>
           </div>

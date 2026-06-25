@@ -275,13 +275,13 @@ export default function OrganisationPage() {
       <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Organisation</h1>
-            <p style={{fontSize:'14px', color:'#64748b', marginTop:'4px'}}>Manage organisations and link them to PCC codes</p>
+            <h1 style={{fontSize:'30px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Organisation</h1>
+            
           </div>
           {isAdmin && (
             <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
               <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'#1e293b', cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                 onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -289,14 +289,14 @@ export default function OrganisationPage() {
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'#1e293b', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                 onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'14px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
                 onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -310,91 +310,102 @@ export default function OrganisationPage() {
       <div style={{padding:'0 28px 28px'}}>
 
 
-                {/* ── Data Table ── */}
-        <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          {/* Table header */}
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 160px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'0'}}>
-            {['Organisation', 'IATA', 'Linked PCCs', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'14px 20px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
-                {h}
-              </div>
-            ))}
+                {/* ── Organisation Card Grid ── */}
+        {loading ? (
+          <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
+        ) : paginated.length === 0 ? (
+          <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>
+            {search ? `No organisations match "${search}"` : 'No organisations yet.'}
           </div>
-
-          {/* Table body */}
-          {loading ? (
-            <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
-          ) : paginated.length === 0 ? (
-            <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>
-              {search ? `No organisations match "${search}"` : 'No organisations yet.'}
-            </div>
-          ) : (
-            paginated.map((row, i) => {
+        ) : (
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(500px, 1fr))', gap:'24px'}}>
+            {paginated.map((row) => {
               const pccCount = linkedPCCs(row.id).length
               const avatarPalette = [
-                'linear-gradient(135deg, #a855f7, #7c3aed)', // purple
-                'linear-gradient(135deg, #3b82f6, #2563eb)', // blue
-                'linear-gradient(135deg, #10b981, #059669)', // green
-                'linear-gradient(135deg, #f59e0b, #d97706)', // amber
-                'linear-gradient(135deg, #ec4899, #db2777)', // pink
+                { bg: '#9333ea' }, // purple
+                { bg: '#ec4899' }, // pink
+                { bg: '#8b5cf6' }, // violet
+                { bg: '#6366f1' }, // indigo
+                { bg: '#f43f5e' }, // rose
               ]
-              const avatarBg = avatarPalette[row.organisation.charCodeAt(0) % avatarPalette.length]
+              const avatarColor = avatarPalette[row.organisation.charCodeAt(0) % avatarPalette.length].bg
               return (
                 <div key={row.id}
-                  style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 160px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  {/* Organisation */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'14px', borderRight:'1px solid #f1f5f9'}}>
-                    <div style={{width:'36px', height:'36px', borderRadius:'50%', background:avatarBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                      <span style={{fontSize:'13px', fontWeight:600, color:'white'}}>{row.organisation.charAt(0).toUpperCase()}</span>
+                  style={{position:'relative', overflow:'hidden', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'16px', padding:'24px', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                  onMouseEnter={e => { e.currentTarget.style.transform='translateY(-4px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'; e.currentTarget.style.borderColor='#e2e8f0' }}>
+                  {/* Colored left-edge stripe */}
+                  <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#1a5f3c'}} />
+
+                  {/* Header — avatar + name */}
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'14px'}}>
+                      <div style={{width:'40px', height:'40px', borderRadius:'50%', background:avatarColor, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                        <span style={{fontSize:'14px', fontWeight:700, color:'white'}}>{row.organisation.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <h3 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0}}>{row.organisation}</h3>
                     </div>
-                    <span style={{fontSize:'14px', fontWeight:600, color:'#1e293b'}}>{row.organisation}</span>
                   </div>
-                  {/* IATA */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                    {row.iata
-                      ? <span style={{display:'inline-flex', alignItems:'center', justifyContent:'center', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', fontWeight:600, color:'#64748b', background:'#f8fafc', border:'1px solid #e2e8f0', fontFamily:'monospace', letterSpacing:'0.05em'}}>{row.iata}</span>
-                      : <span style={{color:'#cbd5e1', fontSize:'13px'}}>-</span>}
+
+                  {/* Meta rows */}
+                  <div style={{display:'flex', flexDirection:'column', gap:'12px', marginBottom:'24px'}}>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7c-.4.4-.3 1 .2 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 2.7 3.4c.3.5 1 .6 1.3.2l.7-.7c.4-.3.6-.8.5-1.3z"/></svg>
+                        IATA
+                      </span>
+                      {row.iata
+                        ? <span style={{fontSize:'16px', fontWeight:600, color:'#1e293b', background:'#f8fafc', padding:'6px 12px', borderRadius:'8px', border:'1px solid #e2e8f0', fontFamily:'monospace', letterSpacing:'0.05em'}}>{row.iata}</span>
+                        : <span style={{color:'#cbd5e1', fontSize:'16px'}}>-</span>}
+                    </div>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        Linked PCCs
+                      </span>
+                      {pccCount > 0
+                        ? <button onClick={() => openPCCs(row)}
+                            style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'6px 12px', borderRadius:'9999px', fontSize:'16px', fontWeight:600, color:'#166534', background:'#dcfce7', border:'1px solid #bbf7d0', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                            onMouseOver={e => { e.currentTarget.style.background='#bbf7d0'; e.currentTarget.style.borderColor='#86efac' }}
+                            onMouseOut={e => { e.currentTarget.style.background='#dcfce7'; e.currentTarget.style.borderColor='#bbf7d0' }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            {pccCount} PCC{pccCount !== 1 ? 's' : ''}
+                          </button>
+                        : <span style={{fontSize:'13px', color:'#94a3b8'}}>None</span>}
+                    </div>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Created
+                      </span>
+                      <span style={{fontSize:'16px', color:'#64748b', fontWeight:500}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</span>
+                    </div>
                   </div>
-                  {/* Linked PCCs */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                    {pccCount > 0
-                      ? <button onClick={() => openPCCs(row)}
-                          style={{display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'6px', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', fontWeight:600, color:'#1a5f3c', background:'#f0fdf4', border:'1px solid #bbf7d0', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                          onMouseOver={e => { e.currentTarget.style.background='#dcfce7'; e.currentTarget.style.borderColor='#86efac'; e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
-                          onMouseOut={e => { e.currentTarget.style.background='#f0fdf4'; e.currentTarget.style.borderColor='#bbf7d0'; e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                          {pccCount} PCC{pccCount !== 1 ? 's' : ''}
-                        </button>
-                      : <span style={{display:'inline-flex', alignItems:'center', justifyContent:'center', width:'110px', height:'36px', borderRadius:'9999px', fontSize:'13px', color:'#94a3b8', background:'#f8fafc', border:'1px solid #e2e8f0'}}>None</span>}
-                  </div>
-                  {/* Created */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontSize:'14px', color:'#1e293b'}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</span>
-                  </div>
+
                   {/* Actions */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
-                    {isAdmin && (<>
+                  {isAdmin && (
+                    <div style={{display:'flex', gap:'10px'}}>
                       <button onClick={() => openEdit(row)}
-                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
+                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#ffffff', color:'#64748b', fontSize:'13px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#94a3b8'; e.currentTarget.style.color='#1e293b' }}
+                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.color='#64748b' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         Edit
                       </button>
                       <button onClick={() => openDelete(row)}
-                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
+                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #fecaca', background:'#ffffff', color:'#dc2626', fontSize:'13px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#dc2626' }}
                         onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         Delete
                       </button>
-                    </>)}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
 
         {/* ── Pagination ── */}
         {totalPages > 1 && (

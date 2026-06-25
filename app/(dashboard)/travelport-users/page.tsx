@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { TravelportUser, User, OTAClient } from '@/types'
-import { syncUserToTable } from '@/lib/syncUser'
+import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
 
 
 const T = {
@@ -137,6 +137,8 @@ export default function TravelportUsersPage() {
     // Keep the linked users.ota_client flag in sync with this record's OTA toggle
     if (resolvedUserId) {
       await supabase.from('users').update({ ota_client: form.ota }).eq('id', resolvedUserId)
+      // Re-evaluate this person's overall status across Sabre/Amadeus/Travelport
+      await syncUserStatus(resolvedUserId)
     }
 
     setSaving(false); setModalOpen(false); fetchAll()
@@ -166,20 +168,12 @@ export default function TravelportUsersPage() {
     // Delete the GDS user record
     await supabase.from('travelport_user').delete().eq('id', editing.id)
 
-    // If this person has no OTHER active Sabre/Amadeus/Travelport account, mark them Inactive in Users
+    // Re-evaluate this person's overall status across remaining Sabre/Amadeus/Travelport accounts
     if (u?.email_address) {
       const userRow = await supabase.from('users').select('id').eq('email_address', u.email_address).maybeSingle()
       const userId = userRow.data?.id
       if (userId) {
-        const [{ count: sabreCount }, { count: amadeusCount }, { count: tpCount }] = await Promise.all([
-          supabase.from('sabre_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-          supabase.from('amadeus_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-          supabase.from('travelport_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-        ])
-        const hasOtherActiveAccount = (sabreCount ?? 0) > 0 || (amadeusCount ?? 0) > 0 || (tpCount ?? 0) > 0
-        if (!hasOtherActiveAccount) {
-          await supabase.from('users').update({ status: 'Inactive' }).eq('id', userId)
-        }
+        await syncUserStatus(userId)
       }
     }
     setSaving(false); setDeleteOpen(false); fetchAll()
@@ -262,14 +256,17 @@ export default function TravelportUsersPage() {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
     const term = search.toLowerCase()
-    const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active') === filterStatus
-    return (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term) || (r.initial ?? '').toLowerCase().includes(term) && matchStatus
+    const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active').toLowerCase() === filterStatus.toLowerCase()
+    const matchSearch = (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.cid ?? '').toLowerCase().includes(term) || (r.pcc ?? '').toLowerCase().includes(term) || name.includes(term) || (r.initial ?? '').toLowerCase().includes(term)
+    return matchSearch && matchStatus
   })
 
   const validRows = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
   const activeCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='active').length
+  const inactiveCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='inactive').length
+  const suspendedCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='suspended').length
   const otaCount = records.filter(r=>r.ota).length
 
   return (
@@ -303,8 +300,8 @@ export default function TravelportUsersPage() {
         </div>
       </div>
       <div style={{padding:'0 28px 28px'}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'16px',marginBottom:'24px'}}>
-          {[{label:'Total Users',value:records.length,sub:'registered'},{label:'Active',value:activeCount,sub:'currently active'},{label:'Inactive',value:records.length-activeCount,sub:'not active'},{label:'OTA Users',value:otaCount,sub:'OTA enabled',highlighted:true}].map((s,i)=>(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'16px',marginBottom:'24px'}}>
+          {[{label:'Total Users',value:records.length,sub:'registered'},{label:'Active',value:activeCount,sub:'currently active'},{label:'Inactive',value:inactiveCount,sub:'not active'},{label:'Suspended',value:suspendedCount,sub:'temporarily suspended'},{label:'OTA Users',value:otaCount,sub:'OTA enabled',highlighted:true}].map((s,i)=>(
             <div key={i}
               style={{
                 position:'relative', overflow:'hidden',
@@ -335,7 +332,6 @@ export default function TravelportUsersPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="suspended">Suspended</option>
-            <option value="resigned">Resigned</option>
           </select>
           <span style={{fontSize:'14px',color:'#64748b',fontWeight:500}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> record{filtered.length!==1?'s':''}</span>
         </div>
@@ -442,7 +438,6 @@ export default function TravelportUsersPage() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="suspended">Suspended</option>
-              <option value="resigned">Resigned</option>
             </select></div>
 
           {/* 5. Linked User */}

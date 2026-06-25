@@ -104,7 +104,7 @@ export default function GDSInfoPage() {
   // PCC Assigned login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
-  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;name:string|null;email:string|null}[];amadeus:{id:number;sign_on_id:string|null;name:string|null;email:string|null}[];travelport:{id:number;sign_on_id:string|null;name:string|null;email:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
   // GDS Feature detail popup
@@ -226,23 +226,42 @@ export default function GDSInfoPage() {
 
   //  PCC ASSIGNED LOGIN POPUP 
   async function openLoginPopup(pcc: PCCList) {
-    if (!pcc.ota_client_id) return
     setLoginPopupPCC(pcc)
     setLoginPopupOpen(true)
     setLoginPopupLoading(true)
     const gdsName = (pcc.gds as GDS)?.name ?? ''
+    const pccCode = pcc.pcc
     const [{ data: sabreData }, { data: amData }, { data: tpData }] = await Promise.all([
       gdsName === 'Sabre' || !gdsName
-        ? supabase.from('sabre_user').select('id,epr,pcc,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('epr')
+        ? supabase.from('sabre_user').select('id,epr,users:user_id(first_name,last_name,email_address)').eq('pcc', pccCode).order('epr')
         : Promise.resolve({ data: [] }),
       gdsName === 'Amadeus' || !gdsName
-        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid').eq('ota_client_id', pcc.ota_client_id).order('login')
+        ? supabase.from('amadeus_user').select('id,sign_on_id,users:user_id(first_name,last_name,email_address)').eq('oid', pccCode).order('sign_on_id')
         : Promise.resolve({ data: [] }),
       gdsName === 'Travelport' || !gdsName
-        ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
+        ? supabase.from('travelport_user').select('id,sign_on_id,users:user_id(first_name,last_name,email_address)').eq('pcc', pccCode).order('sign_on_id')
         : Promise.resolve({ data: [] }),
     ])
-    setLoginPopupData({ sabre: sabreData ?? [], amadeus: amData ?? [], travelport: tpData ?? [] })
+    setLoginPopupData({
+      sabre: (sabreData ?? []).map((r: {id:number; epr:string; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
+        id: r.id,
+        epr: r.epr,
+        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
+        email: r.users?.email_address ?? null,
+      })),
+      amadeus: (amData ?? []).map((r: {id:number; sign_on_id: string|null; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
+        id: r.id,
+        sign_on_id: r.sign_on_id,
+        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
+        email: r.users?.email_address ?? null,
+      })),
+      travelport: (tpData ?? []).map((r: {id:number; sign_on_id: string|null; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
+        id: r.id,
+        sign_on_id: r.sign_on_id,
+        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
+        email: r.users?.email_address ?? null,
+      })),
+    })
     setLoginPopupLoading(false)
   }
 
@@ -532,9 +551,11 @@ export default function GDSInfoPage() {
       key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
-        return ota ? (
+        return (
           <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
-            <span style={{fontSize:'13px',fontWeight:500,color:'#1e293b',whiteSpace:'nowrap'}}>{ota.company_name}</span>
+            {ota
+              ? <span style={{fontSize:'13px',fontWeight:500,color:'#1e293b',whiteSpace:'nowrap'}}>{ota.company_name}</span>
+              : <span style={{color:'#cbd5e1',fontSize:'13px'}}></span>}
             <button onClick={() => openLoginPopup(row)}
               style={{fontSize:'12px',color:'#2d8a5e',background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0,whiteSpace:'nowrap',fontWeight:500,textAlign:'left'}}
               onMouseOver={e => e.currentTarget.style.textDecoration='underline'}
@@ -542,7 +563,7 @@ export default function GDSInfoPage() {
               View IDs
             </button>
           </div>
-        ) : <span style={{color:'#cbd5e1'}}></span>
+        )
       }
     },
     // 4b. Client Group
@@ -1082,7 +1103,7 @@ export default function GDSInfoPage() {
       <Modal
         open={loginPopupOpen}
         onClose={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }}
-        title={`GDS Logins  ${(loginPopupPCC?.ota_client as OTAClient)?.company_name ?? ''}`}
+        title={`GDS Logins  ${loginPopupPCC?.pcc ?? ''}${(loginPopupPCC?.ota_client as OTAClient)?.company_name ? ` (${(loginPopupPCC?.ota_client as OTAClient).company_name})` : ''}`}
         size="lg"
       >
         {loginPopupLoading ? (
@@ -1106,15 +1127,14 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['EPR','Email','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['EPR / Agent ID','User Name','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.sabre.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.sabre.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 text-xs">{(r as {users?:{email_address:string}|null}).users?.email_address??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
-                              <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
+                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1128,14 +1148,14 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Login','Sign-On ID','OID'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Sign-On ID','User Name','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.amadeus.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.amadeus.length-1?'border-b border-slate-50':''}>
-                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??''}</td>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
+                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1149,14 +1169,14 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Sign-On ID','CID','PCC'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Sign-On ID','Username','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.travelport.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.travelport.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
+                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
                             </tr>
                           ))}
                         </tbody>

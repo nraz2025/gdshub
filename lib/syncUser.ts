@@ -45,3 +45,44 @@ export async function syncUserToTable(params: {
 export async function syncUserToOTAClient(_params: { userId: string; otaClientId: number }): Promise<void> {
   // no-op — kept for compatibility, junction table no longer used
 }
+
+/**
+ * Re-evaluates and syncs a person's status in the `users` table based on
+ * the status of ALL their linked GDS accounts (Sabre / Amadeus / Travelport).
+ *
+ * Priority: Active > Suspended > Inactive
+ * - If ANY linked account is Active        → users.status = 'Active'
+ * - Else if ANY linked account is Suspended → users.status = 'Suspended'
+ * - Else (all Inactive, or no accounts left) → users.status = 'Inactive'
+ *
+ * Call this after any Save (Add/Edit) or Delete on a Sabre/Amadeus/Travelport
+ * user record that has a linked user_id, so the Users page always reflects
+ * the most "active" status across all three GDS platforms.
+ */
+export async function syncUserStatus(userId: string): Promise<void> {
+  if (!userId) return
+  const supabase = createClient()
+
+  const [{ data: sabreRows }, { data: amadeusRows }, { data: travelportRows }] = await Promise.all([
+    supabase.from('sabre_user').select('status').eq('user_id', userId),
+    supabase.from('amadeus_user').select('status').eq('user_id', userId),
+    supabase.from('travelport_user').select('status').eq('user_id', userId),
+  ])
+
+  // Normalize: Sabre stores 'Active'/'Inactive'/'Suspended' (capitalized).
+  // Amadeus/Travelport store lowercase ('active'/'inactive'/'suspended').
+  const allStatuses = [
+    ...(sabreRows ?? []).map(r => (r.status ?? '').toLowerCase()),
+    ...(amadeusRows ?? []).map(r => ((r as { status?: string }).status ?? '').toLowerCase()),
+    ...(travelportRows ?? []).map(r => ((r as { status?: string }).status ?? '').toLowerCase()),
+  ]
+
+  let newStatus: 'Active' | 'Suspended' | 'Inactive' = 'Inactive'
+  if (allStatuses.includes('active')) {
+    newStatus = 'Active'
+  } else if (allStatuses.includes('suspended')) {
+    newStatus = 'Suspended'
+  }
+
+  await supabase.from('users').update({ status: newStatus }).eq('id', userId)
+}

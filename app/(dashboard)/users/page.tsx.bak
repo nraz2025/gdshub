@@ -217,10 +217,9 @@ export default function UsersPage() {
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
-  const activeCount    = users.filter(u => (u.status ?? 'Active') === 'Active').length
-  const inactiveCount  = users.filter(u => u.status === 'Inactive').length
-  const suspendedCount = users.filter(u => u.status === 'Suspended').length
-  const otaCount       = users.filter(u => u.ota_client).length
+  const activeCount   = users.filter(u => (u.status ?? 'Active') === 'Active').length
+  const inactiveCount = users.filter(u => u.status === 'Inactive').length
+  const otaCount      = users.filter(u => u.ota_client).length
 
   // ── Label style ──
   const lbl = { display:'block', fontSize:'12px', fontWeight:600, color:T.textMid, marginBottom:'6px' } as const
@@ -268,12 +267,11 @@ export default function UsersPage() {
       <div style={{padding:'0 28px 28px'}}>
 
         {/* ── Stats row ── */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'20px', marginBottom:'24px'}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'16px', marginBottom:'24px'}}>
           {[
-            { label:'Total Users', value: users.length, sub:'', icon:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', iconColor:'#3b82f6', iconBg:'#eff6ff',highlighted:true },
-            { label:'Active', value: activeCount, sub:'', icon:'M9 12l2 2 4-4', iconColor:'#22c55e', iconBg:'#f0fdf4',highlighted:true },
-            { label:'Inactive', value: inactiveCount, sub:'', icon:'M18 6L6 18M6 6l12 12', iconColor:'#ef4444', iconBg:'#fef2f2',highlighted:true },
-            { label:'Suspended', value: suspendedCount, sub:'', icon:'M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z', iconColor:'#f59e0b', iconBg:'#fffbeb',highlighted:true },
+            { label:'Total Users', value: users.length, sub:'Registered', icon:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', iconColor:'#3b82f6', iconBg:'#eff6ff' },
+            { label:'Active', value: activeCount, sub:'', icon:'M9 12l2 2 4-4', iconColor:'#22c55e', iconBg:'#f0fdf4' },
+            { label:'Inactive', value: inactiveCount, sub:'', icon:'M18 6L6 18M6 6l12 12', iconColor:'#ef4444', iconBg:'#fef2f2' },
             { label:'OTA users', value: otaCount, sub:'', icon:'M3 9l2-6h14l2 6M3 9a2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', highlighted:true },
           ].map((s, i) => (
             <div key={i}
@@ -289,8 +287,8 @@ export default function UsersPage() {
               onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
               onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
               <div style={{flex:1}}>
-                <div style={{fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8', marginBottom:'8px'}}>{s.label}</div>
-                <div style={{fontSize:'26px', fontWeight:700, color: s.highlighted ? 'white' : '#1e293b', lineHeight:1, marginBottom:'4px'}}>{s.value}</div>
+                <div style={{fontSize:'11px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8', marginBottom:'8px'}}>{s.label}</div>
+                <div style={{fontSize:'28px', fontWeight:700, color: s.highlighted ? 'white' : '#1e293b', lineHeight:1, marginBottom:'4px'}}>{s.value}</div>
                 <div style={{fontSize:'12px', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
               </div>
               <div style={{width:'44px', height:'44px', borderRadius:'8px', background: s.highlighted ? 'rgba(255,255,255,0.2)' : s.iconBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
@@ -306,7 +304,7 @@ export default function UsersPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke='#94a3b8' strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'16px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search by name, email or OTA status..." value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
-              style={{width:'100%', padding:'12px 16px 12px 44px', fontSize:'16px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', outline:'none', boxSizing:'border-box', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              style={{width:'100%', padding:'12px 16px 12px 44px', fontSize:'14px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', outline:'none', boxSizing:'border-box', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
               onFocus={e => { e.target.style.borderColor='#2d8a5e'; e.target.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }}
               onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none' }} />
           </div>
@@ -315,11 +313,10 @@ export default function UsersPage() {
             <option value="all">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
-            <option value="Suspended">Suspended</option>
           </select>
-          {/*<span style={{fontSize:'14px', color:'#64748b', fontWeight:500}}>
+          <span style={{fontSize:'14px', color:'#64748b', fontWeight:500}}>
             {filtered.length} user{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}
-          </span>*/}
+          </span>
           {(search || filterStatus !== 'all') && (
             <button onClick={() => { setSearch(''); setFilterStatus('all'); setCurrentPage(1) }}
               style={{padding:'8px 14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', fontSize:'13px', color:'#1a5f3c', cursor:'pointer', fontWeight:500}}>
@@ -330,15 +327,15 @@ export default function UsersPage() {
 
         {/* ── Top record bar ── */}
         <div style={{display:'flex', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'16px'}}>
-          <div style={{fontSize:'16px', color:'#64748b'}}>
+          <div style={{fontSize:'14px', color:'#64748b'}}>
             {pageSize === 0
               ? <>Showing <strong style={{color:'#1e293b'}}>all {filtered.length}</strong> users</>
               : <>Showing <strong style={{color:'#1e293b'}}>{Math.min((currentPage-1)*pageSize+1, filtered.length)}-{Math.min(currentPage*pageSize, filtered.length)}</strong> of <strong style={{color:'#1e293b'}}>{filtered.length} users</strong></>}
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-            <span style={{fontSize:'16px', color:'#64748b'}}>Per page:</span>
+            <span style={{fontSize:'14px', color:'#64748b'}}>Per page:</span>
             <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-              style={{padding:'6px 28px 6px 12px', fontSize:'16px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', color:'#1e293b', cursor:'pointer', outline:'none', appearance:'none', backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 8px center'}}>
+              style={{padding:'6px 28px 6px 12px', fontSize:'14px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', color:'#1e293b', cursor:'pointer', outline:'none', appearance:'none', backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 8px center'}}>
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -352,7 +349,7 @@ export default function UsersPage() {
           {/* Header */}
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 170px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
             {['User', 'Status', 'OTA Client', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'14px 20px', fontSize:'16px', fontWeight:700, color:'#000000ff', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
+              <div key={h} style={{padding:'14px 20px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
                 {h}
               </div>
             ))}
@@ -367,6 +364,7 @@ export default function UsersPage() {
             </div>
           ) : (
             paginated.map((u, i) => {
+              const isActive = (u.status ?? 'Active') === 'Active'
               const fullName = `${u.first_name} ${u.last_name}`
               return (
                 <div key={u.id}
@@ -378,34 +376,25 @@ export default function UsersPage() {
                   <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'14px', borderRight:'1px solid #e2e8f0'}}>
                     <Avatar name={fullName} />
                     <div>
-                      <div style={{fontSize:'16px', fontWeight:600, color:'#1e293b'}}>{fullName}</div>
-                      <div style={{fontSize:'16px', color:'#94a3b8', marginTop:'1px'}}>{u.email_address}</div>
+                      <div style={{fontSize:'14px', fontWeight:600, color:'#1e293b'}}>{fullName}</div>
+                      <div style={{fontSize:'12px', color:'#94a3b8', marginTop:'1px'}}>{u.email_address}</div>
                     </div>
                   </div>
 
                   {/* Status */}
                   <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #e2e8f0'}}>
-                    {(() => {
-                      const status = u.status ?? 'Active'
-                      const statusStyle = status === 'Active'
-                        ? { bg:'#d7f8dfff', color:'#16a34a', dot:'#37610fff' }
-                        : status === 'Suspended'
-                        ? { bg:'#fffbeb', color:'#b45309', dot:'#f59e0b' }
-                        : { bg:'#f1f5f9', color:'#94a3b8', dot:'#bbf7d0' }
-                      return (
-                        <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'15px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
-                          background: statusStyle.bg, color: statusStyle.color}}>
-                          <span style={{width:'6px', height:'6px', borderRadius:'50%', background: statusStyle.dot, flexShrink:0}} />
-                          {status}
-                        </span>
-                      )
-                    })()}
+                    <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
+                      background: isActive ? '#f0fdf4' : '#f1f5f9',
+                      color:      isActive ? '#16a34a' : '#94a3b8'}}>
+                      <span style={{width:'6px', height:'6px', borderRadius:'50%', background: isActive ? '#22c55e' : '#94a3b8', flexShrink:0}} />
+                      {u.status ?? 'Active'}
+                    </span>
                   </div>
 
                   {/* OTA Client */}
                   <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #e2e8f0'}}>
-                    <span style={{fontSize:'15px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
-                      background: u.ota_client ? '#d7f8dfff' : '#f1f5f9',
+                    <span style={{fontSize:'12px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
+                      background: u.ota_client ? '#f0fdf4' : '#f1f5f9',
                       color:      u.ota_client ? '#16a34a' : '#94a3b8',
                       border:     `1px solid ${u.ota_client ? '#bbf7d0' : '#e2e8f0'}`}}>
                       {u.ota_client ? 'Yes' : 'No'}
@@ -414,7 +403,7 @@ export default function UsersPage() {
 
                   {/* Created + last modified sub-text */}
                   <div style={{padding:'16px 20px', display:'flex', flexDirection:'column', justifyContent:'center', borderRight:'1px solid #e2e8f0'}}>
-                    <div style={{fontSize:'15px', color:'#1e293b'}}>{new Date(u.created_at).toLocaleDateString('en-GB')}</div>
+                    <div style={{fontSize:'14px', color:'#1e293b'}}>{new Date(u.created_at).toLocaleDateString('en-GB')}</div>
                     {u.modified_at && (
                       <div style={{fontSize:'12px', color:'#94a3b8', marginTop:'2px'}}>
                         Edited {new Date(u.modified_at).toLocaleDateString('en-GB')}
@@ -426,13 +415,13 @@ export default function UsersPage() {
                   <div style={{padding:'16px 16px 16px 20px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(u)}
-                        style={{padding:'6px 14px', fontSize:'15px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                         onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
                         onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
                         Edit
                       </button>
                       <button onClick={() => openDelete(u)}
-                        style={{padding:'6px 14px', fontSize:'15px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                        style={{padding:'6px 14px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                         onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
                         onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
                         Delete
@@ -505,7 +494,7 @@ export default function UsersPage() {
             <div>
               <label style={lbl}>Status</label>
               <div style={{display:'flex', gap:'16px', marginTop:'4px'}}>
-                {['Active','Inactive','Suspended'].map(s => (
+                {['Active','Inactive'].map(s => (
                   <label key={s} style={{display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'13px', color:T.textMid}}>
                     <input type="radio" name="status" checked={(form.status ?? 'Active') === s} onChange={() => setForm(f => ({ ...f, status: s }))} style={{accentColor:T.primary}} />
                     {s}

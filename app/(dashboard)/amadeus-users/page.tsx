@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { AmadeusUser, User, OTAClient } from '@/types'
-import { syncUserToTable } from '@/lib/syncUser'
+import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
 
 
 const T = {
@@ -75,6 +75,7 @@ export default function AmadeusUsersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [filterOTA, setFilterOTA] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -195,6 +196,8 @@ export default function AmadeusUsersPage() {
     // Keep the linked users.ota_client flag in sync with this record's OTA toggle
     if (resolvedUserId) {
       await supabase.from('users').update({ ota_client: form.ota }).eq('id', resolvedUserId)
+      // Re-evaluate this person's overall status across Sabre/Amadeus/Travelport
+      await syncUserStatus(resolvedUserId)
     }
 
     setSaving(false); setModalOpen(false); fetchAll()
@@ -217,20 +220,12 @@ export default function AmadeusUsersPage() {
     })
     await supabase.from('amadeus_user').delete().eq('id', editing.id)
 
-    // If this person has no OTHER active Sabre/Amadeus/Travelport account, mark them Inactive in Users
+    // Re-evaluate this person's overall status across remaining Sabre/Amadeus/Travelport accounts
     if (u?.email_address) {
       const userRow = await supabase.from('users').select('id').eq('email_address', u.email_address).maybeSingle()
       const userId = userRow.data?.id
       if (userId) {
-        const [{ count: sabreCount }, { count: amadeusCount }, { count: tpCount }] = await Promise.all([
-          supabase.from('sabre_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-          supabase.from('amadeus_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-          supabase.from('travelport_user').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-        ])
-        const hasOtherActiveAccount = (sabreCount ?? 0) > 0 || (amadeusCount ?? 0) > 0 || (tpCount ?? 0) > 0
-        if (!hasOtherActiveAccount) {
-          await supabase.from('users').update({ status: 'Inactive' }).eq('id', userId)
-        }
+        await syncUserStatus(userId)
       }
     }
     setSaving(false); setDeleteOpen(false); fetchAll()
@@ -310,12 +305,19 @@ export default function AmadeusUsersPage() {
   })
   const getPccAssigned = (oid?: string | null) => oid ? pccOtaMap[oid.toUpperCase()] : undefined
 
+  const activeCount    = records.filter(r => ((r as {status?:string}).status ?? 'active') === 'active').length
+  const inactiveCount  = records.filter(r => (r as {status?:string}).status === 'inactive').length
+  const suspendedCount = records.filter(r => (r as {status?:string}).status === 'suspended').length
+  const otaCount       = records.filter(r => r.ota).length
+
   const filtered = records.filter(r => {
     const u = r.users as User
     const name = u ? `${u.first_name} ${u.last_name}`.toLowerCase() : ''
     const term = search.toLowerCase()
     const matchStatus = filterStatus === 'all' || ((r as {status?: string}).status ?? 'active') === filterStatus
-    return (r.login.toLowerCase().includes(term) || (r.oid ?? '').toLowerCase().includes(term) || name.includes(term) || (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.initial ?? '').toLowerCase().includes(term)) && matchStatus
+    const matchOTA = filterOTA === 'all' || (filterOTA === 'yes' ? r.ota === true : r.ota !== true)
+    const matchSearch = r.login.toLowerCase().includes(term) || (r.oid ?? '').toLowerCase().includes(term) || name.includes(term) || (r.sign_on_id ?? '').toLowerCase().includes(term) || (r.initial ?? '').toLowerCase().includes(term)
+    return matchSearch && matchStatus && matchOTA
   })
 
   const validRows = importRows.filter(r => r._errors.length === 0)
@@ -356,25 +358,25 @@ export default function AmadeusUsersPage() {
       <div style={{padding:"20px 28px",marginBottom:"0"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"12px"}}>
           <div>
-            <h1 style={{fontSize:"24px",fontWeight:700,color:'#1e293b',margin:0,letterSpacing:"-0.02em"}}>Amadeus Users</h1>
-            <p style={{fontSize:"14px",color:'#64748b',marginTop:"4px"}}>Manage Amadeus login accounts</p>
+            <h1 style={{fontSize:"30px",fontWeight:700,color:'#1e293b',margin:0,letterSpacing:"-0.02em"}}>Amadeus Users</h1>
+           
           </div>
           <div className="flex items-center" style={{gap:'12px'}}>
           {isAdmin && (
           <button onClick={handleExport} disabled={filtered.length === 0}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
           )}
           {isAdmin && <><input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
           <button onClick={openAdd}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
             onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Amadeus User</button></>}
@@ -382,6 +384,25 @@ export default function AmadeusUsersPage() {
         </div>
       </div>
       <div style={{padding:'0 28px 28px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'16px',marginBottom:'24px'}}>
+          {[{label:'Total Users',value:records.length,sub:' '},{label:'Active',value:activeCount,sub:' '},{label:'Inactive',value:inactiveCount,sub:' '},{label:'Suspended',value:suspendedCount,sub:' '},{label:'OTA Users',value:otaCount,sub:' ',highlighted:true}].map((s,i)=>(
+            <div key={i}
+              style={{
+                position:'relative', overflow:'hidden',
+                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
+                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
+                borderRadius:'12px', padding:'20px',
+                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
+                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+              }}
+              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
+              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
+              <div style={{fontSize:'11px',fontWeight:700,color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'8px'}}>{s.label}</div>
+              <div style={{fontSize:'28px',fontWeight:700,color: s.highlighted ? 'white' : '#1e293b',lineHeight:1,marginBottom:'4px'}}>{s.value}</div>
+              <div style={{fontSize:'12px',color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
       <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'20px',flexWrap:'wrap'}}>
         <div style={{position:'relative',flex:1,minWidth:'280px'}}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'16px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -395,16 +416,20 @@ export default function AmadeusUsersPage() {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
           <option value="suspended">Suspended</option>
-          <option value="resigned">Resigned</option>
         </select>
-        <span style={{fontSize:'14px',color:'#64748b',fontWeight:500}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> record{filtered.length !== 1 ? 's' : ''}</span>
+        <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
+          style={{padding:'12px 40px 12px 16px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',minWidth:'140px',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 16px center'}}>
+          <option value="all">All OTA</option>
+          <option value="yes">OTA: Yes</option>
+          <option value="no">OTA: No</option>
+        </select>
       </div>
         <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
           <span style={{fontSize:'14px', color:'#64748b'}}>Showing <strong style={{color:'#1e293b'}}>{filtered.length} Amadeus user{filtered.length!==1?'s':''}</strong></span>
         </div>
       {loading ? <div style={{textAlign:"center",padding:"60px",color:'#94a3b8'}}>Loading...</div> : (
         <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:"hidden",boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          <div style={{display:"grid",gridTemplateColumns:"0.9fr 1fr 1fr 1fr 0.6fr 0.7fr 0.6fr 0.8fr 120px",background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr 150px",background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
             {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Status','Actions'].map((h,i)=>(
               <div key={h} style={{padding:"14px 16px",fontSize:"12px",fontWeight:700,color:'#94a3b8',textTransform:"uppercase",letterSpacing:"0.05em",textAlign:i===8?"right":"left",borderRight: i<8 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
             ))}
@@ -416,7 +441,7 @@ export default function AmadeusUsersPage() {
             const s = SS[sval] ?? SS.active
             const pccAssigned = getPccAssigned(row.oid)
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"0.9fr 1fr 1fr 1fr 0.6fr 0.7fr 0.6fr 0.8fr 120px",borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr 150px",borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                 <div style={{padding:"14px 16px",display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
                   <span style={{fontFamily:"monospace",fontSize:"13px",color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.oid??"-"}</span>
@@ -476,7 +501,7 @@ export default function AmadeusUsersPage() {
                       minWidth: 0,
                     }}
                   >
-                    <div style={{ fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
                     <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap' }}>{cat.min}–{cat.max}</div>
                   </button>
                 ))}
@@ -568,7 +593,6 @@ export default function AmadeusUsersPage() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="suspended">Suspended</option>
-              <option value="resigned">Resigned</option>
             </select>
           </div>
 

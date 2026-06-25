@@ -618,8 +618,8 @@ export default function GDSInfoPage() {
       {/* Page Header */}
       <div className="flex items-start justify-between mb-5" style={{padding:'20px 28px',marginBottom:'0'}}>
         <div>
-          <h1 style={{fontSize:'24px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Info</h1>
-          <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Manage GDS, PCC, OTA clients and PCC functionality</p>
+          <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Info</h1>
+          
         </div>
         <div className="flex items-center" style={{gap:'12px'}}>
           {isAdmin && (
