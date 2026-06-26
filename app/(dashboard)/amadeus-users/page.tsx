@@ -358,25 +358,25 @@ export default function AmadeusUsersPage() {
       <div style={{padding:"20px 28px",marginBottom:"0"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"12px"}}>
           <div>
-            <h1 style={{fontSize:"30px",fontWeight:700,color:'#1e293b',margin:0,letterSpacing:"-0.02em"}}>Amadeus Users</h1>
-           
+            <h1 style={{fontSize:"24px",fontWeight:700,color:'#1e293b',margin:0,letterSpacing:"-0.02em"}}>Amadeus Users</h1>
+            <p style={{fontSize:"14px",color:'#64748b',marginTop:"4px"}}>Manage Amadeus login accounts</p>
           </div>
           <div className="flex items-center" style={{gap:'12px'}}>
           {isAdmin && (
           <button onClick={handleExport} disabled={filtered.length === 0}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
           )}
           {isAdmin && <><input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
           <button onClick={openAdd}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
             onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Amadeus User</button></>}
@@ -424,12 +424,9 @@ export default function AmadeusUsersPage() {
           <option value="no">OTA: No</option>
         </select>
       </div>
-        <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
-          <span style={{fontSize:'14px', color:'#64748b'}}>Showing <strong style={{color:'#1e293b'}}>{filtered.length} Amadeus user{filtered.length!==1?'s':''}</strong></span>
-        </div>
       {loading ? <div style={{textAlign:"center",padding:"60px",color:'#94a3b8'}}>Loading...</div> : (
-        <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:"hidden",boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr 150px",background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+        <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflowX:"auto",boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+          <div style={{display:"grid",gridTemplateColumns:"140px 160px 140px 220px 90px 90px 90px 120px 150px",minWidth:'1200px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
             {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Status','Actions'].map((h,i)=>(
               <div key={h} style={{padding:"14px 16px",fontSize:"12px",fontWeight:700,color:'#94a3b8',textTransform:"uppercase",letterSpacing:"0.05em",textAlign:i===8?"right":"left",borderRight: i<8 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
             ))}
@@ -441,7 +438,7 @@ export default function AmadeusUsersPage() {
             const s = SS[sval] ?? SS.active
             const pccAssigned = getPccAssigned(row.oid)
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.8fr 150px",borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"140px 160px 140px 220px 90px 90px 90px 120px 150px",minWidth:'1200px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                 <div style={{padding:"14px 16px",display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
                   <span style={{fontFamily:"monospace",fontSize:"13px",color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.oid??"-"}</span>
@@ -501,7 +498,7 @@ export default function AmadeusUsersPage() {
                       minWidth: 0,
                     }}
                   >
-                    <div style={{ fontSize: '14px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
                     <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap' }}>{cat.min}–{cat.max}</div>
                   </button>
                 ))}

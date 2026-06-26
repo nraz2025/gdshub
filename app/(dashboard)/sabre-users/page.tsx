@@ -515,14 +515,10 @@ export default function SabreUsersPage() {
             <option value="yes">OTA: Yes</option>
             <option value="no">OTA: No</option>
           </select>
-          <span style={{fontSize:'16px',color:'#64748b',fontWeight:500}}>{filtered.length} record{filtered.length!==1?'s':''}</span>
-        </div>
-        <div style={{display:'flex', alignItems:'center', marginBottom:'16px'}}>
-          <span style={{fontSize:'16px', color:'#64748b'}}>Showing <strong style={{color:'#1e293b'}}>{filtered.length} Sabre user{filtered.length!==1?'s':''}</strong></span>
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
-          <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'15px',overflow:'hidden',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 0.6fr 0.8fr 200px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'15px',overflowX:'auto',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'200px 150px 380px 110px 150px 150px 150px 90px 130px 200px',minWidth:'1230px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
               {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'14px 16px',fontSize:'16px',fontWeight:700,color:'#0c0c0c',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===9?'right':'left',borderRight: i<9 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
               ))}
@@ -533,10 +529,10 @@ export default function SabreUsersPage() {
               const ss = STATUS_STYLE[row.status] ?? STATUS_STYLE.Active
               const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.9fr 0.7fr 1fr 0.6fr 0.8fr 0.8fr 0.8fr 0.6fr 0.8fr 200px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'200px 150px 380px 110px 150px 150px 150px 90px 130px 200px',minWidth:'1230px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
                   <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontFamily:'monospace',fontSize:'15px',fontWeight:600,padding:'4px 10px',borderRadius:'8px',background:'#f8fafc',border:'1px solid #e2e8f0',color:'#64748b',letterSpacing:'0.05em',display:'inline-block',width:'fit-content'}}>{row.pcc??'-'}</span>
+                    <span style={{fontFamily:'monospace',fontSize:'15px',fontWeight:600,color:'#64748b',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span>
                     {pccAssigned && <span style={{fontSize:'14px',color:'#58536e'}}>{pccAssigned}</span>}
                   </div>
                   <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#1e293b'}}>{row.epr}</span></div>
