@@ -303,7 +303,7 @@ export default function TravelportUsersPage() {
       </div>
       <div style={{padding:'0 28px 28px'}}>
         <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'16px',marginBottom:'24px'}}>
-          {[{label:'Total Users',value:records.length,sub:' '},{label:'Active',value:activeCount,sub:' '},{label:'Inactive',value:inactiveCount,sub:' '},{label:'Suspended',value:suspendedCount,sub:' '},{label:'OTA Users',value:otaCount,sub:' ',highlighted:true}].map((s,i)=>(
+          {[{label:'Total Users',value:records.length,sub:'registered'},{label:'Active',value:activeCount,sub:'currently active'},{label:'Inactive',value:inactiveCount,sub:'not active'},{label:'Suspended',value:suspendedCount,sub:'temporarily suspended'},{label:'OTA Users',value:otaCount,sub:'OTA enabled',highlighted:true}].map((s,i)=>(
             <div key={i}
               style={{
                 position:'relative', overflow:'hidden',

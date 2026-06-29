@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
-import DataTable from '@/components/shared/DataTable'
+// DataTable import removed — GDS Info now uses its own custom grid-based table
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
@@ -104,7 +104,7 @@ export default function GDSInfoPage() {
   // PCC Assigned login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
-  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;name:string|null;email:string|null}[];amadeus:{id:number;sign_on_id:string|null;name:string|null;email:string|null}[];travelport:{id:number;sign_on_id:string|null;name:string|null;email:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
   // GDS Feature detail popup
@@ -226,42 +226,23 @@ export default function GDSInfoPage() {
 
   //  PCC ASSIGNED LOGIN POPUP 
   async function openLoginPopup(pcc: PCCList) {
+    if (!pcc.ota_client_id) return
     setLoginPopupPCC(pcc)
     setLoginPopupOpen(true)
     setLoginPopupLoading(true)
     const gdsName = (pcc.gds as GDS)?.name ?? ''
-    const pccCode = pcc.pcc
     const [{ data: sabreData }, { data: amData }, { data: tpData }] = await Promise.all([
       gdsName === 'Sabre' || !gdsName
-        ? supabase.from('sabre_user').select('id,epr,users:user_id(first_name,last_name,email_address)').eq('pcc', pccCode).order('epr')
+        ? supabase.from('sabre_user').select('id,epr,pcc,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('epr')
         : Promise.resolve({ data: [] }),
       gdsName === 'Amadeus' || !gdsName
-        ? supabase.from('amadeus_user').select('id,sign_on_id,users:user_id(first_name,last_name,email_address)').eq('oid', pccCode).order('sign_on_id')
+        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid').eq('ota_client_id', pcc.ota_client_id).order('login')
         : Promise.resolve({ data: [] }),
       gdsName === 'Travelport' || !gdsName
-        ? supabase.from('travelport_user').select('id,sign_on_id,users:user_id(first_name,last_name,email_address)').eq('pcc', pccCode).order('sign_on_id')
+        ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
         : Promise.resolve({ data: [] }),
     ])
-    setLoginPopupData({
-      sabre: (sabreData ?? []).map((r: {id:number; epr:string; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
-        id: r.id,
-        epr: r.epr,
-        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
-        email: r.users?.email_address ?? null,
-      })),
-      amadeus: (amData ?? []).map((r: {id:number; sign_on_id: string|null; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
-        id: r.id,
-        sign_on_id: r.sign_on_id,
-        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
-        email: r.users?.email_address ?? null,
-      })),
-      travelport: (tpData ?? []).map((r: {id:number; sign_on_id: string|null; users?: {first_name?:string|null; last_name?:string|null; email_address?:string|null}|null}) => ({
-        id: r.id,
-        sign_on_id: r.sign_on_id,
-        name: r.users ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || null : null,
-        email: r.users?.email_address ?? null,
-      })),
-    })
+    setLoginPopupData({ sabre: sabreData ?? [], amadeus: amData ?? [], travelport: tpData ?? [] })
     setLoginPopupLoading(false)
   }
 
@@ -515,8 +496,8 @@ export default function GDSInfoPage() {
       render: (row: PCCList) => {
         const org = row.organisation as Organisation
         return org
-          ? <div><p className="text-md text-slate-700 font-semibold uppercase">{org.organisation}</p>{org.iata && <p className="text-md text-slate-400 font-mono">{org.iata}</p>}</div>
-          : <span className="text-slate-300 text-md"></span>
+          ? <div><p className="text-sm text-slate-700 font-semibold uppercase">{org.organisation}</p>{org.iata && <p className="text-xs text-slate-400 font-mono">{org.iata}</p>}</div>
+          : <span className="text-slate-300 text-xs"></span>
       }
     },
     // 2. GDS
@@ -524,13 +505,13 @@ export default function GDSInfoPage() {
       key: 'gds', label: 'GDS', width: '120px',
       render: (row: PCCList) => {
         const name = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? ''
-        return <span className={`font-semibold rounded-full border text-center uppercase ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'6px 14px',fontSize:'12px',letterSpacing:'0.05em'}}>{name}</span>
+        return <span className={`font-semibold rounded-full border text-center uppercase ${GDS_COLORS[name] ?? 'bg-slate-100 text-slate-600'}`} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'6px 14px',fontSize:'11px',letterSpacing:'0.05em'}}>{name}</span>
       }
     },
     // 3. PCC
     {
       key: 'pcc', label: 'PCC', width: '120px',
-      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800" style={{fontSize:'14px',letterSpacing:'0.05em'}}>{row.pcc}</span>
+      render: (row: PCCList) => <span className="font-mono font-semibold text-slate-800" style={{fontSize:'13px',letterSpacing:'0.05em'}}>{row.pcc}</span>
     },
     // 5. PCC Functionality
     {
@@ -542,7 +523,7 @@ export default function GDSInfoPage() {
           'Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626'
         }
         return val
-          ? <span style={{fontSize:'14px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
+          ? <span style={{fontSize:'12px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
           : <span style={{color:'#cbd5e1'}}></span>
       }
     },
@@ -551,19 +532,17 @@ export default function GDSInfoPage() {
       key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
-        return (
+        return ota ? (
           <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
-            {ota
-              ? <span style={{fontSize:'14px',fontWeight:500,color:'#1e293b',whiteSpace:'nowrap'}}>{ota.company_name}</span>
-              : <span style={{color:'#cbd5e1',fontSize:'14px'}}></span>}
+            <span style={{fontSize:'13px',fontWeight:500,color:'#1e293b',whiteSpace:'nowrap'}}>{ota.company_name}</span>
             <button onClick={() => openLoginPopup(row)}
-              style={{fontSize:'14px',color:'#2d8a5e',background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0,whiteSpace:'nowrap',fontWeight:500,textAlign:'left'}}
+              style={{fontSize:'12px',color:'#2d8a5e',background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0,whiteSpace:'nowrap',fontWeight:500,textAlign:'left'}}
               onMouseOver={e => e.currentTarget.style.textDecoration='underline'}
               onMouseOut={e => e.currentTarget.style.textDecoration='none'}>
               View IDs
             </button>
           </div>
-        )
+        ) : <span style={{color:'#cbd5e1'}}></span>
       }
     },
     // 4b. Client Group
@@ -572,7 +551,7 @@ export default function GDSInfoPage() {
       render: (row: PCCList) => {
         const g = row.client_group as {id:number;name:string} | null
         return g
-          ? <span style={{fontSize:'14px',fontWeight:500,color:'#a855f7'}}>{g.name}</span>
+          ? <span style={{fontSize:'13px',fontWeight:500,color:'#a855f7'}}>{g.name}</span>
           : <span style={{color:'#cbd5e1'}}></span>
       }
     },
@@ -585,11 +564,11 @@ export default function GDSInfoPage() {
         return (
           <button onClick={() => openFeaturePopup(row)}
             style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
-            <span style={{fontSize:'14px',fontWeight:600,color: directCount > 0 ? '#1e293b' : '#94a3b8',textTransform:'uppercase',letterSpacing:'0.02em'}}>
+            <span style={{fontSize:'13px',fontWeight:600,color: directCount > 0 ? '#1e293b' : '#94a3b8',textTransform:'uppercase',letterSpacing:'0.02em'}}>
               {func ? func.name : directCount > 0 ? 'Assigned' : 'Unassigned'}
             </span>
             <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'50%',
-              fontSize:'14px',fontWeight:700,
+              fontSize:'11px',fontWeight:700,
               color: directCount > 0 ? '#3b82f6' : '#94a3b8',
               background: directCount > 0 ? '#dbeafe' : '#f1f5f9'}}>
               {directCount}
@@ -610,7 +589,7 @@ export default function GDSInfoPage() {
           Active:'#059669', Vacant:'#64748b', Pending:'#d97706'
         }
         return (
-          <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'14px',fontWeight:600,color:txtColor[s]??'#334155',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,color:txtColor[s]??'#334155',textTransform:'uppercase',letterSpacing:'0.05em'}}>
             <span style={{width:'7px',height:'7px',borderRadius:'50%',background:dotColor[s]??'#94a3b8',flexShrink:0,display:'inline-block'}}/>
             {s}
           </span>
@@ -621,14 +600,14 @@ export default function GDSInfoPage() {
     {
       key: 'remarks', label: 'Remarks', width: '120px',
       render: (row: PCCList) => {
-        if (!row.remarks) return <span className="text-slate-300 text-md">—</span>
+        if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
         return points.length > 1 ? (
           <ul className="list-disc list-inside space-y-0.5">
-            {points.map((p, i) => <li key={i} className="text-md text-slate-600">{p}</li>)}
+            {points.map((p, i) => <li key={i} className="text-sm text-slate-600">{p}</li>)}
           </ul>
         ) : (
-          <span className="text-md text-slate-600">{row.remarks}</span>
+          <span className="text-sm text-slate-600">{row.remarks}</span>
         )
       }
     },
@@ -639,13 +618,13 @@ export default function GDSInfoPage() {
       {/* Page Header */}
       <div className="flex items-start justify-between mb-5" style={{padding:'20px 28px',marginBottom:'0'}}>
         <div>
-          <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Hub</h1>
-     
+          <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Info</h1>
+          
         </div>
         <div className="flex items-center" style={{gap:'12px'}}>
           {isAdmin && (
           <button onClick={handleExport} disabled={filtered.length === 0}
-            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+            style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
             onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
             onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -654,7 +633,7 @@ export default function GDSInfoPage() {
           )}
           {isAdmin && selectedIds.size > 0 && (
             <button onClick={openBulk}
-              style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#6366f1',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:500,color:'white',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#6366f1',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
               onMouseOver={e => { e.currentTarget.style.background='#4f46e5' }}
               onMouseOut={e => { e.currentTarget.style.background='#6366f1' }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -665,14 +644,14 @@ export default function GDSInfoPage() {
             <>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'16px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                 onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
                 onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -689,7 +668,7 @@ export default function GDSInfoPage() {
 
           {/* Organisation */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>Organisation</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>Organisation</label>
             <div style={{position:"relative"}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" list="org-list" value={filterOrg} onChange={e => { setFilterOrg(e.target.value); resetPage() }}
@@ -702,7 +681,7 @@ export default function GDSInfoPage() {
 
           {/* PCC */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>PCC</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>PCC</label>
             <div style={{position:"relative"}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" list="pcc-list" value={filterPCC} onChange={e => { setFilterPCC(e.target.value); resetPage() }}
@@ -715,12 +694,12 @@ export default function GDSInfoPage() {
 
           {/* PCC Assigned */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>PCC Assigned</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>PCC Assigned</label>
             <div style={{position:"relative"}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" list="ota-list" value={filterOTA} onChange={e => { setFilterOTA(e.target.value); resetPage() }}
                 placeholder="Assigned..."
-                style={{width:"100%",padding:"10px 14px 10px 34px",fontSize:"16px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{width:"100%",padding:"10px 14px 10px 34px",fontSize:"14px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onFocus={e => { e.currentTarget.style.borderColor = "#2d8a5e"; e.currentTarget.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }} onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow='none' }} />
               <datalist id="ota-list">{otaClients.map(o => <option key={o.id} value={o.company_name} />)}</datalist>
             </div>
@@ -728,12 +707,12 @@ export default function GDSInfoPage() {
 
           {/* Client Group */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>Client Group</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>Client Group</label>
             <div style={{position:"relative"}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" list="group-list" value={filterGroup} onChange={e => { setFilterGroup(e.target.value); resetPage() }}
                 placeholder="Group..."
-                style={{width:"100%",padding:"10px 14px 10px 34px",fontSize:"16px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                style={{width:"100%",padding:"10px 14px 10px 34px",fontSize:"14px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onFocus={e => { e.currentTarget.style.borderColor = "#2d8a5e"; e.currentTarget.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }} onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow='none' }} />
               <datalist id="group-list">{clientGroups.map(g => <option key={g.id} value={g.name} />)}</datalist>
             </div>
@@ -741,9 +720,9 @@ export default function GDSInfoPage() {
 
           {/* GDS */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>GDS</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>GDS</label>
             <select value={filterGDS} onChange={e => { setFilterGDS(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"10px 32px 10px 14px",fontSize:"16px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
+              style={{width:"100%",padding:"10px 32px 10px 14px",fontSize:"14px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
               <option value="all">All GDS</option>
               {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
             </select>
@@ -751,9 +730,9 @@ export default function GDSInfoPage() {
 
           {/* Status */}
           <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            <label style={{fontSize:"16px",fontWeight:600,color:"#64748b"}}>Status</label>
+            <label style={{fontSize:"12px",fontWeight:600,color:"#64748b"}}>Status</label>
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); resetPage() }}
-              style={{width:"100%",padding:"10px 32px 10px 14px",fontSize:"16px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
+              style={{width:"100%",padding:"10px 32px 10px 14px",fontSize:"14px",border:"1px solid #e2e8f0",borderRadius:"8px",background:"white",color:"#1e293b",outline:"none",boxSizing:"border-box",cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
               <option value="all">All Status</option>
               {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -826,14 +805,122 @@ export default function GDSInfoPage() {
       </div>
 
       {loading ? <div className="text-center py-16 text-slate-400 text-sm">Loading</div> : (
-        <DataTable
-          columns={columns}
-          data={paginated as unknown as Record<string, unknown>[]}
-          onEdit={isAdmin ? r => openEdit(r as unknown as PCCList) : undefined}
-          onDelete={isAdmin ? r => openDelete(r as unknown as PCCList) : undefined}
-          isAdmin={isAdmin}
-          emptyMessage="No GDS Info records found."
-        />
+        <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflowX:'auto',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'44px 200px 110px 100px 130px 200px 110px 150px 100px 160px 150px',minWidth:'1454px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+            {['','Organisation','GDS','PCC','PCC Functionality','PCC Assigned','Client Group','GDS Feature','Status','Remarks','Actions'].map((h,i)=>(
+              <div key={h+i} style={{padding:'14px 16px',fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===10?'right':'left',borderRight: i<10 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
+            ))}
+          </div>
+          {paginated.length===0 ? (
+            <div style={{padding:'48px 16px',textAlign:'center',color:'#94a3b8',fontSize:'14px'}}>No GDS Info records found.</div>
+          ) : paginated.map((row,i)=>{
+            const org = row.organisation as Organisation
+            const gdsName = (row.gds as GDS)?.name ?? gdsList.find(g => g.id === row.gds_id)?.name ?? ''
+            const ota = row.ota_client as OTAClient
+            const clientGroup = row.client_group as {id:number;name:string} | null
+            const func = row.gds_functionality as GDSFunctionality
+            const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
+            const s = row.status ?? 'Active'
+            const dotColor: Record<string,string> = { Active:'#10b981', Vacant:'#94a3b8', Pending:'#f59e0b' }
+            const txtColor: Record<string,string> = { Active:'#059669', Vacant:'#64748b', Pending:'#d97706' }
+            const pccFuncColors: Record<string,string> = { 'Booking Only':'#0891b2','Booking & Ticketing':'#7c3aed','Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626' }
+            const remarkPoints = row.remarks ? row.remarks.split('\n').map(l=>l.trim()).filter(Boolean) : []
+            return (
+              <div key={row.id} style={{display:'grid',gridTemplateColumns:'44px 200px 110px 100px 130px 200px 110px 150px 100px 160px 150px',minWidth:'1454px',borderBottom:i<paginated.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                {/* Checkbox */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  {isAdmin && (
+                    <input type="checkbox" checked={selectedIds.has(row.id)} onChange={()=>toggleSelect(row.id)} onClick={e=>e.stopPropagation()} className="w-4 h-4 rounded accent-blue-500 cursor-pointer" />
+                  )}
+                </div>
+                {/* Organisation */}
+                <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>
+                  {org ? (<>
+                    <span style={{fontSize:'13px',fontWeight:600,color:'#334155',textTransform:'uppercase'}}>{org.organisation}</span>
+                    {org.iata && <span style={{fontSize:'11px',color:'#94a3b8',fontFamily:'monospace'}}>{org.iata}</span>}
+                  </>) : <span style={{color:'#cbd5e1',fontSize:'12px'}}></span>}
+                </div>
+                {/* GDS */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  <span className={`font-semibold rounded-full border text-center uppercase ${GDS_COLORS[gdsName] ?? 'bg-slate-100 text-slate-600'}`} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'5px 12px',fontSize:'11px',letterSpacing:'0.05em'}}>{gdsName}</span>
+                </div>
+                {/* PCC */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  <span style={{fontFamily:'monospace',fontWeight:600,color:'#1e293b',fontSize:'13px',letterSpacing:'0.05em'}}>{row.pcc}</span>
+                </div>
+                {/* PCC Functionality */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  {row.pcc_functionality
+                    ? <span style={{fontSize:'12px',fontWeight:500,color:pccFuncColors[row.pcc_functionality]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{row.pcc_functionality}</span>
+                    : <span style={{color:'#cbd5e1'}}></span>}
+                </div>
+                {/* PCC Assigned */}
+                <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
+                  {ota ? (<>
+                    <span style={{fontSize:'13px',fontWeight:500,color:'#1e293b',whiteSpace:'nowrap'}}>{ota.company_name}</span>
+                    <button onClick={()=>openLoginPopup(row)}
+                      style={{fontSize:'12px',color:'#2d8a5e',background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0,whiteSpace:'nowrap',fontWeight:500,textAlign:'left'}}
+                      onMouseOver={e=>e.currentTarget.style.textDecoration='underline'} onMouseOut={e=>e.currentTarget.style.textDecoration='none'}>
+                      View IDs
+                    </button>
+                  </>) : <span style={{color:'#cbd5e1'}}></span>}
+                </div>
+                {/* Client Group */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  {clientGroup
+                    ? <span style={{fontSize:'13px',fontWeight:500,color:'#a855f7'}}>{clientGroup.name}</span>
+                    : <span style={{color:'#cbd5e1'}}></span>}
+                </div>
+                {/* GDS Feature */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  <button onClick={()=>openFeaturePopup(row)} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
+                    <span style={{fontSize:'13px',fontWeight:600,color: directCount > 0 ? '#1e293b' : '#94a3b8',textTransform:'uppercase',letterSpacing:'0.02em',whiteSpace:'nowrap'}}>
+                      {func ? func.name : directCount > 0 ? 'Assigned' : 'Unassigned'}
+                    </span>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'50%',fontSize:'11px',fontWeight:700,
+                      color: directCount > 0 ? '#3b82f6' : '#94a3b8', background: directCount > 0 ? '#dbeafe' : '#f1f5f9',flexShrink:0}}>
+                      {directCount}
+                    </span>
+                  </button>
+                </div>
+                {/* Status */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,color:txtColor[s]??'#334155',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                    <span style={{width:'7px',height:'7px',borderRadius:'50%',background:dotColor[s]??'#94a3b8',flexShrink:0,display:'inline-block'}}/>
+                    {s}
+                  </span>
+                </div>
+                {/* Remarks */}
+                <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>
+                  {remarkPoints.length === 0 ? <span style={{color:'#cbd5e1',fontSize:'12px'}}>—</span>
+                    : remarkPoints.length > 1 ? (
+                      <ul style={{listStyle:'disc',paddingLeft:'14px',margin:0}}>
+                        {remarkPoints.map((p,j)=><li key={j} style={{fontSize:'13px',color:'#64748b'}}>{p}</li>)}
+                      </ul>
+                    ) : <span style={{fontSize:'13px',color:'#64748b'}}>{remarkPoints[0]}</span>}
+                </div>
+                {/* Actions */}
+                <div style={{padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
+                  {isAdmin && (<>
+                    <button onClick={()=>openEdit(row)}
+                      style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#64748b',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                      onMouseOver={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.color='#1e293b'}}
+                      onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.color='#64748b'}}>
+                      Edit
+                    </button>
+                    <button onClick={()=>openDelete(row)}
+                      style={{padding:'6px 14px',fontSize:'12px',fontWeight:500,color:'#ef4444',background:'#ffffff',border:'1px solid #fecaca',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                      onMouseOver={e=>{e.currentTarget.style.background='#fef2f2';e.currentTarget.style.borderColor='#ef4444'}}
+                      onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.borderColor='#fecaca'}}>
+                      Delete
+                    </button>
+                  </>)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {/*  Pagination (right-aligned nav only, matches reference)  */}
@@ -936,7 +1023,7 @@ export default function GDSInfoPage() {
               onChange={e => setForm(f => ({ ...f, remarks: e.target.value || null }))}
               placeholder="Additional notes or information"
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
             />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
@@ -1103,7 +1190,7 @@ export default function GDSInfoPage() {
       <Modal
         open={loginPopupOpen}
         onClose={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }}
-        title={`GDS Logins  ${loginPopupPCC?.pcc ?? ''}${(loginPopupPCC?.ota_client as OTAClient)?.company_name ? ` (${(loginPopupPCC?.ota_client as OTAClient).company_name})` : ''}`}
+        title={`GDS Logins  ${(loginPopupPCC?.ota_client as OTAClient)?.company_name ?? ''}`}
         size="lg"
       >
         {loginPopupLoading ? (
@@ -1127,14 +1214,15 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['EPR / Agent ID','User Name','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['EPR','Email','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.sabre.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.sabre.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.epr}</span></td>
-                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{(r as {users?:{email_address:string}|null}).users?.email_address??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
+                              <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1148,14 +1236,14 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Sign-On ID','User Name','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Login','Sign-On ID','OID'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.amadeus.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.amadeus.length-1?'border-b border-slate-50':''}>
-                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
-                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
+                              <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??''}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1169,14 +1257,14 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Sign-On ID','Username','Email'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Sign-On ID','CID','PCC'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.travelport.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.travelport.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
-                              <td className="px-4 py-2.5 text-slate-700 text-xs">{r.name??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.email??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??''}</td>
+                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
                             </tr>
                           ))}
                         </tbody>
