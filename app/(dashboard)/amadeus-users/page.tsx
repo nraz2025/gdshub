@@ -426,7 +426,7 @@ export default function AmadeusUsersPage() {
       </div>
       {loading ? <div style={{textAlign:"center",padding:"60px",color:'#94a3b8'}}>Loading...</div> : (
         <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflowX:"auto",boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          <div style={{display:"grid",gridTemplateColumns:"280px 260px 240px 400px 190px 190px 190px 230px 200px",minWidth:'1230px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{display:"grid",gridTemplateColumns:"minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,150px)",minWidth:'1140px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
             {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Status','Actions'].map((h,i)=>(
               <div key={h} style={{padding:"14px 16px",fontSize:"16px",fontWeight:700,color:'#94a3b8',textTransform:"uppercase",letterSpacing:"0.05em",textAlign:i===8?"right":"left",borderRight: i<8 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
             ))}
@@ -438,7 +438,7 @@ export default function AmadeusUsersPage() {
             const s = SS[sval] ?? SS.active
             const pccAssigned = getPccAssigned(row.oid)
             return (
-              <div key={row.id} style={{display:"grid",gridTemplateColumns:"280px 260px 240px 400px 190px 190px 190px 230px 200px",minWidth:'1230px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+              <div key={row.id} style={{display:"grid",gridTemplateColumns:"minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,150px)",minWidth:'1140px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':"none",transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                 onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                 <div style={{padding:"14px 16px",display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
                   <span style={{fontFamily:"monospace",fontSize:"15px",color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.oid??"-"}</span>

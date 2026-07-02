@@ -936,7 +936,7 @@ export default function GDSInfoPage() {
               onChange={e => setForm(f => ({ ...f, remarks: e.target.value || null }))}
               placeholder="Additional notes or information"
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-500 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none"
             />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}

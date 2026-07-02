@@ -267,7 +267,8 @@ export default function ResignedUsersPage() {
       {/*  Page Header  */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'20px'}}>
         <div>
-          <h1 style={{fontSize:'30px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Resigned Users</h1>
+          <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Resigned Users</h1>
+          <p style={{fontSize:'13px',color:T.textMid,marginTop:'3px'}}>Archive of GDS users who have resigned  track initial reuse history</p>
         </div>
         <button onClick={exportExcel} disabled={filtered.length === 0}
           style={{display:'flex',alignItems:'center',gap:'7px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>

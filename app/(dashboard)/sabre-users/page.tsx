@@ -518,7 +518,7 @@ export default function SabreUsersPage() {
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
           <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'15px',overflowX:'auto',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'200px 150px 380px 110px 150px 150px 150px 90px 130px 200px',minWidth:'1230px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+            <div style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'1175px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
               {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'14px 16px',fontSize:'16px',fontWeight:700,color:'#0c0c0c',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===9?'right':'left',borderRight: i<9 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
               ))}
@@ -529,7 +529,7 @@ export default function SabreUsersPage() {
               const ss = STATUS_STYLE[row.status] ?? STATUS_STYLE.Active
               const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'200px 150px 380px 110px 150px 150px 150px 90px 130px 200px',minWidth:'1230px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'1175px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
                   <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
                     <span style={{fontFamily:'monospace',fontSize:'15px',fontWeight:600,color:'#64748b',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span>

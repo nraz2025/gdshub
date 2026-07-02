@@ -343,8 +343,8 @@ export default function TravelportUsersPage() {
           </select>
         </div>
         {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
-          <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'0.6fr 0.5fr 1fr 0.3fr 0.3fr 0.3fr 0.3fr 180px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',overflowX:'auto',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'980px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
               {['PCC','Sign-On','Linked User','CID','GTID','OTA','Status','Actions'].map((h,i)=>(
                 <div key={h} style={{padding:'14px 16px',fontSize:'16px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===7?'right':'left',borderRight: i<7 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
               ))}
@@ -356,7 +356,7 @@ export default function TravelportUsersPage() {
               const ss = STATUS_STYLE[sval] ?? STATUS_STYLE.active
               const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.6fr 0.5fr 1fr 0.3fr 0.3fr 0.3fr 0.3fr 180px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'980px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
                   <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
                     <span style={{fontFamily:'monospace',fontSize:'16px',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span>

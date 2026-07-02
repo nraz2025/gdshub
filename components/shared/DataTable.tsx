@@ -47,7 +47,14 @@ export default function DataTable<T extends Record<string, unknown>>({
 
   return (
     // Outer wrapper — no overflow:hidden so sticky works
-    <div style={{borderRadius:'12px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+    <div style={{borderRadius:'12px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', position:'relative'}}>
+
+      {/* ── Right-edge fade shadow — visual cue that table scrolls ── */}
+      <div style={{
+        position:'absolute', top:0, right:0, width:'60px', height:'100%',
+        background:'linear-gradient(to right, transparent, rgba(241,245,249,0.85))',
+        zIndex:10, pointerEvents:'none', borderRadius:'0 12px 12px 0',
+      }} />
 
       {/* ── Sticky top scrollbar ── */}
       {/* Must be outside any overflow:hidden parent for sticky to work */}
@@ -59,15 +66,22 @@ export default function DataTable<T extends Record<string, unknown>>({
           position:'sticky',
           top:0,
           zIndex:20,
-          height:'14px',
-          background:'#e8edf2',
-          border:'1px solid #e2e8f0',
+          height:'20px',
+          background:'#e2e8f0',
+          border:'1px solid #cbd5e1',
           borderBottom:'none',
           borderRadius:'12px 12px 0 0',
-          boxShadow:'0 2px 4px rgba(0,0,0,0.06)',
+          boxShadow:'0 2px 6px rgba(0,0,0,0.10)',
           cursor:'ew-resize',
+          display:'flex',
+          alignItems:'center',
+          paddingLeft:'12px',
+          gap:'6px',
         }}>
-        <div style={{width: scrollWidth, height:'1px'}} />
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/></svg>
+        <span style={{fontSize:'10px',fontWeight:600,color:'#94a3b8',letterSpacing:'0.05em',userSelect:'none',whiteSpace:'nowrap'}}>SCROLL TO SEE MORE →</span>
+        <div style={{flex:1}} />
+        <div style={{width: scrollWidth, height:'1px', position:'absolute'}} />
       </div>
 
       {/* ── Table container ── */}
@@ -75,22 +89,22 @@ export default function DataTable<T extends Record<string, unknown>>({
         <div ref={scrollRef} onScroll={onTableScroll} className="overflow-x-auto">
           <table className="w-full" style={{minWidth:'1400px', borderCollapse:'collapse'}}>
             <thead>
-              <tr style={{borderBottom:'2px solid #6EE7B7', background:'#F0FDF4'}}>
+              <tr style={{borderBottom:'1px solid #e2e8f0', background:'#f8fafc'}}>
                 {columns.map(col => (
                   <th key={col.key}
                     style={{
-                      textAlign:'left', padding:'11px 16px',
-                      fontSize:'16px', fontWeight:800,
-                      color:'#065F46', textTransform:'uppercase',
-                      letterSpacing:'0.07em', whiteSpace:'nowrap',
-                      borderRight:'1px solid #d1fae5',
+                      textAlign:'left', padding:'14px 16px',
+                      fontSize:'12px', fontWeight:700,
+                      color:'#94a3b8', textTransform:'uppercase',
+                      letterSpacing:'0.05em', whiteSpace:'nowrap',
+                      borderRight:'1px solid #e2e8f0',
                       ...(col.width ? {width: col.width} : {})
                     }}>
                     {col.label}
                   </th>
                 ))}
                 {isAdmin && (onEdit || onDelete) && (
-                  <th style={{textAlign:'right', padding:'11px 16px', fontSize:'16px', fontWeight:800, color:'#065F46', textTransform:'uppercase', letterSpacing:'0.07em', borderRight:'none'}}>
+                  <th style={{textAlign:'right', padding:'14px 16px', fontSize:'12px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', borderRight:'none'}}>
                     Actions
                   </th>
                 )}

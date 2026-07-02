@@ -216,6 +216,7 @@ export default function GDSFunctionalityPage() {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Features</h1>
+
           </div>
           {isAdmin && (
             <button onClick={openAdd}

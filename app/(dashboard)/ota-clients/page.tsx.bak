@@ -271,7 +271,7 @@ export default function OTAClientPage() {
       <div style={{padding:'20px 28px',marginBottom:'0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
-            <h1 style={{fontSize:'24px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>PCC Name</h1>
+            <h1 style={{fontSize:'24px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>Client</h1>
             <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Manage OTA clients and their GDS user assignments</p>
           </div>
           {isAdmin && (
