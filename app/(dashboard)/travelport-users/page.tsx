@@ -498,7 +498,7 @@ export default function TravelportUsersPage() {
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
-                    <tr>{['Row','Sign-On ID','CID','GTID','PCC','OTA','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr>
+                    <tr>{['Row','Sign-On ID','CID','GTID','PCC','OTA','Validation'].map(h => <th key={h} className="text-left px-3 py-2 font-medium text-black">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {importRows.map((row, i) => (

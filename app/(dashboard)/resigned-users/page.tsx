@@ -270,7 +270,7 @@ export default function ResignedUsersPage() {
           <h1 style={{fontSize:'30px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Resigned Users</h1>
         </div>
         <button onClick={exportExcel} disabled={filtered.length === 0}
-          style={{display:'flex',alignItems:'center',gap:'7px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
+          style={{display:'flex',alignItems:'center',gap:'7px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:600,cursor:'pointer',opacity:filtered.length===0?0.4:1}}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export Excel
         </button>
@@ -296,16 +296,15 @@ export default function ResignedUsersPage() {
       </div>
 
       {/*  Filters  */}
-      <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+      <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'nowrap'}}>
         <input type="text" placeholder="Search name, initial, email, org, PCC" value={search} onChange={e => setSearch(e.target.value)}
-          style={{...inp(), width:'280px'}} />
-        <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} style={inp({width:'140px'})}>
+          style={{...inp(), flex:'1 1 auto', minWidth:'120px'}} />
+        <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)} style={inp({width:'140px', flex:'0 0 auto'})}>
           <option value="all">All GDS</option>
           <option value="Amadeus">Amadeus</option>
           <option value="Sabre">Sabre</option>
           <option value="Travelport">Travelport</option>
         </select>
-        <span style={{fontSize:'12px',color:'#94a3b8',marginLeft:'4px'}}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
         {(search || filterGDS !== 'all') && (
           <button onClick={() => { setSearch(''); setFilterGDS('all') }}
             style={{display:'flex',alignItems:'center',justifyContent:'center',width:'32px',height:'32px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'7px',cursor:'pointer',color:'#64748b'}}>
@@ -315,11 +314,8 @@ export default function ResignedUsersPage() {
       </div>
 
       {/*  Table  */}
-            <div style={{display:'flex', alignItems:'center', padding:'10px 16px', background:T.card, border:'1px solid #e2e8f0', borderRadius:'6px', marginBottom:'12px'}}>
-        <span style={{fontSize:'13px', color:'#94a3b8'}}>Showing {filtered.length} record{filtered.length!==1?'s':''}</span>
-      </div>
-{loading ? (
-        <div style={{textAlign:'center',padding:'60px',color:'#94a3b8',fontSize:'14px'}}>Loading</div>
+      {loading ? (
+        <div style={{textAlign:'center',padding:'60px',color:'#94a3b8',fontSize:'16px'}}>Loading</div>
       ) : filtered.length === 0 ? (
         <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px',textAlign:'center',color:'#94a3b8'}}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
@@ -333,7 +329,7 @@ export default function ResignedUsersPage() {
               <thead>
                 <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
                   {['GDS','PCC / Login','Full Name','Email','Initial','CTA','PTA','Minicom','Date Created','Date Resigned',''].map(h => (
-                    <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
+                    <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:'15px',fontWeight:700,color:'#121113',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -347,28 +343,28 @@ export default function ResignedUsersPage() {
                       onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
                       onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
                       <td style={{padding:'11px 14px'}}>
-                        <span style={{fontSize:'11px',fontWeight:700,padding:'3px 9px',borderRadius:'20px',background:gds.bg,color:gds.color,border:`1px solid ${gds.border}`}}>{r.source_gds}</span>
+                        <span style={{fontSize:'15px',fontWeight:700,padding:'3px 9px',borderRadius:'20px',background:gds.bg,color:gds.color,border:`1px solid ${gds.border}`}}>{r.source_gds}</span>
                       </td>
                       <td style={{padding:'11px 14px'}}>
                         <div style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#0f172a'}}>{pcc !== '' ? pcc : ''}</div>
-                        <div style={{fontFamily:'monospace',fontSize:'11px',color:'#64748b'}}>{loginId}</div>
+                        <div style={{fontFamily:'monospace',fontSize:'15px',color:'#64748b'}}>{loginId}</div>
                       </td>
-                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'13px'}}>{r.full_name ?? ''}</td>
-                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'12px'}}>{r.email ?? ''}</td>
+                      <td style={{padding:'11px 14px',fontWeight:600,color:'#0f172a',fontSize:'15px'}}>{r.full_name ?? ''}</td>
+                      <td style={{padding:'11px 14px',color:'#0369a1',fontSize:'15px'}}>{r.email ?? ''}</td>
                       <td style={{padding:'11px 14px'}}>
                         {r.initial
-                          ? <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'14px',color:'#7c3aed',background:'#f3e8ff',padding:'2px 8px',borderRadius:'5px'}}>{r.initial}</span>
+                          ? <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'15px',color:'#7c3aed',background:'#f3e8ff',padding:'2px 8px',borderRadius:'5px'}}>{r.initial}</span>
                           : <span style={{color:'#cbd5e1'}}></span>}
                       </td>
                       <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.cta ?? ''}</span></td>
                       <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.pta ?? ''}</span></td>
                       <td style={{padding:'11px 14px'}}><span style={{fontFamily:'monospace',fontSize:'13px',color:'#334155'}}>{r.minicom ?? ''}</span></td>
                       <td style={{padding:'11px 14px',fontSize:'16px',color:'#64748b',whiteSpace:'nowrap'}}>{fmt(r.date_created_in_gds)}</td>
-                      <td style={{padding:'11px 14px',fontSize:'12px',color:'#dc2626',fontWeight:600,whiteSpace:'nowrap'}}>{fmt(r.date_resigned)}</td>
+                      <td style={{padding:'11px 14px',fontSize:'15px',color:'#dc2626',fontWeight:600,whiteSpace:'nowrap'}}>{fmt(r.date_resigned)}</td>
                       <td style={{padding:'11px 14px'}}>
                         {isAdmin && (
                           <button onClick={() => openDetail(r)}
-                            style={{fontSize:'12px',padding:'4px 12px',borderRadius:'6px',border:'1px solid #e2e8f0',background:T.card,color:'#475569',cursor:'pointer',fontWeight:500,whiteSpace:'nowrap'}}>
+                            style={{fontSize:'15px',padding:'4px 12px',borderRadius:'6px',border:'1px solid #e2e8f0',background:T.card,color:'#475569',cursor:'pointer',fontWeight:500,whiteSpace:'nowrap'}}>
                             View / Edit
                           </button>
                         )}
