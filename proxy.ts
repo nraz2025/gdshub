@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/pcc', '/login', '/reset-password']
+const PUBLIC_ROUTES = ['/login', '/reset-password']
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -29,11 +29,11 @@ export async function proxy(request: NextRequest) {
   const isPublic = PUBLIC_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'))
 
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/pcc', request.url))
+    return NextResponse.redirect(new URL(user ? '/dashboard' : '/login', request.url))
   }
 
   if (!user && !isPublic) {
-    return NextResponse.redirect(new URL('/pcc', request.url))
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   if (user && pathname === '/login') {

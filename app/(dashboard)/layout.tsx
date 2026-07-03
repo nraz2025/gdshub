@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import ConditionalSidebar from '@/components/layout/ConditionalSidebar'
 import TopBar from '@/components/layout/TopBar'
 import IdleLogout from '@/components/shared/IdleLogout'
-import PublicTopBar from '@/components/layout/PublicTopBar'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -11,16 +11,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // If not logged in — show public minimal layout (no sidebar)
+  // No session — send to login. All dashboard routes require authentication.
   if (!user) {
-    return (
-      <div className="min-h-screen" style={{background:'#f7f9fb'}}>
-        <PublicTopBar />
-        <main className="px-8 py-6">
-          {children}
-        </main>
-      </div>
-    )
+    redirect('/login')
   }
 
   // Logged in — full layout with sidebar

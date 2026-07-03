@@ -33,13 +33,13 @@ const ROLE_CONFIG: Record<string, { label: string; badge: string; description: s
 const ALL_MODULES = [
   { key: 'dashboard',         label: 'Dashboard'         },
   { key: 'gds_info',          label: 'GDS Info'          },
-  { key: 'gds_functionality', label: 'GDS Functionality' },
+  { key: 'gds_functionality', label: 'GDS Features' },
   { key: 'organisation',      label: 'Organisation'      },
   { key: 'gds',               label: 'GDS'               },
   { key: 'sabre_users',       label: 'Sabre Users'       },
   { key: 'amadeus_users',     label: 'Amadeus Users'     },
   { key: 'travelport_users',  label: 'Travelport Users'  },
-  { key: 'client',            label: 'Client'            },
+  { key: 'client',            label: 'PCC Group'         },
   { key: 'users',             label: 'Users'             },
   { key: 'admin_panel',       label: 'Admin Panel'       },
 ]
@@ -164,14 +164,19 @@ export default function AdminPage() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         {(['admin', 'manager', 'user', 'none'] as const).map(role => {
           const cfg = ROLE_CONFIG[role]
+          const count = roleCounts[role] ?? 0
           return (
-            <div key={role} className="bg-white border border-slate-200 rounded-xl px-5 py-4">
+            <button key={role} onClick={() => setFilterRole(role)}
+              className={`text-left bg-white border rounded-xl px-5 py-4 transition-colors ${filterRole === role ? 'border-blue-400 ring-1 ring-blue-200' : 'border-slate-200 hover:border-slate-300'}`}>
               <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${cfg.badge}`}>{cfg.label}</span>
-                <span className="text-2xl font-bold text-slate-700">{roleCounts[role] ?? 0}</span>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${cfg.badge}`}>
+                  {role === 'none' && count > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+                  {cfg.label}
+                </span>
+                <span className="text-2xl font-bold text-slate-700">{count}</span>
               </div>
-              <p className="text-xs text-slate-400">{cfg.description}</p>
-            </div>
+              <p className="text-xs text-slate-400">{role === 'none' && count > 0 ? `${count} new sign-up${count !== 1 ? 's' : ''} awaiting a role` : cfg.description}</p>
+            </button>
           )
         })}
       </div>

@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { nav } from './nav-items'
+import { createClient } from '@/lib/supabase/client'
 
 type UserRole = 'admin' | 'manager' | 'user'
 
@@ -16,6 +18,25 @@ interface SidebarProps {
 export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
   const pathname = usePathname()
   const userRole = role ?? (isAdmin ? 'admin' : 'user')
+  const [pendingSignups, setPendingSignups] = useState(0)
+
+  // Poll for users awaiting a role assignment (new signups) — admin only.
+  useEffect(() => {
+    if (userRole !== 'admin') return
+    const supabase = createClient()
+
+    async function fetchPending() {
+      const { count } = await supabase
+        .from('user_profile_view')
+        .select('id', { count: 'exact', head: true })
+        .is('role', null)
+      setPendingSignups(count ?? 0)
+    }
+
+    fetchPending()
+    const interval = setInterval(fetchPending, 60000) // refresh every 60s
+    return () => clearInterval(interval)
+  }, [userRole])
 
   const visibleNav = nav.filter(item => {
     if (permMap) return permMap[item.module]?.can_access === true
@@ -70,7 +91,17 @@ export default function Sidebar({ isAdmin, role, permMap }: SidebarProps) {
             onMouseOut={e => { if (!active) { const el = e.currentTarget; el.style.background = 'transparent'; el.style.color = 'rgba(255,255,255,0.75)' }}}>
               <span style={{flexShrink: 0, opacity: active ? 1 : 0.65}}>{item.icon}</span>
               <span>{item.label}</span>
-              {active && <span style={{marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#6EE7B7', flexShrink: 0}} />}
+              {item.module === 'admin_panel' && pendingSignups > 0 && (
+                <span style={{
+                  marginLeft: 'auto', minWidth: '18px', height: '18px', padding: '0 5px',
+                  borderRadius: '9px', background: '#EF4444', color: 'white',
+                  fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 0 2px rgba(13,61,38,0.9)',
+                }}>
+                  {pendingSignups > 99 ? '99+' : pendingSignups}
+                </span>
+              )}
+              {active && item.module !== 'admin_panel' && <span style={{marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#6EE7B7', flexShrink: 0}} />}
             </Link>
           )
         })}

@@ -348,9 +348,9 @@ export default function UsersPage() {
           </div>
         </div>
         {/* ── Data Table ── */}
-        <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
+        <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflowX:'auto', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
           {/* Header */}
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 170px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(140px,1fr) minmax(170px,170px)', minWidth:'770px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
             {['User', 'Status', 'OTA Client', 'Created', 'Actions'].map((h, i) => (
               <div key={h} style={{padding:'14px 20px', fontSize:'16px', fontWeight:700, color:'#000000ff', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
                 {h}
@@ -370,7 +370,7 @@ export default function UsersPage() {
               const fullName = `${u.first_name} ${u.last_name}`
               return (
                 <div key={u.id}
-                  style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 170px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
+                  style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(140px,1fr) minmax(170px,170px)', minWidth:'770px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                   onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
