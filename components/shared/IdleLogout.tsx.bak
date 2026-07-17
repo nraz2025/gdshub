@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-const IDLE_MINUTES = 30
+const IDLE_MINUTES = 15
 const IDLE_MS = IDLE_MINUTES * 60 * 1000
 const WARNING_MS = 60 * 1000 // warn 1 min before logout
 

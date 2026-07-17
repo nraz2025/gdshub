@@ -88,6 +88,10 @@ export default function SabreUsersPage() {
   const [editing, setEditing] = useState<SabreUser | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deletingLicenseId, setDeletingLicenseId] = useState<string | null>(null)
+  const [showLicenseHistory, setShowLicenseHistory] = useState(false)
+  const [licenseHistory, setLicenseHistory] = useState<{id:number;pcc:string|null;cta:string|null;pta:string|null;minicom:string|null;resigned_full_name:string|null;resigned_email:string|null;deleted_by:string|null;deleted_at:string}[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [nextEpr, setNextEpr] = useState<string | null>(null)
   const [loadingEpr, setLoadingEpr] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -379,6 +383,41 @@ export default function SabreUsersPage() {
   const activePtaSet     = new Set(records.map(r => (r.pta ?? '').trim().toUpperCase()).filter(v => v !== ''))
   const activeMinicomSet = new Set(records.map(r => (r.minicom ?? '').trim().toUpperCase()).filter(v => v !== ''))
 
+  //  Delete an available-license row (logs it, then removes the resigned_user record entirely) 
+  async function deleteLicense(id: string) {
+    if (!confirm('Delete this available license record? This permanently removes it from the database and it will no longer be offered for reassignment. This action will be logged.')) return
+    setDeletingLicenseId(id)
+    const row = resignedUsers.find(r => r.id === id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (row) {
+      const { error: logErr } = await supabase.from('license_deletion_log').insert({
+        source_gds:          'Sabre',
+        pcc:                 row.pcc ?? row.sabre_pcc ?? null,
+        cta:                 row.cta ?? null,
+        pta:                 row.pta ?? null,
+        minicom:             row.minicom ?? null,
+        resigned_user_id:    row.id,
+        resigned_full_name:  row.full_name ?? null,
+        resigned_email:      row.email ?? null,
+        deleted_by:          user?.email ?? null,
+      })
+      if (logErr) { setError(`Could not log deletion history: ${logErr.message}`); setDeletingLicenseId(null); return }
+    }
+    const { error: e } = await supabase.from('resigned_user').delete().eq('id', id)
+    if (e) { setError(e.message); setDeletingLicenseId(null); return }
+    setResignedUsers(prev => prev.filter(r => r.id !== id))
+    setDeletingLicenseId(null)
+  }
+
+  async function loadLicenseHistory() {
+    setLoadingHistory(true); setError('')
+    const { data, error: e } = await supabase.from('license_deletion_log').select('*').eq('source_gds', 'Sabre').order('deleted_at', { ascending: false })
+    if (e) { setError(e.message); setLoadingHistory(false); return }
+    setLicenseHistory(data ?? [])
+    setLoadingHistory(false)
+    setShowLicenseHistory(true)
+  }
+
   // A resigned license row only qualifies if it has at least one non-empty license value.
   // It's hidden once every non-empty value (CTA/PTA/Minicom) has been reused elsewhere.
   const availableLicenses = resignedUsers.filter(row => {
@@ -586,23 +625,36 @@ export default function SabreUsersPage() {
         {/* Available License — PCC, CTA, PTA, Minicom from resigned/deleted users, reusable */}
         {!loading && availableLicenses.length > 0 && (
           <div style={{marginTop:'24px'}}>
+            {error && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'12px'}}>{error}</div>}
             <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
               <span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#059669'}} />
               <h3 style={{fontSize:'15px',fontWeight:700,color:'#065F46',margin:0}}>Available License</h3>
               <span style={{fontSize:'12px',fontWeight:600,padding:'2px 8px',borderRadius:'20px',background:'#ECFDF5',color:'#065F46',border:'1px solid #6EE7B7'}}>{availableLicenses.length}</span>
+              <button onClick={loadLicenseHistory} disabled={loadingHistory}
+                style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,color:'#475569',background:T.card,border:`1px solid ${T.border}`,borderRadius:'7px',padding:'6px 12px',cursor:'pointer'}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {loadingHistory ? 'Loading' : 'View Deletion History'}
+              </button>
             </div>
             <div style={{background:'#FFFFFF',border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr',background:'#ECFDF5',borderBottom:'2px solid #6EE7B7'}}>
-                {['PCC','CTA','PTA','Minicom'].map(h=>(
-                  <div key={h} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',borderRight:'1px solid #d1fae5'}}>{h}</div>
+              <div style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr',background:'#ECFDF5',borderBottom:'2px solid #6EE7B7'}}>
+                {['PCC','CTA','PTA','Minicom',''].map(h=>(
+                  <div key={h||'actions'} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',borderRight: h ? '1px solid #d1fae5' : 'none'}}>{h}</div>
                 ))}
               </div>
               {availableLicenses.map((row, i) => (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr',borderBottom:i<availableLicenses.length-1?`1px solid ${T.border}`:'none'}}>
+                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr',borderBottom:i<availableLicenses.length-1?`1px solid ${T.border}`:'none'}}>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.cta??'-'}</span></div>
                   <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.pta??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.minicom??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.minicom??'-'}</span></div>
+                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}>
+                    <button onClick={() => deleteLicense(row.id)} disabled={deletingLicenseId === row.id}
+                      style={{display:'flex',alignItems:'center',gap:'5px',padding:'5px 10px',fontSize:'12px',fontWeight:600,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',cursor:'pointer',opacity:deletingLicenseId===row.id?0.6:1}}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      {deletingLicenseId === row.id ? 'Deleting' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -813,6 +865,46 @@ export default function SabreUsersPage() {
           </div>
         </div>
       </Modal>
+
+      {/*  Deletion History Modal  */}
+      {showLicenseHistory && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50}} onClick={() => setShowLicenseHistory(false)}>
+          <div style={{background:T.card,borderRadius:'14px',width:'720px',maxWidth:'92vw',maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.25)'}} onClick={e => e.stopPropagation()}>
+            <div style={{padding:'16px 22px',borderBottom:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <h3 style={{fontSize:'16px',fontWeight:700,color:T.text,margin:0}}>Available License — Deletion History</h3>
+              <button onClick={() => setShowLicenseHistory(false)} style={{background:'none',border:'none',cursor:'pointer',color:T.textLight,fontSize:'18px',lineHeight:1}}>✕</button>
+            </div>
+            <div style={{padding:'0',overflowY:'auto'}}>
+              {licenseHistory.length === 0 ? (
+                <div style={{padding:'40px',textAlign:'center',color:T.textLight,fontSize:'13px'}}>No deletions logged yet.</div>
+              ) : (
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+                  <thead style={{position:'sticky',top:0,background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`}}>
+                    <tr>
+                      {['PCC','CTA','PTA','Minicom','Resigned User','Deleted By','Deleted At'].map(h => (
+                        <th key={h} style={{padding:'9px 12px',textAlign:'left',fontWeight:700,color:T.textMid,textTransform:'uppercase',letterSpacing:'0.05em',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {licenseHistory.map((h, i) => (
+                      <tr key={h.id} style={{borderBottom: i < licenseHistory.length - 1 ? `1px solid ${T.border}` : 'none'}}>
+                        <td style={{padding:'9px 12px',fontFamily:'monospace'}}>{h.pcc ?? '-'}</td>
+                        <td style={{padding:'9px 12px',fontFamily:'monospace'}}>{h.cta ?? '-'}</td>
+                        <td style={{padding:'9px 12px',fontFamily:'monospace'}}>{h.pta ?? '-'}</td>
+                        <td style={{padding:'9px 12px',fontFamily:'monospace'}}>{h.minicom ?? '-'}</td>
+                        <td style={{padding:'9px 12px',color:T.textMid}}>{h.resigned_full_name ?? h.resigned_email ?? '-'}</td>
+                        <td style={{padding:'9px 12px',color:T.textMid}}>{h.deleted_by ?? '-'}</td>
+                        <td style={{padding:'9px 12px',color:T.textMid,whiteSpace:'nowrap'}}>{new Date(h.deleted_at).toLocaleString('en-GB')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
