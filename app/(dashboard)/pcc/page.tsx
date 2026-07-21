@@ -145,7 +145,7 @@ export default function GDSInfoPage() {
       const role = profile?.role ?? 'user'
       setIsAdmin(role === 'admin' || role === 'manager')
     }
-    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }] = await Promise.all([
+    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }] = await Promise.all([
       supabase.from('pcc_list').select(`
         *, gds:gds_id(id, name),
         organisation:org_id(id, organisation, iata),
@@ -160,6 +160,7 @@ export default function GDSInfoPage() {
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
       supabase.from('gds_features').select('*, pricing_tiers').order('label'),
+      supabase.from('billing_cycles').select('value, label').order('sort_order'),
     ])
     const sorted = (pccData ?? []).slice().sort((a, b) => {
       const orgA = (a.organisation as { organisation: string } | undefined)?.organisation ?? ''
@@ -175,6 +176,7 @@ export default function GDSInfoPage() {
     setOtaClients(otaData ?? [])
     setFuncList(funcData ?? [])
     setAllFeatures(featData ?? [])
+    setBillingCycles(cycleData ?? [])
     setLoading(false)
   }
 
@@ -284,7 +286,7 @@ export default function GDSInfoPage() {
       const featCosts = pccFeats.map(pf => {
         const f = pf.gds_features
         if (!f) return ''
-        return f.cost ? `${f.currency ?? ''} ${f.cost} ${f.billing_cycle ?? ''}`.trim() : ''
+        return f.cost ? `${f.currency ?? ''} ${f.cost} ${cycleLabel(f.billing_cycle)}`.trim() : ''
       }).filter(Boolean).join(', ')
       return {
         'No.':                  i + 1,
@@ -457,6 +459,27 @@ export default function GDSInfoPage() {
 
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
+
+  const [billingCycles, setBillingCycles] = useState<{value:string;label:string}[]>([])
+
+  // Look up the proper unit-of-measure label from the billing_cycles table.
+  // Falls back to a prettified version of the raw code for legacy values that were
+  // never registered there (e.g. old free-typed codes like "transactionmonth").
+  function cycleLabel(raw?: string): string {
+    if (!raw) return ''
+    const match = billingCycles.find(c => c.value === raw)
+    if (match) return match.label
+    return raw
+      .replace(/_/g, ' ')                          // snake_case -> spaced
+      .replace(/([a-z])([A-Z])/g, '$1 $2')          // camelCase -> spaced
+      .replace(/(\d)([a-z])/gi, '$1 $2')            // 100monthly -> 100 monthly
+      .replace(/\b(oid)\b/gi, 'OID')                // known acronym
+      .replace(/\b(transaction)(month|year)\b/gi, '$1 / $2')  // transactionmonth -> transaction / month
+      .split(' ')
+      .map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
+      .join(' ')
+      .replace(/Oid/g, 'OID')
+  }
 
   // Features for popup  only those matching the PCC's GDS
   const popupGdsId = featurePopup ? featurePopup.gds_id : null
@@ -1010,7 +1033,7 @@ export default function GDSInfoPage() {
                             <div className="flex items-center gap-2 mt-0.5">
                               {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
                               {f.billing_cycle && costStr && <span className="text-xs text-slate-300"></span>}
-                              {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
+                              {f.billing_cycle && <p className="text-xs text-slate-400">{cycleLabel(f.billing_cycle as string)}</p>}
                             </div>
                           </div>
                         </div>
@@ -1058,7 +1081,7 @@ export default function GDSInfoPage() {
                                   <button onClick={() => setTierModalFeature({label: f.label, tiers: (f as {pricing_tiers: {sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]}).pricing_tiers})} className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium"> Tiers</button>
                                 )}
                                 {f.billing_cycle && <span className="text-xs text-slate-300"></span>}
-                                {f.billing_cycle && <p className="text-xs text-slate-400">{f.billing_cycle}</p>}
+                                {f.billing_cycle && <p className="text-xs text-slate-400">{cycleLabel(f.billing_cycle as string)}</p>}
                               </div>
                             </div>
                           </div>
