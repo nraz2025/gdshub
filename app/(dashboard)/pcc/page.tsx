@@ -59,8 +59,8 @@ const PCC_FUNC_COLORS: Record<string, string> = {
   'Profile':             'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Fareview':            'bg-amber-50 text-amber-700 border-amber-200',
   'Cert PCC':            'bg-rose-50 text-rose-700 border-rose-200',
+  'SCVB':                'bg-teal-50 text-teal-700 border-teal-200',
 }
-const PCC_FUNCTIONALITY = ['Booking Only', 'Booking & Ticketing', 'Profile', 'Fareview', 'Cert PCC'] as const
 
 const EMPTY: Partial<PCCList> = {
   gds_id: undefined, pcc: '', status: 'Active',
@@ -145,7 +145,7 @@ export default function GDSInfoPage() {
       const role = profile?.role ?? 'user'
       setIsAdmin(role === 'admin' || role === 'manager')
     }
-    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }] = await Promise.all([
+    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
       supabase.from('pcc_list').select(`
         *, gds:gds_id(id, name),
         organisation:org_id(id, organisation, iata),
@@ -161,6 +161,7 @@ export default function GDSInfoPage() {
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
       supabase.from('gds_features').select('*, pricing_tiers').order('label'),
       supabase.from('billing_cycles').select('value, label').order('sort_order'),
+      supabase.from('pcc_functionality_options').select('id, name').order('sort_order'),
     ])
     const sorted = (pccData ?? []).slice().sort((a, b) => {
       const orgA = (a.organisation as { organisation: string } | undefined)?.organisation ?? ''
@@ -177,6 +178,7 @@ export default function GDSInfoPage() {
     setFuncList(funcData ?? [])
     setAllFeatures(featData ?? [])
     setBillingCycles(cycleData ?? [])
+    setPccFunctionalityOptions(pccFuncOptData ?? [])
     setLoading(false)
   }
 
@@ -461,6 +463,10 @@ export default function GDSInfoPage() {
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
   const [billingCycles, setBillingCycles] = useState<{value:string;label:string}[]>([])
+  const [pccFunctionalityOptions, setPccFunctionalityOptions] = useState<{id:number;name:string}[]>([])
+  const [addingFunctionality, setAddingFunctionality] = useState(false)
+  const [newFunctionalityName, setNewFunctionalityName] = useState('')
+  const [savingFunctionality, setSavingFunctionality] = useState(false)
 
   // Look up the proper unit-of-measure label from the billing_cycles table.
   // Falls back to a prettified version of the raw code for legacy values that were
@@ -479,6 +485,26 @@ export default function GDSInfoPage() {
       .map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
       .join(' ')
       .replace(/Oid/g, 'OID')
+  }
+
+  async function addPccFunctionalityOption(name: string): Promise<string | null> {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    setSavingFunctionality(true)
+    const nextSort = pccFunctionalityOptions.length > 0 ? Math.max(...pccFunctionalityOptions.map((_, i) => i)) + 1 : 1
+    const { data, error: e } = await supabase.from('pcc_functionality_options')
+      .insert({ name: trimmed, sort_order: nextSort })
+      .select('id, name').single()
+    setSavingFunctionality(false)
+    if (e) {
+      // Unique violation just means it already exists — use the existing one instead of failing.
+      const existing = pccFunctionalityOptions.find(o => o.name.toLowerCase() === trimmed.toLowerCase())
+      if (existing) return existing.name
+      alert(`Could not add functionality: ${e.message}`)
+      return null
+    }
+    setPccFunctionalityOptions(prev => [...prev, data])
+    return data.name
   }
 
   // Features for popup  only those matching the PCC's GDS
@@ -543,7 +569,7 @@ export default function GDSInfoPage() {
         const val = row.pcc_functionality
         const colors: Record<string,string> = {
           'Booking Only':'#0891b2','Booking & Ticketing':'#7c3aed',
-          'Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626'
+          'Profile':'#059669','Fareview':'#d97706','Cert PCC':'#dc2626','SCVB':'#0d9488'
         }
         return val
           ? <span style={{fontSize:'12px',fontWeight:500,color:colors[val]??'#334155',textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
@@ -904,10 +930,52 @@ export default function GDSInfoPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC Functionality</label>
-            <select value={(form as Partial<PCCList>).pcc_functionality ?? ''} onChange={e => setForm(f => ({ ...f, pcc_functionality: e.target.value || null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value=""> None </option>
-              {PCC_FUNCTIONALITY.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            {!addingFunctionality ? (
+              <select
+                value={(form as Partial<PCCList>).pcc_functionality ?? ''}
+                onChange={e => {
+                  if (e.target.value === '__add_new__') { setNewFunctionalityName(''); setAddingFunctionality(true); return }
+                  setForm(f => ({ ...f, pcc_functionality: e.target.value || null }))
+                }}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+              >
+                <option value=""> None </option>
+                {pccFunctionalityOptions.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+                <option value="__add_new__">+ Add New Functionality…</option>
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text" autoFocus value={newFunctionalityName}
+                  onChange={e => setNewFunctionalityName(e.target.value)}
+                  placeholder="e.g. Group Desk"
+                  className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter') {
+                      const saved = await addPccFunctionalityOption(newFunctionalityName)
+                      if (saved) { setForm(f => ({ ...f, pcc_functionality: saved })); setAddingFunctionality(false) }
+                    }
+                    if (e.key === 'Escape') setAddingFunctionality(false)
+                  }}
+                />
+                <button
+                  type="button" disabled={savingFunctionality || !newFunctionalityName.trim()}
+                  onClick={async () => {
+                    const saved = await addPccFunctionalityOption(newFunctionalityName)
+                    if (saved) { setForm(f => ({ ...f, pcc_functionality: saved })); setAddingFunctionality(false) }
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {savingFunctionality ? 'Saving' : 'Add'}
+                </button>
+                <button
+                  type="button" onClick={() => setAddingFunctionality(false)}
+                  className="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Client Group</label>
