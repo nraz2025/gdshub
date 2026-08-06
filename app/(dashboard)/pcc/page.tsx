@@ -104,7 +104,7 @@ export default function GDSInfoPage() {
   // PCC Assigned login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
-  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null;status:string}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null;status:string}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
   // GDS Feature detail popup
@@ -240,10 +240,10 @@ export default function GDSInfoPage() {
         ? supabase.from('sabre_user').select('id,epr,pcc,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('epr')
         : Promise.resolve({ data: [] }),
       gdsName === 'Amadeus' || !gdsName
-        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid').eq('ota_client_id', pcc.ota_client_id).order('login')
+        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid,status').eq('ota_client_id', pcc.ota_client_id).order('login')
         : Promise.resolve({ data: [] }),
       gdsName === 'Travelport' || !gdsName
-        ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
+        ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc,status').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
         : Promise.resolve({ data: [] }),
     ])
     setLoginPopupData({ sabre: sabreData ?? [], amadeus: amData ?? [], travelport: tpData ?? [] })
@@ -303,7 +303,7 @@ export default function GDSInfoPage() {
         'PCC Functionality':    (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
         'Enabled Features':     featNames,
         'Feature Costs':        featCosts,
-        'Remarks':              r.remarks ?? '',
+        'Remarks':              r.remarks ? r.remarks.split('\n').map(l => chunkText(l.trim(), 50).join('\n')).join('\n') : '',
         'Modified By':          (r as PCCList & {modified_by?: string}).modified_by ?? '',
         'Modified Date':        (r as PCCList & {modified_at?: string}).modified_at
                                   ? new Date((r as PCCList & {modified_at?: string}).modified_at!).toLocaleDateString('en-MY')
@@ -516,6 +516,33 @@ export default function GDSInfoPage() {
   const popupOrg = featurePopup?.organisation as Organisation | undefined
   const popupOta = featurePopup?.ota_client as OTAClient | undefined
 
+  // Split text into chunks of at most maxLen characters, breaking at word boundaries
+  // where possible so a single continuous line never exceeds maxLen characters
+  // regardless of how narrow the container it's rendered in actually is.
+  function chunkText(text: string, maxLen: number): string[] {
+    const words = text.split(' ')
+    const lines: string[] = []
+    let current = ''
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word
+      if (candidate.length > maxLen) {
+        if (current) lines.push(current)
+        if (word.length > maxLen) {
+          // A single word longer than maxLen — hard-break it.
+          let w = word
+          while (w.length > maxLen) { lines.push(w.slice(0, maxLen)); w = w.slice(maxLen) }
+          current = w
+        } else {
+          current = word
+        }
+      } else {
+        current = candidate
+      }
+    }
+    if (current) lines.push(current)
+    return lines
+  }
+
   function fmtCost(cost: number, currency: string, cycle: string) {
     if (!cost) return null
     const amt = new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
@@ -647,16 +674,23 @@ export default function GDSInfoPage() {
     },
     // 8. Remarks
     {
-      key: 'remarks', label: 'Remarks', width: '120px',
+      key: 'remarks', label: 'Remarks', width: '260px',
       render: (row: PCCList) => {
         if (!row.remarks) return <span className="text-slate-300 text-xs">—</span>
         const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
-        return points.length > 1 ? (
-          <ul className="list-disc list-inside space-y-0.5">
-            {points.map((p, i) => <li key={i} className="text-sm text-slate-600">{p}</li>)}
+        return (
+          <ul className="list-disc list-outside pl-4 space-y-0.5">
+            {points.map((p, i) => {
+              const chunks = chunkText(p, 50)
+              return (
+                <li key={i} className="text-sm text-slate-600 break-words">
+                  {chunks.map((line, j) => (
+                    <span key={j}>{line}{j < chunks.length - 1 && <br />}</span>
+                  ))}
+                </li>
+              )
+            })}
           </ul>
-        ) : (
-          <span className="text-sm text-slate-600">{row.remarks}</span>
         )
       }
     },
@@ -1218,7 +1252,7 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Login','Sign-On ID','OID'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Login','Sign-On ID','OID','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.amadeus.map((r,i)=>(
@@ -1226,6 +1260,7 @@ export default function GDSInfoPage() {
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??''}</td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??''}</td>
+                              <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1239,7 +1274,7 @@ export default function GDSInfoPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Sign-On ID','CID','PCC'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Sign-On ID','CID','PCC','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.travelport.map((r,i)=>(
@@ -1247,6 +1282,7 @@ export default function GDSInfoPage() {
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.sign_on_id??''}</span></td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.cid??''}</td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.pcc??''}</td>
+                              <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>
                           ))}
                         </tbody>

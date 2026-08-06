@@ -22,7 +22,7 @@ body {
 
 * { box-sizing: border-box; }
 
-::-webkit-scrollbar { width: 5px; height: 21px; }
+::-webkit-scrollbar { width: 6px; height: 20px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d3d5e7; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #d3d5e7; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

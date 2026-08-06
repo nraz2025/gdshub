@@ -67,7 +67,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           top:0,
           zIndex:20,
           height:'20px',
-          background:'#e2e8f0',
+          background:'transparent',
           border:'1px solid #cbd5e1',
           borderBottom:'none',
           borderRadius:'12px 12px 0 0',
