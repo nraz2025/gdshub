@@ -10,6 +10,7 @@ interface BillingCycle {
 
 const EMPTY = { value: '', label: '', sort_order: 0 }
 
+// Modal styling stays light (shared Modal component not touched this session)
 const T = {
   primary:    '#10B981',
   primaryDk:  '#059669',
@@ -26,19 +27,13 @@ const T = {
   radius:     '12px',
   radiusSm:   '8px',
 }
-const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
-  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
-  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
-  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
-  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
-  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+// Main page dark theme (matches TopNav's System group = coral)
+const D = {
+  bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
+  fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
+  accent: '#f78166', accentSoft: 'rgba(247,129,102,0.10)',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
 }
-
-
 
 export default function BillingCyclesPage() {
   const supabase = createClient()
@@ -108,72 +103,83 @@ export default function BillingCyclesPage() {
   const lbl = { display:'block', fontSize:'12px', fontWeight:600, color:T.textMid, marginBottom:'6px' } as const
 
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:'#f1f5f9', minHeight:'100vh'}}>
-      {/* Header */}
-      <div style={{padding:'20px 28px', marginBottom:'0'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-          <div>
-            <h1 style={{fontSize:'30px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Billing Cycles</h1>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
+      <div style={{padding:'32px 28px 40px'}}>
 
+        {/* Header */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'28px'}}>
+          <div>
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>Billing Cycles</h1>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Define how features and services are measured and billed</p>
           </div>
           {isAdmin && (
             <button onClick={openAdd}
-              style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'16px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-              onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Billing Cycle
             </button>
           )}
         </div>
-      </div>
 
-      <div style={{padding:'0 28px 28px'}}>
         {/* Table */}
         {loading ? (
-          <div style={{textAlign:'center', padding:'60px', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
+          <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'15px'}}>Loading...</div>
+        ) : records.length === 0 ? (
+          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'15px'}}>No billing cycles yet.</div>
         ) : (
-          <div style={{maxWidth:'680px'}}>
-            <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-              {records.length === 0 ? (
-                <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>No billing cycles yet.</div>
-              ) : (
-                <>
-                  <div style={{display:'grid', gridTemplateColumns:'1fr 180px 140px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
-                    {['Unit of Measure', 'Billing Unit', 'Actions'].map((h,i) => (
-                      <div key={h} style={{padding:'12px 16px', fontSize:'11px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i===2 ? 'right' : 'left', borderRight: i<2 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
-                    ))}
-                  </div>
-                  {records.map((row, i) => (
-                    <div key={row.id} style={{display:'grid', gridTemplateColumns:'1fr 180px 140px', borderBottom: i < records.length-1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                      onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                      <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                        <span style={{fontSize:'14px', fontWeight:600, color:'#1e293b'}}>{row.label}</span>
-                      </div>
-                      <div style={{padding:'14px 16px', display:'flex', alignItems:'center', borderRight:'1px solid #f1f5f9'}}>
-                        <span style={{fontFamily:'monospace', fontSize:'12px', fontWeight:500, padding:'4px 10px', borderRadius:'6px', background:'#f1f5f9', color:'#64748b', border:'1px solid #e2e8f0', letterSpacing:'0.02em', whiteSpace:'nowrap'}}>{row.value}</span>
-                      </div>
-                      <div style={{padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
+          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden'}}>
+            <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+              <colgroup>
+                <col style={{width:'40%'}} />
+                <col style={{width:'30%'}} />
+                <col style={{width:'30%'}} />
+              </colgroup>
+              <thead>
+                <tr>
+                  {['Unit of Measure', 'Billing Unit', 'Actions'].map((h, i) => (
+                    <th key={h} style={{padding:'12px 20px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i===2 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((row, i) => (
+                  <tr key={row.id} style={{borderBottom: i < records.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                    onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{padding:'14px 20px', fontSize:'16px', fontWeight:600, color:D.fg}}>{row.label}</td>
+                    <td style={{padding:'14px 20px'}}>
+                      <span style={{display:'inline-flex', alignItems:'center', fontFamily:'monospace', fontSize:'14px', fontWeight:600, padding:'5px 12px', borderRadius:'6px', background:D.accentSoft, color:D.accent, letterSpacing:'0.02em', whiteSpace:'nowrap'}}>{row.value}</span>
+                    </td>
+                    <td style={{padding:'14px 20px'}}>
+                      <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'6px'}}>
                         {isAdmin && (<>
+                          <button onClick={() => moveRow(row.id, 'up')} disabled={i === 0}
+                            style={{width:'30px', height:'30px', display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor: i===0 ? 'default' : 'pointer', opacity: i===0 ? 0.35 : 1}}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                          </button>
+                          <button onClick={() => moveRow(row.id, 'down')} disabled={i === records.length - 1}
+                            style={{width:'30px', height:'30px', display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor: i===records.length-1 ? 'default' : 'pointer', opacity: i===records.length-1 ? 0.35 : 1}}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
                           <button onClick={() => openEdit(row)}
-                            style={{padding:'5px 12px', fontSize:'12px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'6px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                            onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b' }}
-                            onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b' }}>
+                            style={{padding:'7px 14px', fontSize:'14px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                            onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
+                            onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                             Edit
                           </button>
                           <button onClick={() => openDelete(row)}
-                            style={{padding:'5px 12px', fontSize:'12px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'6px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                            onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
-                            onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
+                            style={{padding:'7px 14px', fontSize:'14px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                            onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                            onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                             Delete
                           </button>
                         </>)}
                       </div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -170,7 +170,9 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                             return (
                               <Link key={item.href} href={item.href} onClick={() => setOpenGroup(null)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', fontSize: '14px', fontWeight: active ? 600 : 500, textTransform: 'uppercase', letterSpacing: '0.03em',
-                                  color: active ? g.color : T.fg, background: active ? g.soft : 'transparent', borderRadius: '7px', textDecoration: 'none' }}>
+                                  color: active ? g.color : T.fg, background: active ? g.soft : 'transparent', border: `1.5px solid ${active ? g.border : 'transparent'}`, borderRadius: '7px', textDecoration: 'none', transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s', boxShadow: active ? `0 0 0 3px ${g.soft}` : 'none' }}
+                                onMouseOver={e => { if (!active) { e.currentTarget.style.borderColor = g.border; e.currentTarget.style.background = g.soft; e.currentTarget.style.boxShadow = `0 0 0 3px ${g.soft}` } }}
+                                onMouseOut={e => { if (!active) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none' } }}>
                                 {item.icon} {item.label}
                               </Link>
                             )
@@ -218,7 +220,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
                       style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', fontSize: '13px', fontWeight: active ? 600 : 500,
-                        color: active ? g.color : T.fgDim, background: active ? g.soft : 'transparent', borderRadius: '8px', textDecoration: 'none', marginBottom: '2px' }}>
+                        color: active ? g.color : T.fgDim, background: active ? g.soft : 'transparent', border: `1.5px solid ${active ? g.border : 'transparent'}`, borderRadius: '8px', textDecoration: 'none', marginBottom: '2px' }}>
                       {item.icon} {item.label}
                     </Link>
                   )

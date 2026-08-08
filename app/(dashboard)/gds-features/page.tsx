@@ -7,6 +7,7 @@ import { getAuditFields } from '@/lib/audit'
 import type { GDSFeature, GDS } from '@/types'
 
 
+// Modal styling stays light (shared Modal component not touched this session)
 const T = {
   primary:    '#10B981',
   primaryDk:  '#059669',
@@ -22,6 +23,23 @@ const T = {
   warning:    '#F59E0B',
   radius:     '12px',
   radiusSm:   '8px',
+}
+// Main page dark theme (matches TopNav's GDS group = cyan/teal)
+const D = {
+  bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
+  fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
+  accent: '#39d2c0', accentSoft: 'rgba(57,210,192,0.10)',
+  success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
+  purple: '#a371f7', purpleSoft: 'rgba(163,113,247,0.10)',
+  warning: '#d29922', warningSoft: 'rgba(210,153,34,0.10)',
+  orange: '#f78166', orangeSoft: 'rgba(247,129,102,0.10)',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
+}
+const PROVIDER_COLOR: Record<string, string> = { Sabre: '#f78166', Amadeus: '#39d2c0', Travelport: '#58a6ff' }
+const PROVIDER_GRADIENT: Record<string, string> = {
+  Sabre: 'linear-gradient(135deg,#f78166,#da6b50)',
+  Amadeus: 'linear-gradient(135deg,#39d2c0,#2bb5a5)',
+  Travelport: 'linear-gradient(135deg,#58a6ff,#388bfd)',
 }
 const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
@@ -84,6 +102,7 @@ export default function GDSFunctionalityPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [filterGDS, setFilterGDS] = useState('all')
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
 
   // ADD modal  one name, tick GDS
   const [addOpen, setAddOpen] = useState(false)
@@ -194,14 +213,32 @@ export default function GDSFunctionalityPage() {
   }
 
   //  DISPLAY: group by GDS then sort by label 
-  const filtered = filterGDS === 'all'
-    ? features
-    : features.filter(f => String(f.gds_id) === filterGDS)
+  const filtered = features.filter(f => filterGDS === 'all' || String(f.gds_id) === filterGDS)
 
   const grouped = gdsList.map(gds => ({
     gds,
     features: filtered.filter(f => f.gds_id === gds.id).sort((a, b) => a.label.localeCompare(b.label)),
   })).filter(g => filterGDS === 'all' || String(g.gds.id) === filterGDS)
+
+  function toggleCollapsed(id: number) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // Billing type badge — label + color, derived from real billing_cycles lookup + cost
+  function typeBadge(cost: number, cycleValue?: string): { label: string; color: string; soft: string } {
+    if (!cost) return { label: 'Free', color: D.success, soft: D.successSoft }
+    const raw = (cycleValue ?? '').toLowerCase()
+    const cycleLabel = billingCycles.find(c => c.value === cycleValue)?.label
+    if (raw.includes('transaction')) return { label: cycleLabel ?? 'Per Transaction', color: D.accent, soft: D.accentSoft }
+    if (raw.includes('year')) return { label: cycleLabel ?? 'Yearly', color: D.warning, soft: D.warningSoft }
+    if (raw.includes('one_time') || raw.includes('onetime')) return { label: cycleLabel ?? 'One-time', color: D.orange, soft: D.orangeSoft }
+    if (raw.includes('month')) return { label: cycleLabel ?? 'Monthly', color: D.purple, soft: D.purpleSoft }
+    return { label: cycleLabel ?? (cycleValue || 'Custom'), color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' }
+  }
 
   const editGdsName = editTarget ? (editTarget.gds as GDS)?.name ?? '' : ''
 
@@ -210,128 +247,128 @@ export default function GDSFunctionalityPage() {
   const tpCount = features.filter(r=>(r.gds as {name?:string})?.name==='Travelport').length
 
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:'#f1f5f9', minHeight:'100vh'}}>
-      {/* Header */}
-      <div style={{padding:'20px 28px',marginBottom:'0'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
+      <div style={{padding:'32px 28px 40px'}}>
+
+        {/* Header */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'28px'}}>
           <div>
-            <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>GDS Features</h1>
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>GDS Features</h1>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Configure features and pricing for each GDS provider</p>
           </div>
           {isAdmin && (
             <button onClick={openAdd}
-              style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-              onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Feature
             </button>
           )}
         </div>
-      </div>
-      <div style={{padding:'0 28px 28px'}}>
-        {/* Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px',marginBottom:'24px'}}>
-          {[{label:'Sabre Features',value:sabreCount},{label:'Amadeus Features',value:amadeusCount},{label:'Travelport Features',value:tpCount,highlighted:true}].map((s,i)=>(
-            <div key={i}
-              style={{
-                position:'relative', overflow:'hidden',
-                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
-                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
-                borderRadius:'12px', padding:'20px',
-                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
-                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-              }}
-              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
-              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
-              <div style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8',marginBottom:'8px'}}>{s.label}</div>
-              <div style={{fontSize:'32px',fontWeight:700,color: s.highlighted ? 'white' : '#1e293b',lineHeight:1}}>{s.value}</div>
-            </div>
+
+        {/* Filter bar */}
+        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px', flexWrap:'wrap'}}>
+          <button onClick={() => setFilterGDS('all')}
+            style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, border:`1px solid ${filterGDS==='all' ? D.accent : D.border}`, borderRadius:'20px', background: filterGDS==='all' ? D.accentSoft : 'transparent', color: filterGDS==='all' ? D.accent : D.fgMuted, cursor:'pointer'}}>
+            All
+          </button>
+          {gdsList.map(g => (
+            <button key={g.id} onClick={() => setFilterGDS(String(g.id))}
+              style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, border:`1px solid ${filterGDS===String(g.id) ? (PROVIDER_COLOR[g.name] ?? D.accent) : D.border}`, borderRadius:'20px', background: filterGDS===String(g.id) ? `${PROVIDER_COLOR[g.name] ?? D.accent}1A` : 'transparent', color: filterGDS===String(g.id) ? (PROVIDER_COLOR[g.name] ?? D.accent) : D.fgMuted, cursor:'pointer'}}>
+              {g.name}
+            </button>
           ))}
         </div>
-        {/* Filter */}
-        <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'24px'}}>
-          <select value={filterGDS} onChange={e => setFilterGDS(e.target.value)}
-            style={{padding:'10px 32px 10px 14px',fontSize:'14px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
-            <option value="all">All GDS</option>
-            {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-          </select>
-          {!loading && <span style={{fontSize:'14px',color:'#64748b'}}><strong style={{color:'#1a5f3c'}}>{filtered.length}</strong> feature{filtered.length !== 1 ? 's' : ''}</span>}
-        </div>
 
-      {loading ? (
-        <div className="text-center py-16 text-slate-400 text-sm">Loading</div>
-      ) : (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', alignItems:'start', gap:'24px'}}>
-          {grouped.map(({ gds, features: gdsFeatures }) => {
-            const badgeStyle: Record<string,{color:string;bg:string;border:string}> = {
-              Amadeus:    { color:'#a855f7', bg:'#f3e8ff', border:'#e9d5ff' },
-              Sabre:      { color:'#3b82f6', bg:'#eff6ff', border:'#dbeafe' },
-              Travelport: { color:'#10b981', bg:'#f0fdf4', border:'#bbf7d0' },
-            }
-            const b = badgeStyle[gds.name] ?? { color:'#64748b', bg:'#f1f5f9', border:'#e2e8f0' }
+        {/* Collapsible GDS Sections */}
+        {loading ? (
+          <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>Loading</div>
+        ) : (
+          grouped.map(({ gds, features: gdsFeatures }) => {
+            const isCollapsed = collapsed.has(gds.id)
+            const pColor = PROVIDER_COLOR[gds.name] ?? D.accent
             return (
-              <div key={gds.id} style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-                {/* GDS column header */}
-                <div style={{display:'flex', alignItems:'center', gap:'12px', padding:'16px 20px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc'}}>
-                  <span style={{display:'inline-flex', alignItems:'center', padding:'6px 14px', borderRadius:'9999px', fontSize:'12px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:b.color, background:b.bg, border:`1px solid ${b.border}`}}>{gds.name}</span>
-                  <span style={{fontSize:'13px', color:'#94a3b8'}}>{gdsFeatures.length} feature{gdsFeatures.length !== 1 ? 's' : ''}</span>
+              <div key={gds.id} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden', marginBottom:'16px'}}>
+                <div onClick={() => toggleCollapsed(gds.id)}
+                  style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 22px', cursor:'pointer', userSelect:'none'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'14px'}}>
+                    <div style={{width:'40px', height:'40px', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', fontWeight:700, color:'#fff', flexShrink:0, background: PROVIDER_GRADIENT[gds.name] ?? `linear-gradient(135deg,${pColor},${pColor})`}}>
+                      {gds.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'19px', fontWeight:600, color:D.fg, textTransform:'uppercase'}}>{gds.name}</span>
+                    <span style={{fontSize:'13px', fontWeight:600, padding:'3px 10px', borderRadius:'20px', background:`${pColor}1A`, color:pColor}}>{gdsFeatures.length} feature{gdsFeatures.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition:'transform 0.2s'}}><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
 
-                {gdsFeatures.length === 0 ? (
-                  <p style={{fontSize:'14px', color:'#94a3b8', fontStyle:'italic', padding:'20px'}}>No features yet for {gds.name}.</p>
-                ) : (
-                  <ul style={{listStyle:'none', padding:0, margin:0}}>
-                    {gdsFeatures.map((f, i) => {
-                      const costStr = fmtCost(f.cost, f.currency)
-                      const cycleLabel = billingCycles.find(c => c.value === f.billing_cycle)?.label ?? ''
-                      const isLast = i === gdsFeatures.length - 1
-                      return (
-                        <li key={f.id} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', borderBottom: isLast ? 'none' : '1px solid #e2e8f0', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                          onMouseEnter={e => (e.currentTarget.style.background='#f8fafc')}
-                          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
-                          {/* Feature info */}
-                          <div style={{display:'flex', alignItems:'center', gap:'14px', flex:1, minWidth:0}}>
-                            <span style={{width:'32px', height:'32px', borderRadius:'50%', background:'#f8fafc', border:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', flexShrink:0}}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                            </span>
-                            <div style={{minWidth:0}}>
-                              <div style={{fontSize:'14px', fontWeight:600, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{f.label}</div>
-                              <div style={{fontSize:'11px', color:'#94a3b8', fontFamily:'monospace'}}>{f.key}</div>
-                            </div>
-                          </div>
-                          {/* Cost */}
-                          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'2px', marginRight:'16px', minWidth:'120px'}}>
-                            {costStr
-                              ? <><div style={{fontSize:'14px', fontWeight:600, color:'#1e293b', whiteSpace:'nowrap'}}>{costStr}</div><div style={{fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap'}}>{cycleLabel}</div></>
-                              : <div style={{fontSize:'14px', fontWeight:600, color:'#94a3b8'}}>No cost</div>}
-                          </div>
-                          {/* Actions */}
-                          {isAdmin && (
-                            <div style={{display:'flex', gap:'8px', flexShrink:0}}>
-                              <button onClick={() => openEdit(f)}
-                                style={{padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:500, cursor:'pointer', border:'1px solid #e2e8f0', background:'#ffffff', color:'#64748b', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
-                                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
-                                Edit
-                              </button>
-                              <button onClick={() => { setDeleteTarget(f); setDeleteOpen(true) }}
-                                style={{padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:500, cursor:'pointer', border:'1px solid #fecaca', background:'#ffffff', color:'#ef4444', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                                onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
-                                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
+                {!isCollapsed && (
+                  gdsFeatures.length === 0 ? (
+                    <div style={{padding:'32px 20px', textAlign:'center', borderTop:`1px solid ${D.border}`}}>
+                      <p style={{fontSize:'15px', color:D.fgDim}}>No features configured for {gds.name}.</p>
+                    </div>
+                  ) : (
+                    <div style={{borderTop:`1px solid ${D.border}`, overflowX:'auto'}}>
+                      <table style={{width:'100%', borderCollapse:'collapse', minWidth:'640px', tableLayout:'fixed'}}>
+                        <colgroup>
+                          <col style={{width:'32%'}} />
+                          <col style={{width:'18%'}} />
+                          <col style={{width:'25%'}} />
+                          <col style={{width:'25%'}} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            {['Feature Name','Pricing','Billing Type','Actions'].map(h => (
+                              <th key={h} style={{padding:'12px 20px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gdsFeatures.map((f, i) => {
+                            const costStr = fmtCost(f.cost, f.currency)
+                            const badge = typeBadge(f.cost, f.billing_cycle as string)
+                            return (
+                              <tr key={f.id} style={{borderBottom: i < gdsFeatures.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                                onMouseEnter={e => (e.currentTarget.style.background = `${pColor}08`)}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                <td style={{padding:'14px 20px', fontSize:'16px', fontWeight:600, color:D.fg, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{f.label}</td>
+                                <td style={{padding:'14px 20px', whiteSpace:'nowrap'}}>
+                                  {costStr
+                                    ? <span style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:pColor}}>{costStr}</span>
+                                    : <span style={{fontSize:'16px', color:D.fgDim}}>—</span>}
+                                </td>
+                                <td style={{padding:'14px 20px', whiteSpace:'nowrap'}}>
+                                  <span style={{display:'inline-flex', alignItems:'center', padding:'5px 12px', borderRadius:'6px', fontSize:'14px', fontWeight:600, background:badge.soft, color:badge.color}}>{badge.label}</span>
+                                </td>
+                                <td style={{padding:'14px 20px'}}>
+                                  {isAdmin && (
+                                    <div style={{display:'flex', gap:'8px'}}>
+                                      <button onClick={() => openEdit(f)}
+                                        style={{padding:'7px 14px', fontSize:'14px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                        onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
+                                        onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                        Edit
+                                      </button>
+                                      <button onClick={() => { setDeleteTarget(f); setDeleteOpen(true) }}
+                                        style={{padding:'7px 14px', fontSize:'14px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                        onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                                        onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
                 )}
               </div>
             )
-          })}
-        </div>
-      )}
+          })
+        )}
+
 
       {/*  ADD Modal  one name, tick GDS  */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Feature" size="sm">

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import TopNav from '@/components/layout/TopNav'
+import MainContent from '@/components/layout/MainContent'
 import IdleLogout from '@/components/shared/IdleLogout'
 
 export const dynamic = 'force-dynamic'
@@ -38,9 +39,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div style={{ minHeight: '100vh', background: '#0e1117' }}>
       <TopNav user={user} isAdmin={isAdmin} role={role} permMap={permMap} />
       <IdleLogout />
-      <main className="p-6">
+      <MainContent>
         {children}
-      </main>
+      </MainContent>
     </div>
   )
 }

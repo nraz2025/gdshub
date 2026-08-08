@@ -23,7 +23,7 @@ export default async function DashboardPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     role = (profile?.role as string) ?? 'user'
     isAdmin = role === 'admin'
-    if (role === 'user') redirect('/gds-info')
+    if (role === 'user') redirect('/gds-access-record')
   }
 
   const { data: perms } = await supabase
