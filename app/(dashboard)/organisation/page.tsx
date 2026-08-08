@@ -30,23 +30,30 @@ const GDS_COLORS: Record<string, string> = {
   Travelport: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
-// Design tokens
+// Design tokens — dark theme matching the "Organisation Management" mockup
 const T = {
-  primary:    '#10B981',
-  primaryDk:  '#059669',
-  secondary:  '#3B82F6',
-  surface:    '#F8FAFC',
-  surfaceAlt: '#F1F5F9',
-  card:       '#FFFFFF',
-  border:     '#E2E8F0',
-  text:       '#1E293B',
-  textMid:    '#64748B',
-  textLight:  '#94A3B8',
-  danger:     '#EF4444',
-  warning:    '#F59E0B',
-  radius:     '12px',
+  bg:         '#0e1117',
+  bgElevated: '#161b22',
+  card:       '#1c2129',
+  cardHover:  '#1f262e',
+  border:     '#2d333b',
+  borderLight:'#373e47',
+  text:       '#e6edf3',
+  textMid:    '#8b949e',
+  textDim:    '#6e7681',
+  accent:     '#58a6ff',
+  accentSoft: 'rgba(88,166,255,0.10)',
+  accentHover:'#79c0ff',
+  danger:     '#f85149',
+  dangerSoft: 'rgba(248,81,73,0.10)',
+  success:    '#3fb950',
+  successSoft:'rgba(63,185,80,0.10)',
+  warning:    '#d29922',
+  warningSoft:'rgba(210,153,34,0.10)',
+  radius:     '10px',
   radiusSm:   '8px',
 }
+const AVATAR_PALETTE = ['#d29922','#58a6ff','#a371f7','#3fb950','#f78166','#79c0ff','#ec4899','#8b5cf6']
 const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
   Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
@@ -123,8 +130,7 @@ export default function OrganisationPage() {
     return r.organisation.toLowerCase().includes(term) || (r.iata ?? '').toLowerCase().includes(term)
   })
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  // Note: pagination is now computed further down using iataFiltered (accounts for the IATA filter chips too)
 
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalTab('details'); setContracts([]); setModalOpen(true) }
   function openEdit(row: Organisation) { setEditing(row); setForm({ organisation: row.organisation, iata: row.iata ?? '' }); setError(''); setSaving(false); setModalTab('details'); setModalOpen(true); fetchContracts(row.id) }
@@ -268,170 +274,191 @@ export default function OrganisationPage() {
   const selectedPCCs = selectedOrg ? linkedPCCs(selectedOrg.id) : []
 
 
+  const withIata = records.filter(r => r.iata).length
+  const totalLinkedPccs = records.reduce((sum, r) => sum + linkedPCCs(r.id).length, 0)
+  const latestYear = records.length > 0 ? Math.max(...records.map(r => new Date(r.created_at).getFullYear())) : new Date().getFullYear()
+  const [iataFilter, setIataFilterState] = useState<'all'|'has'|'missing'>('all')
+  const iataFiltered = filtered.filter(r => iataFilter === 'all' ? true : iataFilter === 'has' ? !!r.iata : !r.iata)
+  const iataTotalPages = Math.ceil(iataFiltered.length / PAGE_SIZE)
+  const iataPaginated = iataFiltered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const [sortCol, setSortCol] = useState<'organisation'|'iata'|'pccs'|'created'|null>(null)
+  const [sortDir, setSortDir] = useState<1|-1>(1)
+  function toggleSort(col: typeof sortCol) {
+    if (sortCol === col) setSortDir(d => d === 1 ? -1 : 1)
+    else { setSortCol(col); setSortDir(1) }
+  }
+  const sortedPaginated = [...iataPaginated].sort((a, b) => {
+    if (!sortCol) return 0
+    let av: string | number = '', bv: string | number = ''
+    if (sortCol === 'organisation') { av = a.organisation.toLowerCase(); bv = b.organisation.toLowerCase() }
+    if (sortCol === 'iata') { av = a.iata ?? ''; bv = b.iata ?? '' }
+    if (sortCol === 'pccs') { av = linkedPCCs(a.id).length; bv = linkedPCCs(b.id).length }
+    if (sortCol === 'created') { av = a.created_at; bv = b.created_at }
+    if (av < bv) return -1 * sortDir
+    if (av > bv) return 1 * sortDir
+    return 0
+  })
+
   return (
-    <div style={{fontFamily:"'Hanken Grotesk', Inter, system-ui, sans-serif", background:T.surface, minHeight:'100vh', padding:'0'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:T.bg, minHeight:'100vh', padding:'0', color:T.text}}>
 
       {/* ── Page Header ── */}
-      <div style={{background:T.card, borderBottom:`1px solid ${T.border}`, padding:'20px 28px', marginBottom:'24px'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
+      <div style={{padding:'32px 28px 0'}}>
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'24px'}}>
           <div>
-            <h1 style={{fontSize:'30px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Organisation</h1>
-            
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'30px', fontWeight:700, color:T.text, margin:0, letterSpacing:'-0.5px'}}>Organisations</h1>
+            <p style={{fontSize:'15px', color:T.textMid, marginTop:'5px'}}>Manage your travel organisations and their configurations</p>
           </div>
           {isAdmin && (
-            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
               <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:T.card, border:`1px solid ${T.border}`, borderRadius:'8px', fontSize:'15px', fontWeight:600, color:T.textMid, cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.2s'}}
+                onMouseOver={e => { e.currentTarget.style.background=T.cardHover; e.currentTarget.style.color=T.text }}
+                onMouseOut={e => { e.currentTarget.style.background=T.card; e.currentTarget.style.color=T.textMid }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export xlsx
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:T.card, border:`1px solid ${T.border}`, borderRadius:'8px', fontSize:'15px', fontWeight:600, color:T.textMid, cursor:'pointer', transition:'all 0.2s'}}
+                onMouseOver={e => { e.currentTarget.style.background=T.cardHover; e.currentTarget.style.color=T.text }}
+                onMouseOut={e => { e.currentTarget.style.background=T.card; e.currentTarget.style.color=T.textMid }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-                onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:T.accent, border:`1px solid ${T.accent}`, borderRadius:'8px', fontSize:'15px', fontWeight:600, color:'#fff', cursor:'pointer', transition:'all 0.2s'}}
+                onMouseOver={e => { e.currentTarget.style.background=T.accentHover; e.currentTarget.style.borderColor=T.accentHover }}
+                onMouseOut={e => { e.currentTarget.style.background=T.accent; e.currentTarget.style.borderColor=T.accent }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Organisation
               </button>
             </div>
           )}
         </div>
-      </div>
 
-      <div style={{padding:'0 28px 28px'}}>
+        {/* ── Filter Bar ── */}
+        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px', flexWrap:'wrap'}}>
+          {(['all','has','missing'] as const).map(f => (
+            <button key={f} onClick={() => { setIataFilterState(f); setCurrentPage(1) }}
+              style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, border:`1px solid ${iataFilter===f ? T.accent : T.border}`, borderRadius:'20px', background: iataFilter===f ? T.accentSoft : 'transparent', color: iataFilter===f ? T.accent : T.textMid, cursor:'pointer'}}>
+              {f === 'all' ? 'All' : f === 'has' ? 'Has IATA' : 'Missing IATA'}
+            </button>
+          ))}
+        </div>
 
-
-                {/* ── Organisation Card Grid ── */}
+        {/* ── Data Table ── */}
         {loading ? (
-          <div style={{padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
-        ) : paginated.length === 0 ? (
-          <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', padding:'60px', textAlign:'center', color:'#94a3b8', fontSize:'14px'}}>
+          <div style={{padding:'60px', textAlign:'center', color:T.textMid, fontSize:'14px'}}>Loading...</div>
+        ) : sortedPaginated.length === 0 ? (
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textMid, fontSize:'14px'}}>
             {search ? `No organisations match "${search}"` : 'No organisations yet.'}
           </div>
         ) : (
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(500px, 1fr))', gap:'24px'}}>
-            {paginated.map((row) => {
-              const pccCount = linkedPCCs(row.id).length
-              const avatarPalette = [
-                { bg: '#9333ea' }, // purple
-                { bg: '#ec4899' }, // pink
-                { bg: '#8b5cf6' }, // violet
-                { bg: '#6366f1' }, // indigo
-                { bg: '#f43f5e' }, // rose
-              ]
-              const avatarColor = avatarPalette[row.organisation.charCodeAt(0) % avatarPalette.length].bg
-              return (
-                <div key={row.id}
-                  style={{position:'relative', overflow:'hidden', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'16px', padding:'24px', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e => { e.currentTarget.style.transform='translateY(-4px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'; e.currentTarget.style.borderColor='#e2e8f0' }}>
-                  {/* Colored left-edge stripe */}
-                  <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#1a5f3c'}} />
-
-                  {/* Header — avatar + name */}
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'14px'}}>
-                      <div style={{width:'40px', height:'40px', borderRadius:'50%', background:avatarColor, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                        <span style={{fontSize:'14px', fontWeight:700, color:'white'}}>{row.organisation.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <h3 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0}}>{row.organisation}</h3>
-                    </div>
-                  </div>
-
-                  {/* Meta rows */}
-                  <div style={{display:'flex', flexDirection:'column', gap:'12px', marginBottom:'24px'}}>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7c-.4.4-.3 1 .2 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 2.7 3.4c.3.5 1 .6 1.3.2l.7-.7c.4-.3.6-.8.5-1.3z"/></svg>
-                        IATA
-                      </span>
-                      {row.iata
-                        ? <span style={{fontSize:'16px', fontWeight:600, color:'#1e293b', background:'#f8fafc', padding:'6px 12px', borderRadius:'8px', border:'1px solid #e2e8f0', fontFamily:'monospace', letterSpacing:'0.05em'}}>{row.iata}</span>
-                        : <span style={{color:'#cbd5e1', fontSize:'16px'}}>-</span>}
-                    </div>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        Linked PCCs
-                      </span>
-                      {pccCount > 0
-                        ? <button onClick={() => openPCCs(row)}
-                            style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'6px 12px', borderRadius:'9999px', fontSize:'16px', fontWeight:600, color:'#166534', background:'#dcfce7', border:'1px solid #bbf7d0', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                            onMouseOver={e => { e.currentTarget.style.background='#bbf7d0'; e.currentTarget.style.borderColor='#86efac' }}
-                            onMouseOut={e => { e.currentTarget.style.background='#dcfce7'; e.currentTarget.style.borderColor='#bbf7d0' }}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                            {pccCount} PCC{pccCount !== 1 ? 's' : ''}
-                          </button>
-                        : <span style={{fontSize:'13px', color:'#94a3b8'}}>None</span>}
-                    </div>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-                      <span style={{display:'flex', alignItems:'center', gap:'8px', color:'#64748b', fontSize:'16px', fontWeight:500}}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        Created
-                      </span>
-                      <span style={{fontSize:'16px', color:'#64748b', fontWeight:500}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {isAdmin && (
-                    <div style={{display:'flex', gap:'10px'}}>
-                      <button onClick={() => openEdit(row)}
-                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#ffffff', color:'#64748b', fontSize:'13px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#94a3b8'; e.currentTarget.style.color='#1e293b' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.color='#64748b' }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
-                      </button>
-                      <button onClick={() => openDelete(row)}
-                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #fecaca', background:'#ffffff', color:'#dc2626', fontSize:'13px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#dc2626' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        Delete
-                      </button>
-                    </div>
-                  )}
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden'}}>
+            <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead>
+                <tr>
+                  {[
+                    {key:'organisation' as const, label:'Organisation'},
+                    {key:'iata' as const, label:'IATA Number'},
+                    {key:'pccs' as const, label:'PCCs'},
+                    {key:'created' as const, label:'Created'},
+                  ].map(col => (
+                    <th key={col.key} onClick={() => toggleSort(col.key)}
+                      style={{padding:'14px 18px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.7px', color: sortCol===col.key ? T.accent : T.textDim, textAlign:'left', borderBottom:`1px solid ${T.border}`, background:'rgba(0,0,0,0.15)', cursor:'pointer', whiteSpace:'nowrap'}}>
+                      {col.label} <span style={{marginLeft:'5px', fontSize:'10px', opacity: sortCol===col.key ? 1 : 0.4}}>{sortCol===col.key ? (sortDir===1?'↑':'↓') : '↕'}</span>
+                    </th>
+                  ))}
+                  <th style={{padding:'14px 18px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.7px', color:T.textDim, textAlign:'left', borderBottom:`1px solid ${T.border}`, background:'rgba(0,0,0,0.15)'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPaginated.map((row, i) => {
+                  const pccCount = linkedPCCs(row.id).length
+                  const avatarColor = AVATAR_PALETTE[row.organisation.charCodeAt(0) % AVATAR_PALETTE.length]
+                  return (
+                    <tr key={row.id} style={{borderBottom: i < sortedPaginated.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.15s'}}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(88,166,255,0.04)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{padding:'16px 18px'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                          <div style={{width:'34px', height:'34px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:avatarColor, color:'#fff', fontSize:'15px', fontWeight:700}}>
+                            {row.organisation.charAt(0).toUpperCase()}
+                          </div>
+                          <span style={{fontWeight:600, fontSize:'16px', color:T.text}}>{row.organisation}</span>
+                        </div>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        {row.iata
+                          ? <span style={{display:'inline-flex', alignItems:'center', gap:'5px', padding:'4px 10px', background:T.accentSoft, borderRadius:'6px', fontSize:'14px', fontWeight:700, color:T.accent, letterSpacing:'0.3px', fontFamily:"'Space Grotesk', sans-serif"}}>{row.iata}</span>
+                          : <span style={{color:T.textDim, fontSize:'15px'}}>—</span>}
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        {pccCount > 0
+                          ? <button onClick={() => openPCCs(row)}
+                              style={{display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:'28px', height:'26px', padding:'0 8px', borderRadius:'6px', fontSize:'15px', fontWeight:700, fontFamily:"'Space Grotesk', sans-serif", background:T.successSoft, color:T.success, border:'none', cursor:'pointer'}}>
+                              {pccCount}
+                            </button>
+                          : <span style={{fontSize:'15px', color:T.textDim}}>0</span>}
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        <span style={{display:'flex', alignItems:'center', gap:'7px', color:T.textMid, fontSize:'15px'}}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          {new Date(row.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}
+                        </span>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        {isAdmin && (
+                          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                            <button onClick={() => openEdit(row)}
+                              style={{padding:'6px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:'transparent', color:T.textMid, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px'}}
+                              onMouseOver={e => { e.currentTarget.style.background=T.accentSoft; e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.color=T.accent }}
+                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textMid }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              Edit
+                            </button>
+                            <button onClick={() => openDelete(row)}
+                              style={{padding:'6px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:'transparent', color:T.textMid, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px'}}
+                              onMouseOver={e => { e.currentTarget.style.background=T.dangerSoft; e.currentTarget.style.borderColor=T.danger; e.currentTarget.style.color=T.danger }}
+                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textMid }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {/* ── Table Footer / Pagination ── */}
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 18px', borderTop:`1px solid ${T.border}`, background:'rgba(0,0,0,0.1)', fontSize:'14px', color:T.textDim}}>
+              <span>Showing <strong style={{color:T.text}}>{sortedPaginated.length}</strong> of <strong style={{color:T.text}}>{iataFiltered.length}</strong> organisations</span>
+              {iataTotalPages > 1 && (
+                <div style={{display:'flex', gap:'4px'}}>
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                    style={{padding:'5px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
+                    Previous
+                  </button>
+                  {Array.from({length: iataTotalPages}, (_, idx) => idx + 1).map(p => (
+                    <button key={p} onClick={() => setCurrentPage(p)}
+                      style={{padding:'5px 10px', fontSize:'14px', fontWeight:700, border:`1px solid ${p===currentPage ? T.accent : T.border}`, borderRadius:'6px', background: p===currentPage ? T.accent : 'transparent', color: p===currentPage ? '#fff' : T.textMid, cursor:'pointer'}}>
+                      {p}
+                    </button>
+                  ))}
+                  <button onClick={() => setCurrentPage(p => Math.min(iataTotalPages, p + 1))} disabled={currentPage === iataTotalPages}
+                    style={{padding:'5px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===iataTotalPages?0.35:1}}>
+                    Next
+                  </button>
                 </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'14px', padding:'10px 16px', background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius}}>
-            <span style={{fontSize:'17px', color:'#065F46', fontWeight:600}}>
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            <div style={{display:'flex', gap:'4px'}}>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===1?0.35:1}}>
-                Previous
-              </button>
-              {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-                <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{padding:'5px 10px', fontSize:'12px', fontWeight:700, border:`1px solid ${p===currentPage ? T.primary : T.border}`, borderRadius:T.radius, background: p===currentPage ? T.primary : 'white', color: p===currentPage ? 'white' : T.textMid, cursor:'pointer'}}>
-                  {p}
-                </button>
-              ))}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                style={{padding:'5px 12px', fontSize:'12px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer', opacity:currentPage===totalPages?0.35:1}}>
-                Next
-              </button>
+              )}
             </div>
           </div>
         )}
       </div>
+      <div style={{height:'28px'}} />
 
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Organisation' : 'Add Organisation'} size="md">

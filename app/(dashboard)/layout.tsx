@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import ConditionalSidebar from '@/components/layout/ConditionalSidebar'
-import TopBar from '@/components/layout/TopBar'
+import TopNav from '@/components/layout/TopNav'
 import IdleLogout from '@/components/shared/IdleLogout'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +15,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/login')
   }
 
-  // Logged in — full layout with sidebar
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -37,15 +35,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{background:'#f1f5f9'}}>
-      <ConditionalSidebar isAdmin={isAdmin} role={role} permMap={permMap} />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <TopBar user={user} isAdmin={isAdmin} />
-        <IdleLogout />
-        <main className="flex-1 overflow-auto p-6">
-          {children}
-        </main>
-      </div>
+    <div style={{ minHeight: '100vh', background: '#0e1117' }}>
+      <TopNav user={user} isAdmin={isAdmin} role={role} permMap={permMap} />
+      <IdleLogout />
+      <main className="p-6">
+        {children}
+      </main>
     </div>
   )
 }

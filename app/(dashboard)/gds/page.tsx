@@ -7,41 +7,25 @@ import type { GDS } from '@/types'
 
 const EMPTY: Partial<GDS> = { name: '' }
 
+// Dark theme tokens matching the Organisation page
 const T = {
-  primary:    '#10B981',
-  primaryDk:  '#059669',
-  secondary:  '#3B82F6',
-  surface:    '#F8FAFC',
-  surfaceAlt: '#F1F5F9',
-  card:       '#FFFFFF',
-  border:     '#E2E8F0',
-  text:       '#1E293B',
-  textMid:    '#64748B',
-  textLight:  '#94A3B8',
-  danger:     '#EF4444',
-  warning:    '#F59E0B',
-  radius:     '12px',
-  radiusSm:   '8px',
-}
-const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
-  active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
-  Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
-  inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
-  Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
-  Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
+  bg: '#0e1117', bgElevated: '#161b22', card: '#1c2129', cardHover: '#222830',
+  border: '#2d333b', borderLight: '#373e47',
+  text: '#e6edf3', textMid: '#8b949e', textDim: '#6e7681',
+  accent: '#58a6ff', accentSoft: 'rgba(88,166,255,0.10)', accentHover: '#79c0ff',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
+  success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
+  warning: '#d29922', warningSoft: 'rgba(210,153,34,0.10)',
+  radius: '10px',
 }
 
-
-
-const GDS_STYLE: Record<string, { dot: string; stripe: string }> = {
-  Amadeus:    { dot: '#9333ea', stripe: '#9333ea' },
-  Sabre:      { dot: '#3b82f6', stripe: '#3b82f6' },
-  Travelport: { dot: '#22c55e', stripe: '#10b981' },
+// Per-GDS accent colors (reused for avatar, type badge, and top stripe)
+const GDS_STYLE: Record<string, { color: string; soft: string; gradient: string }> = {
+  Amadeus:    { color: '#39d2c0', soft: 'rgba(57,210,192,0.10)',  gradient: 'linear-gradient(135deg,#39d2c0,#2bb5a5)' },
+  Sabre:      { color: '#f78166', soft: 'rgba(247,129,102,0.10)', gradient: 'linear-gradient(135deg,#f78166,#da6b50)' },
+  Travelport: { color: '#58a6ff', soft: 'rgba(88,166,255,0.10)',  gradient: 'linear-gradient(135deg,#58a6ff,#388bfd)' },
 }
+const DEFAULT_STYLE = { color: '#a371f7', soft: 'rgba(163,113,247,0.10)', gradient: 'linear-gradient(135deg,#a371f7,#8b5cf6)' }
 
 export default function GDSPage() {
   const supabase = createClient()
@@ -54,6 +38,8 @@ export default function GDSPage() {
   const [editing, setEditing] = useState<GDS | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [sortCol, setSortCol] = useState<'name' | 'created' | null>(null)
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -93,97 +79,124 @@ export default function GDSPage() {
     setSaving(false); setDeleteOpen(false); fetchAll()
   }
 
-  // GDS descriptions for the card view
-  const GDS_DESC: Record<string, string> = {
-    Sabre:      'Global Distribution System — airline, hotel and car rental booking platform',
-    Amadeus:    'Travel technology platform for bookings, ticketing and travel management',
-    Travelport: 'Travel commerce platform connecting travel providers and agencies',
+  function toggleSort(col: typeof sortCol) {
+    if (sortCol === col) setSortDir(d => d === 1 ? -1 : 1)
+    else { setSortCol(col); setSortDir(1) }
   }
+  const sorted = [...records].sort((a, b) => {
+    if (!sortCol) return 0
+    const av = sortCol === 'name' ? a.name.toLowerCase() : a.created_at
+    const bv = sortCol === 'name' ? b.name.toLowerCase() : b.created_at
+    if (av < bv) return -1 * sortDir
+    if (av > bv) return 1 * sortDir
+    return 0
+  })
 
   return (
-    <div style={{fontFamily:"Inter, system-ui, sans-serif", background:'#f1f5f9', minHeight:'100vh'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:T.bg, minHeight:'100vh', color:T.text}}>
+      <div style={{padding:'32px 28px 40px'}}>
 
-      {/* ── Page Header ── */}
-      <div style={{padding:'20px 28px', marginBottom:'0'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
+        {/* ── Page Header ── */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'28px'}}>
           <div>
-            <h1 style={{fontSize:'30px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>GDS</h1>
-          
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'30px', fontWeight:700, letterSpacing:'-0.5px', color:T.text, margin:0}}>GDS</h1>
+            <p style={{fontSize:'15px', color:T.textMid, marginTop:'5px'}}>Configure and manage Global Distribution Systems</p>
           </div>
           {isAdmin && (
             <button onClick={openAdd}
-              style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-              onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:T.accent, border:`1px solid ${T.accent}`, borderRadius:'8px', fontSize:'15px', fontWeight:600, color:'#fff', cursor:'pointer', transition:'all 0.2s'}}
+              onMouseOver={e => { e.currentTarget.style.background=T.accentHover; e.currentTarget.style.borderColor=T.accentHover }}
+              onMouseOut={e => { e.currentTarget.style.background=T.accent; e.currentTarget.style.borderColor=T.accent }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add GDS
             </button>
           )}
         </div>
-      </div>
 
-      <div style={{padding:'0 28px 28px'}}>
-
-        {/* ── GDS Card Grid ── */}
+        {/* ── Data Table ── */}
         {loading ? (
-          <div style={{textAlign:'center', padding:'60px', color:'#94a3b8', fontSize:'14px'}}>Loading...</div>
+          <div style={{padding:'60px', textAlign:'center', color:T.textMid, fontSize:'15px'}}>Loading...</div>
+        ) : sorted.length === 0 ? (
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, padding:'60px', textAlign:'center', color:T.textMid, fontSize:'15px'}}>
+            No GDS platforms configured yet.
+          </div>
         ) : (
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(500px, 1fr))', gap:'30px'}}>
-            {records.map((row) => {
-              const style = GDS_STYLE[row.name] ?? GDS_STYLE.Sabre
-              return (
-                <div key={row.id}
-                  style={{position:'relative', overflow:'hidden', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'16px', padding:'28px', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e => { e.currentTarget.style.transform='translateY(-4px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'; e.currentTarget.style.borderColor='#e2e8f0' }}>
-                  {/* Colored left-edge stripe */}
-                  <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:style.stripe}} />
-
-                  {/* Header — dot + name */}
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                      <span style={{width:'10px', height:'10px', borderRadius:'50%', background:style.dot, boxShadow:`0 0 0 3px ${style.dot}26`, display:'inline-block', flexShrink:0}} />
-                      <h3 style={{fontSize:'24px', fontWeight:700, color:'#1e293b', margin:0}}>{row.name}</h3>
-                    </div>
-                  </div>
-
-                  {/* Meta */}
-                  <div style={{display:'flex', flexDirection:'column', gap:'10px', marginBottom:'24px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', color:'#64748b', fontSize:'18px'}}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                      <span>Created on <strong style={{color:'#1e293b', fontWeight:600}}>{new Date(row.created_at).toLocaleDateString('en-GB')}</strong></span>
-                    </div>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', color:'#64748b', fontSize:'18px'}}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                      <span>Status: <span style={{display:'inline-flex', alignItems:'center', gap:'6px', background:'#dcfce7', color:'#166534', padding:'4px 10px', borderRadius:'9999px', fontSize:'16px', fontWeight:600, marginLeft:'4px'}}><span style={{width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e', flexShrink:0}} />Active</span></span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {isAdmin && (
-                    <div style={{display:'flex', gap:'10px'}}>
-                      <button onClick={() => openEdit(row)}
-                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#ffffff', color:'#64748b', fontSize:'18px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#94a3b8'; e.currentTarget.style.color='#1e293b' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.color='#64748b' }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
-                      </button>
-                      <button onClick={() => openDelete(row)}
-                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #fecaca', background:'#ffffff', color:'#dc2626', fontSize:'18px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#dc2626' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div style={{background:T.card, border:`1px solid ${T.border}`, borderRadius:T.radius, overflow:'hidden'}}>
+            <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead>
+                <tr>
+                  {[{key:'name' as const, label:'GDS Name'}, {key:null, label:'Type'}, {key:null, label:'Status'}, {key:'created' as const, label:'Created'}].map((col, i) => (
+                    <th key={i} onClick={() => col.key && toggleSort(col.key)}
+                      style={{padding:'14px 18px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.7px', color: sortCol===col.key ? T.accent : T.textDim, textAlign:'left', borderBottom:`1px solid ${T.border}`, background:'rgba(0,0,0,0.15)', cursor: col.key ? 'pointer' : 'default', whiteSpace:'nowrap'}}>
+                      {col.label} {col.key && <span style={{marginLeft:'5px', fontSize:'10px', opacity: sortCol===col.key ? 1 : 0.4}}>{sortCol===col.key ? (sortDir===1?'↑':'↓') : '↕'}</span>}
+                    </th>
+                  ))}
+                  <th style={{padding:'14px 18px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.7px', color:T.textDim, textAlign:'left', borderBottom:`1px solid ${T.border}`, background:'rgba(0,0,0,0.15)'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((row, i) => {
+                  const style = GDS_STYLE[row.name] ?? DEFAULT_STYLE
+                  return (
+                    <tr key={row.id} style={{borderBottom: i < sorted.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.15s'}}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(88,166,255,0.04)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{padding:'16px 18px'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                          <div style={{width:'36px', height:'36px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:style.gradient, color:'#fff', fontSize:'14px', fontWeight:700, position:'relative'}}>
+                            {row.name.charAt(0).toUpperCase()}
+                            <span style={{position:'absolute', bottom:'-1px', right:'-1px', width:'10px', height:'10px', borderRadius:'50%', background:T.success, border:`2px solid ${T.card}`, boxShadow:`0 0 6px ${T.success}`}} />
+                          </div>
+                          <span style={{fontWeight:600, fontSize:'16px', color:T.text}}>{row.name}</span>
+                        </div>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        <span style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'4px 10px', borderRadius:'6px', fontSize:'14px', fontWeight:600, background:style.soft, color:style.color}}>{row.name}</span>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        <span style={{display:'inline-flex', alignItems:'center', gap:'7px', padding:'5px 12px', borderRadius:'20px', fontSize:'14px', fontWeight:600, background:T.successSoft, color:T.success}}>
+                          <span style={{width:'7px', height:'7px', borderRadius:'50%', background:T.success, boxShadow:`0 0 6px ${T.success}`}} />
+                          Active
+                        </span>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        <span style={{display:'flex', alignItems:'center', gap:'7px', color:T.textMid, fontSize:'15px'}}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          {new Date(row.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}
+                        </span>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        {isAdmin && (
+                          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                            <button onClick={() => openEdit(row)}
+                              style={{padding:'6px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:'transparent', color:T.textMid, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px'}}
+                              onMouseOver={e => { e.currentTarget.style.background=T.accentSoft; e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.color=T.accent }}
+                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textMid }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              Edit
+                            </button>
+                            <button onClick={() => openDelete(row)}
+                              style={{padding:'6px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:'transparent', color:T.textMid, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px'}}
+                              onMouseOver={e => { e.currentTarget.style.background=T.dangerSoft; e.currentTarget.style.borderColor=T.danger; e.currentTarget.style.color=T.danger }}
+                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textMid }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div style={{display:'flex', alignItems:'center', padding:'12px 18px', borderTop:`1px solid ${T.border}`, background:'rgba(0,0,0,0.1)', fontSize:'14px', color:T.textDim}}>
+              Showing <strong style={{color:T.text, margin:'0 4px'}}>{sorted.length}</strong> of <strong style={{color:T.text, margin:'0 4px'}}>{sorted.length}</strong> GDS entries
+            </div>
           </div>
         )}
       </div>
+
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit GDS' : 'Add GDS'} size="md">
         <div className="space-y-4">
