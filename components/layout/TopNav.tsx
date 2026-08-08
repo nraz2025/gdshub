@@ -23,44 +23,44 @@ const ICONS = {
   admin: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
   chevron: <polyline points="6 9 12 15 18 9" />,
 }
-function Ic({ path, w = 15 }: { path: React.ReactNode; w?: number }) {
-  return <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{path}</svg>
+function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?: string }) {
+  return <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke={color ?? 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{path}</svg>
 }
 
 const GROUPS: NavGroup[] = [
   {
     key: 'organisation', label: 'Organisation', color: '#d29922', soft: 'rgba(210,153,34,0.10)', glow: 'rgba(210,153,34,0.06)', border: 'rgba(210,153,34,0.20)',
     desc: 'Manage travel organisations and configs',
-    items: [{ label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} /> }],
+    items: [{ label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} color="#d29922" /> }],
   },
   {
     key: 'gds', label: 'GDS', color: '#39d2c0', soft: 'rgba(57,210,192,0.10)', glow: 'rgba(57,210,192,0.06)', border: 'rgba(57,210,192,0.20)',
     desc: 'Global Distribution Systems & features',
     items: [
-      { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} /> },
-      { label: 'GDS Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} /> },
-      { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} /> },
-      { label: 'GDS Information', href: '/gds-info', module: 'gds_info', icon: <Ic path={ICONS.info} /> },
-      { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} /> },
+      { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
+      { label: 'GDS Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} color="#3fb950" /> },
+      { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
+      { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
+      { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
     ],
   },
   {
     key: 'users', label: 'Users', color: '#a371f7', soft: 'rgba(163,113,247,0.10)', glow: 'rgba(163,113,247,0.06)', border: 'rgba(163,113,247,0.20)',
     desc: 'User accounts across platforms',
     items: [
-      { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} /> },
-      { label: 'Sabre', href: '/sabre-users', module: 'sabre_users', icon: <Ic path={ICONS.shield} /> },
-      { label: 'Amadeus', href: '/amadeus-users', module: 'amadeus_users', icon: <Ic path={ICONS.shield} /> },
-      { label: 'Travelport', href: '/travelport-users', module: 'travelport_users', icon: <Ic path={ICONS.shield} /> },
-      { label: 'Offboarded Users', href: '/resigned-users', module: 'resigned_users', icon: <Ic path={ICONS.offboard} /> },
+      { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} color="#a371f7" /> },
+      { label: 'Sabre', href: '/sabre-users', module: 'sabre_users', icon: <Ic path={ICONS.shield} color="#f78166" /> },
+      { label: 'Amadeus', href: '/amadeus-users', module: 'amadeus_users', icon: <Ic path={ICONS.shield} color="#39d2c0" /> },
+      { label: 'Travelport', href: '/travelport-users', module: 'travelport_users', icon: <Ic path={ICONS.shield} color="#58a6ff" /> },
+      { label: 'Offboarded Users', href: '/resigned-users', module: 'resigned_users', icon: <Ic path={ICONS.offboard} color="#f85149" /> },
     ],
   },
   {
     key: 'system', label: 'System', color: '#f78166', soft: 'rgba(247,129,102,0.10)', glow: 'rgba(247,129,102,0.06)', border: 'rgba(247,129,102,0.20)',
     desc: 'Reports & administration',
     items: [
-      { label: 'Report', href: '/report', module: 'reporting', icon: <Ic path={ICONS.report} /> },
-      { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} /> },
+      { label: 'Report', href: '/report', module: 'reporting', icon: <Ic path={ICONS.report} color="#a371f7" /> },
+      { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} color="#db61a2" /> },
     ],
   },
 ]
@@ -106,9 +106,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
 
   const activeGroup = visibleGroups.find(g => g.items.some(i => pathname === i.href || pathname?.startsWith(i.href + '/')))
   const activeColor = activeGroup?.color ?? '#58a6ff'
-  const activeSoft = activeGroup?.soft ?? 'rgba(88,166,255,0.10)'
   const activeGlow = activeGroup?.glow ?? 'rgba(88,166,255,0.06)'
-  const activeBorder = activeGroup?.border ?? 'rgba(88,166,255,0.20)'
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -126,20 +124,20 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
       <div style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none',
         background: `radial-gradient(ellipse 700px 500px at 15% 0%, ${activeGlow}, transparent)`, transition: 'background 0.4s ease' }} />
 
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: T.bgElevated, borderBottom: `1px solid ${T.border}` }}>
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, width: '100%', zIndex: 100, background: T.bgElevated, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px', background: activeColor, opacity: 0.35, transition: 'background 0.4s' }} />
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 40px', display: 'flex', alignItems: 'center', height: '56px' }}>
+        <div style={{ padding: '0 24px', display: 'flex', alignItems: 'center', height: '84px' }}>
 
           {/* Brand */}
-          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '28px', flexShrink: 0, textDecoration: 'none' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: activeColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', transition: 'background 0.4s' }}>G</div>
-            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '16px', fontWeight: 700, color: T.fg, letterSpacing: '-0.3px' }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '11px', marginRight: '32px', flexShrink: 0, textDecoration: 'none' }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '11px', background: activeColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px', fontWeight: 700, color: '#fff', transition: 'background 0.4s' }}>G</div>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '23px', fontWeight: 700, color: T.fg, letterSpacing: '-0.3px' }}>
               GDS<span style={{ color: activeColor, transition: 'color 0.4s' }}>Hub</span>
             </div>
           </Link>
 
           {/* Nav links — desktop */}
-          <div className="hidden lg:flex" style={{ alignItems: 'center', gap: '2px', overflowX: 'auto', flex: 1, minWidth: 0, padding: '6px 0' }}>
+          <div className="hidden lg:flex" style={{ alignItems: 'center', gap: '2px', flex: 1, minWidth: 0, padding: '6px 0' }}>
             {visibleGroups.map((g, gi) => {
               const isActiveGroup = activeGroup?.key === g.key
               const isSingle = g.items.length === 1
@@ -148,32 +146,36 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                   {gi > 0 && <div style={{ width: '1px', height: '20px', background: T.border, margin: '0 6px', flexShrink: 0 }} />}
                   {isSingle ? (
                     <Link href={g.items[0].href}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 13px', fontSize: '13px', fontWeight: isActiveGroup ? 600 : 500,
-                        color: isActiveGroup ? g.color : T.fgDim, borderRadius: '6px', textDecoration: 'none', whiteSpace: 'nowrap',
-                        background: isActiveGroup ? g.soft : 'transparent', border: `1px solid ${isActiveGroup ? g.border : 'transparent'}` }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 16px', fontSize: '15px', fontWeight: 600,
+                        color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', textDecoration: 'none', whiteSpace: 'nowrap',
+                        background: isActiveGroup ? g.soft : 'transparent', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}` }}>
                       {g.items[0].icon} {g.label}
                     </Link>
                   ) : (
-                    <div style={{ position: 'relative' }}>
-                      <button onClick={() => setOpenGroup(o => o === g.key ? null : g.key)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 13px', fontSize: '13px', fontWeight: isActiveGroup ? 600 : 500,
-                          color: isActiveGroup ? g.color : T.fgDim, borderRadius: '6px', border: `1px solid ${isActiveGroup ? g.border : 'transparent'}`,
+                    <div style={{ position: 'relative' }}
+                      onMouseEnter={() => setOpenGroup(g.key)}
+                      onMouseLeave={() => setOpenGroup(null)}>
+                      <button type="button" onClick={() => setOpenGroup(o => o === g.key ? null : g.key)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 16px', fontSize: '15px', fontWeight: 600,
+                          color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}`,
                           background: isActiveGroup ? g.soft : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         {g.items[0].icon} {g.label}
-                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={11} /></span>
+                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={13} /></span>
                       </button>
                       {openGroup === g.key && (
-                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: '210px', background: T.card, border: `1px solid ${T.border}`, borderRadius: '10px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', padding: '6px', zIndex: 50 }}>
+                        <div style={{ position: 'absolute', top: '100%', left: 0, paddingTop: '6px', minWidth: '230px', zIndex: 50 }}>
+                        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: '10px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', padding: '6px' }}>
                           {g.items.map(item => {
                             const active = pathname === item.href
                             return (
                               <Link key={item.href} href={item.href} onClick={() => setOpenGroup(null)}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', fontSize: '13px', fontWeight: active ? 600 : 500,
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', fontSize: '14px', fontWeight: active ? 600 : 500, textTransform: 'uppercase', letterSpacing: '0.03em',
                                   color: active ? g.color : T.fg, background: active ? g.soft : 'transparent', borderRadius: '7px', textDecoration: 'none' }}>
                                 {item.icon} {item.label}
                               </Link>
                             )
                           })}
+                        </div>
                         </div>
                       )}
                     </div>
@@ -202,17 +204,6 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
           </div>
         </div>
       </nav>
-
-      {/* Group indicator bar */}
-      {activeGroup && (
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '8px 40px 6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeColor, boxShadow: `0 0 8px ${activeColor}` }} />
-            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: activeColor }}>{activeGroup.label}</span>
-            <span style={{ fontSize: '11px', color: T.fgDim, marginLeft: '4px' }}>— {activeGroup.desc}</span>
-          </div>
-        </div>
-      )}
 
       {/* Mobile drawer */}
       {mobileOpen && (
