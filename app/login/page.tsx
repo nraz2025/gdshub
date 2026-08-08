@@ -218,12 +218,6 @@ export default function LoginPage() {
             </button>
           </div>
         )}
-
-        <p className="text-center mt-4">
-          {/*<a href="/pcc" className="text-slate-400 hover:text-slate-300 underline text-xs transition-colors">
-            View GDS Info without logging in →
-          </a>*/}
-        </p>
         <p className="text-center text-slate-600 text-xs mt-2">PST Travel Services · Internal System</p>
       </div>
     </div>
