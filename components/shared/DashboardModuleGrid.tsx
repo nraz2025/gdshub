@@ -48,8 +48,8 @@ export default function DashboardModuleGrid({ modules }: ModuleGridProps) {
         groupedSections.map((g, gi) => (
           <div key={g.title} style={{marginBottom: gi < groupedSections.length - 1 ? '28px' : 0}}>
             <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px'}}>
-              <span style={{width:'8px', height:'8px', borderRadius:'50%', background:g.color, boxShadow:`0 0 8px ${g.color}`}} />
-              <h3 style={{fontSize:'15px', fontWeight:700, color:g.color, textTransform:'uppercase', letterSpacing:'0.06em', margin:0}}>{g.title}</h3>
+              <span style={{width:'10px', height:'10px', borderRadius:'50%', background:g.color, boxShadow:`0 0 10px ${g.color}`, flexShrink:0}} />
+              <h3 style={{fontSize:'19px', fontWeight:700, color:g.color, textTransform:'uppercase', letterSpacing:'0.06em', margin:0}}>{g.title}</h3>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(230px, 1fr))', gap:'16px'}}>
               {g.items.map(item => (
