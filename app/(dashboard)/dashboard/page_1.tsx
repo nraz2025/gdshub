@@ -82,11 +82,12 @@ export default async function DashboardPage() {
         </div>
 
         {/* Hero */}
-        <div style={{textAlign:'center', padding:'28px 20px 44px'}}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/pst-logo.png" alt="Peter Stuyvesant Travel" style={{height:'64px', width:'auto', margin:'0 auto 22px', display:'block'}} />
+        <div style={{textAlign:'center', padding:'36px 20px 44px'}}>
+          <div style={{width:'56px', height:'56px', borderRadius:'14px', background:T.accent, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 18px', boxShadow:`0 0 32px ${T.accentSoft}`}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
           <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'42px', fontWeight:700, letterSpacing:'-1px', margin:0, color:T.fg}}>
-            GDS <span style={{color:T.accent}}>Hub System</span>
+            GDS <span style={{color:T.accent}}>Management System</span>
           </h2>
           <p style={{fontSize:'15px', color:T.fgMuted, marginTop:'10px', maxWidth:'480px', marginLeft:'auto', marginRight:'auto'}}>
             Centralised access governance across Sabre, Amadeus and Travelport
