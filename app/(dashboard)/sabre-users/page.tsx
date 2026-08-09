@@ -37,6 +37,17 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
 }
 
+// Main page dark theme (matches TopNav's Users group = purple)
+const D = {
+  bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
+  fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
+  accent: '#a371f7', accentSoft: 'rgba(163,113,247,0.10)',
+  success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
+  warning: '#d29922', warningSoft: 'rgba(210,153,34,0.10)',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
+  cyan: '#39d2c0', cyanSoft: 'rgba(57,210,192,0.10)',
+}
+
 type SabreStatus = 'Active' | 'Inactive' | 'Suspended'
 const STATUSES: SabreStatus[] = ['Active', 'Inactive', 'Suspended']
 const STATUS_COLORS: Record<string, string> = {
@@ -487,131 +498,143 @@ export default function SabreUsersPage() {
   const otaCount = records.filter(r=>r.ota).length
 
   return (
-    <div style={{fontFamily:'Inter, system-ui, sans-serif', background:'#f1f5f9', minHeight:'100vh'}}>
-      <div style={{padding:'20px 28px',marginBottom:'0'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
+      <div style={{padding:'32px 28px 40px'}}>
+
+        {/* Header */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'22px'}}>
           <div>
-            <h1 style={{fontSize:'30px',fontWeight:700,color:'#1e293b',margin:0,letterSpacing:'-0.02em'}}>Sabre Users</h1>
-        
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>Sabre Users</h1>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Sabre platform user accounts and PCC configurations</p>
           </div>
           {isAdmin && (
-            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
               <button onClick={handleExport} disabled={filtered.length===0}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',opacity:filtered.length===0?0.4:1,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:filtered.length===0?0.4:1}}
+                onMouseOver={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.fg }}
+                onMouseOut={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.color=D.fgMuted }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'#1e293b',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer'}}
+                onMouseOver={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.fg }}
+                onMouseOut={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.color=D.fgMuted }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import
+              </button>
               <button onClick={openAdd}
-                style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)',border:'none',borderRadius:'8px',fontSize:'18px',fontWeight:500,color:'white',cursor:'pointer',boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-                onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Sabre User</button>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1.5px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Sabre User
+              </button>
             </div>
           )}
         </div>
-      </div>
-      <div style={{padding:'0 28px 28px'}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'16px',marginBottom:'24px'}}>
-          {[{label:'Total Users',value:records.length,sub:' '},{label:'Active',value:activeCount,sub:' '},{label:'Inactive',value:inactiveCount,sub:' '},{label:'Suspended',value:suspendedCount,sub:' '},{label:'OTA Users',value:otaCount,sub:' ',highlighted:true}].map((s,i)=>(
-            <div key={i}
-              style={{
-                position:'relative', overflow:'hidden',
-                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
-                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
-                borderRadius:'12px', padding:'20px',
-                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
-                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-              }}
-              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
-              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
-              <div style={{fontSize:'15px',fontWeight:700,color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'8px'}}>{s.label}</div>
-              <div style={{fontSize:'28px',fontWeight:700,color: s.highlighted ? 'white' : '#1e293b',lineHeight:1,marginBottom:'4px'}}>{s.value}</div>
-              <div style={{fontSize:'15px',color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
+
+        {/* Stats — real counts */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:'16px', marginBottom:'22px'}}>
+          {[
+            { label: 'Total Users', value: records.length, color: D.accent, soft: D.accentSoft, icon: <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></> },
+            { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
+            { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
+            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
+            { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
+          ].map((s, i) => (
+            <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
+              <div style={{width:'36px', height:'36px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:s.soft, color:s.color}}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{s.icon}</svg>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'20px', fontWeight:700, lineHeight:1.1, color:D.fg}}>{s.value}</div>
+                <div style={{fontSize:'11px', color:D.fgMuted, marginTop:'2px'}}>{s.label}</div>
+              </div>
             </div>
           ))}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'16px',flexWrap:'wrap'}}>
-          <div style={{position:'relative',flex:1,minWidth:'280px'}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute',left:'16px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+
+        {/* Filter */}
+        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
+          <div style={{position:'relative', flex:1, minWidth:'240px'}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search EPR, PCC, initial or name..." value={search} onChange={e => setSearch(e.target.value)}
-              style={{width:'100%',padding:'12px 16px 12px 44px',fontSize:'16px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',boxSizing:'border-box',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onFocus={e => { e.currentTarget.style.borderColor='#2d8a5e'; e.currentTarget.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }} onBlur={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.boxShadow='none' }} />
+              style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
+              onFocus={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.accentSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }} />
           </div>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            style={{padding:'12px 40px 12px 16px',fontSize:'16px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',minWidth:'140px',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 16px center'}}>
+            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'130px'}}>
             <option value="all">All Status</option>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
-            style={{padding:'12px 40px 12px 16px',fontSize:'16px',border:'1px solid #e2e8f0',borderRadius:'8px',background:'#ffffff',color:'#1e293b',outline:'none',cursor:'pointer',minWidth:'140px',appearance:'none',backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:'no-repeat',backgroundPosition:'right 16px center'}}>
+            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'130px'}}>
             <option value="all">All OTA</option>
             <option value="yes">OTA: Yes</option>
             <option value="no">OTA: No</option>
           </select>
         </div>
-        {loading ? <div style={{textAlign:'center',padding:'60px',color:'#94a3b8'}}>Loading...</div> : (
-          <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'15px',overflowX:'auto',boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-            <div style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'1175px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
-              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i)=>(
-                <div key={h} style={{padding:'14px 16px',fontSize:'16px',fontWeight:700,color:'#0c0c0c',textTransform:'uppercase',letterSpacing:'0.05em',textAlign:i===9?'right':'left',borderRight: i<9 ? '1px solid #e2e8f0' : 'none'}}>{h}</div>
+
+        {loading ? <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div> : (
+          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
+            <div style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1175px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i) => (
+                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===9 ? 'right' : 'left'}}>{h}</div>
               ))}
             </div>
-            {filtered.length===0 ? <div style={{padding:'60px',textAlign:'center',color:T.textLight}}>No Sabre users found.</div> :
-            filtered.map((row,i)=>{
+            {filtered.length===0 ? <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>No Sabre users found.</div> :
+            filtered.map((row,i) => {
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
-              const ss = STATUS_STYLE[row.status] ?? STATUS_STYLE.Active
               const pccAssigned = getPccAssigned(row.pcc)
+              const status = row.status ?? 'Active'
+              const statusStyle = status === 'Active' ? { soft: D.successSoft, color: D.success }
+                : status === 'Suspended' ? { soft: D.dangerSoft, color: D.danger }
+                : { soft: D.warningSoft, color: D.warning }
+              const ini = (row as {initial?:string}).initial
+              const dup = isDuplicateInitial(ini)
+              const ota = (row as {ota?:boolean}).ota
               return (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)',minWidth:'1175px',borderBottom:i<filtered.length-1?'1px solid #e2e8f0':'none',transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e=>(e.currentTarget.style.background='#f8fafc')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                  <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'2px',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontFamily:'monospace',fontSize:'15px',fontWeight:600,color:'#64748b',letterSpacing:'0.05em'}}>{row.pcc??'-'}</span>
-                    {pccAssigned && <span style={{fontSize:'14px',color:'#58536e'}}>{pccAssigned}</span>}
+                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1175px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                  onMouseEnter={e=>(e.currentTarget.style.background = D.accentSoft)} onMouseLeave={e=>(e.currentTarget.style.background = 'transparent')}>
+                  <div style={{padding:'12px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:'2px'}}>
+                    <span style={{fontFamily:'monospace', fontSize:'14px', fontWeight:600, color:D.fg, letterSpacing:'0.03em'}}>{row.pcc??'—'}</span>
+                    {pccAssigned && <span style={{fontSize:'12px', color:D.fgDim}}>{pccAssigned}</span>}
                   </div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'#1e293b'}}>{row.epr}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',flexDirection:'column',justifyContent:'center',borderRight:'1px solid #f1f5f9'}}>{u?<><div style={{fontSize:'16px',fontWeight:600,color:'#1e293b'}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'16px',color:'#94a3b8'}}>{u.email_address}</div></>:<span style={{fontSize:'16px',color:'#94a3b8'}}>-</span>}</div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
-                    {(() => {
-                      const ini = (row as {initial?:string}).initial
-                      const dup = isDuplicateInitial(ini)
-                      return ini ? (
-                        <span style={{
-                          display:'inline-flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'8px',
-                          fontSize:'16px', fontWeight:600, textTransform:'uppercase',
-                          color: dup ? '#dc2626' : '#a855f7',
-                          background: dup ? '#fef2f2' : '#f3e8ff',
-                          border: `1px solid ${dup ? '#fecaca' : '#e9d5ff'}`,
-                        }}>
-                          {ini}
-                        </span>
-                      ) : <span style={{color:'#cbd5e1'}}>-</span>
-                    })()}
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'14px', fontWeight:600, color:D.fg}}>{row.epr}</span></div>
+                  <div style={{padding:'12px 16px', display:'flex', flexDirection:'column', justifyContent:'center'}}>{u ? <><div style={{fontSize:'14px', fontWeight:600, color:D.fg}}>{u.first_name} {u.last_name}</div><div style={{fontSize:'12px', color:D.fgDim}}>{u.email_address}</div></> : <span style={{fontSize:'13px', color:D.fgDim}}>—</span>}</div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    {ini ? (
+                      <span style={{display:'inline-flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px', borderRadius:'8px', fontSize:'13px', fontWeight:700, textTransform:'uppercase',
+                        color: dup ? D.danger : D.accent, background: dup ? D.dangerSoft : D.accentSoft}}>
+                        {ini}
+                      </span>
+                    ) : <span style={{color:D.fgDim}}>—</span>}
                   </div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'15px',color:'#64748b',letterSpacing:'0.05em'}}>{row.cta??'-'}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'15px',color:'#64748b',letterSpacing:'0.05em'}}>{row.pta??'-'}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'15px',color:'#64748b',letterSpacing:'0.05em'}}>{row.minicom??'-'}</span></div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}>
-                    <span style={{fontSize:'15px',fontWeight:600,padding:'4px 10px',borderRadius:'9999px',background:(row as {ota?:boolean}).ota?'#f0fdf4':'#f1f5f9',color:(row as {ota?:boolean}).ota?'#16a34a':'#94a3b8',border:`1px solid ${(row as {ota?:boolean}).ota?'#bbf7d0':'#e2e8f0'}`}}>{(row as {ota?:boolean}).ota?'Yes':'No'}</span>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.cta??'—'}</span></div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.pta??'—'}</span></div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.minicom??'—'}</span></div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'12px', fontWeight:600, padding:'4px 10px', borderRadius:'20px', background: ota ? D.cyanSoft : 'rgba(139,148,158,0.10)', color: ota ? D.cyan : D.fgMuted}}>{ota ? 'Yes' : 'No'}</span>
                   </div>
-                  <div style={{padding:'14px 16px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'16px',fontWeight:600,padding:'6px 14px',borderRadius:'9999px',background:row.status==='Active'?'#f0fdf4':ss.bg,color:row.status==='Active'?'#16a34a':ss.color,border:`1px solid ${row.status==='Active'?'#bbf7d0':ss.border}`}}><span style={{width:'6px',height:'6px',borderRadius:'50%',background:row.status==='Active'?'#22c55e':ss.color,flexShrink:0}}/>{row.status}</span></div>
-                  <div style={{padding:'14px 16px 14px 12px',display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
-                    {isAdmin&&(<>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color}}>
+                      <span style={{width:'6px', height:'6px', borderRadius:'50%', background:statusStyle.color, flexShrink:0}}/>
+                      {status}
+                    </span>
+                  </div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
+                    {isAdmin && (<>
                       <button onClick={()=>openEdit(row)}
-                        style={{padding:'6px 14px',fontSize:'16px',fontWeight:500,color:'#64748b',background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.color='#1e293b';e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)'}}
-                        onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.color='#64748b';e.currentTarget.style.boxShadow='none'}}>
+                        style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                        onMouseOver={e=>{ e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
+                        onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Edit
                       </button>
                       <button onClick={()=>openDelete(row)}
-                        style={{padding:'6px 14px',fontSize:'16px',fontWeight:500,color:'#ef4444',background:'#ffffff',border:'1px solid #fecaca',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e=>{e.currentTarget.style.background='#fef2f2';e.currentTarget.style.borderColor='#ef4444'}}
-                        onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.borderColor='#fecaca'}}>
+                        style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                        onMouseOver={e=>{ e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                        onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Delete
                       </button>
                     </>)}
@@ -622,35 +645,35 @@ export default function SabreUsersPage() {
           </div>
         )}
 
-        {/* Available License — PCC, CTA, PTA, Minicom from resigned/deleted users, reusable */}
+        {/* Available License */}
         {!loading && availableLicenses.length > 0 && (
-          <div style={{marginTop:'24px'}}>
-            {error && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'12px'}}>{error}</div>}
-            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
-              <span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#059669'}} />
-              <h3 style={{fontSize:'15px',fontWeight:700,color:'#065F46',margin:0}}>Available License</h3>
-              <span style={{fontSize:'12px',fontWeight:600,padding:'2px 8px',borderRadius:'20px',background:'#ECFDF5',color:'#065F46',border:'1px solid #6EE7B7'}}>{availableLicenses.length}</span>
+          <div style={{marginTop:'22px'}}>
+            {error && <div style={{background:D.dangerSoft, border:`1px solid ${D.danger}`, color:D.danger, padding:'10px 14px', borderRadius:'8px', fontSize:'13px', marginBottom:'12px'}}>{error}</div>}
+            <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+              <span style={{width:'8px', height:'8px', borderRadius:'50%', background:D.success}} />
+              <h3 style={{fontSize:'15px', fontWeight:700, color:D.success, margin:0}}>Available License</h3>
+              <span style={{fontSize:'12px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:D.successSoft, color:D.success}}>{availableLicenses.length}</span>
               <button onClick={loadLicenseHistory} disabled={loadingHistory}
-                style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:600,color:'#475569',background:T.card,border:`1px solid ${T.border}`,borderRadius:'7px',padding:'6px 12px',cursor:'pointer'}}>
+                style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', fontWeight:600, color:D.fgMuted, background:D.card, border:`1px solid ${D.border}`, borderRadius:'7px', padding:'6px 12px', cursor:'pointer'}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 {loadingHistory ? 'Loading' : 'View Deletion History'}
               </button>
             </div>
-            <div style={{background:'#FFFFFF',border:`1px solid ${T.border}`,borderRadius:T.radius,overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr',background:'#ECFDF5',borderBottom:'2px solid #6EE7B7'}}>
-                {['PCC','CTA','PTA','Minicom',''].map(h=>(
-                  <div key={h||'actions'} style={{padding:'11px 14px',fontSize:'16px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.07em',borderRight: h ? '1px solid #d1fae5' : 'none'}}>{h}</div>
+            <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden'}}>
+              <div style={{display:'grid', gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr', background:D.successSoft, borderBottom:`2px solid ${D.success}`}}>
+                {['PCC','CTA','PTA','Minicom',''].map(h => (
+                  <div key={h||'actions'} style={{padding:'11px 14px', fontSize:'13px', fontWeight:700, color:D.success, textTransform:'uppercase', letterSpacing:'0.07em'}}>{h}</div>
                 ))}
               </div>
               {availableLicenses.map((row, i) => (
-                <div key={row.id} style={{display:'grid',gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr',borderBottom:i<availableLicenses.length-1?`1px solid ${T.border}`:'none'}}>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,padding:'2px 6px',borderRadius:T.radius,background:T.surfaceAlt,border:`1px solid ${T.border}`,color:T.textMid}}>{row.pcc??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.cta??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.pta??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center',borderRight:'1px solid #f1f5f9'}}><span style={{fontFamily:'monospace',fontSize:'13px',fontWeight:700,color:'#059669',background:'#ECFDF5',padding:'2px 7px',borderRadius:'6px',border:'1px solid #6EE7B7'}}>{row.minicom??'-'}</span></div>
-                  <div style={{padding:'13px 14px',display:'flex',alignItems:'center'}}>
+                <div key={row.id} style={{display:'grid', gridTemplateColumns:'0.8fr 0.8fr 0.8fr 0.8fr 0.6fr', borderBottom: i<availableLicenses.length-1 ? `1px solid ${D.border}` : 'none'}}>
+                  <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:600, padding:'2px 8px', borderRadius:'6px', background:D.bg, border:`1px solid ${D.border}`, color:D.fgMuted}}>{row.pcc??'—'}</span></div>
+                  <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:700, color:D.success, background:D.successSoft, padding:'2px 7px', borderRadius:'6px'}}>{row.cta??'—'}</span></div>
+                  <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:700, color:D.success, background:D.successSoft, padding:'2px 7px', borderRadius:'6px'}}>{row.pta??'—'}</span></div>
+                  <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:700, color:D.success, background:D.successSoft, padding:'2px 7px', borderRadius:'6px'}}>{row.minicom??'—'}</span></div>
+                  <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}>
                     <button onClick={() => deleteLicense(row.id)} disabled={deletingLicenseId === row.id}
-                      style={{display:'flex',alignItems:'center',gap:'5px',padding:'5px 10px',fontSize:'12px',fontWeight:600,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',cursor:'pointer',opacity:deletingLicenseId===row.id?0.6:1}}>
+                      style={{display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', fontSize:'12px', fontWeight:600, color:D.danger, background:D.dangerSoft, border:`1px solid ${D.danger}`, borderRadius:'6px', cursor:'pointer', opacity:deletingLicenseId===row.id?0.6:1}}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                       {deletingLicenseId === row.id ? 'Deleting' : 'Delete'}
                     </button>
@@ -658,8 +681,8 @@ export default function SabreUsersPage() {
                 </div>
               ))}
             </div>
-            <p style={{fontSize:'16px',color:T.textLight,marginTop:'8px',fontStyle:'italic'}}>
-              💡 These licenses were freed up from deleted users and can be reassigned to a new Sabre user. Rows disappear automatically once CTA, PTA, and Minicom have all been reused.
+            <p style={{fontSize:'13px', color:D.fgDim, marginTop:'8px', fontStyle:'italic'}}>
+              These licenses were freed up from deleted users and can be reassigned to a new Sabre user. Rows disappear automatically once CTA, PTA, and Minicom have all been reused.
             </p>
           </div>
         )}

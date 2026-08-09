@@ -127,7 +127,7 @@ function AutocompleteInput({ value, onChange, options, placeholder }: { value: s
         placeholder={placeholder}
         style={{ width: '100%', padding: '9px 14px 9px 34px', fontSize: '14px', border: `1.5px solid ${open ? D.accent : D.borderLight}`, borderRadius: '8px', background: D.bg, color: D.fg, outline: 'none', boxSizing: 'border-box', boxShadow: open ? `0 0 0 3px ${D.accentSoft}` : 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }} />
       {open && filtered.length > 0 && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', background: D.card, border: `1.5px solid ${D.accent}`, borderRadius: '8px', boxShadow: `0 12px 28px rgba(0,0,0,0.35), 0 0 0 3px ${D.accentSoft}`, zIndex: 60, padding: '4px' }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', background: D.card, border: `1.5px solid ${D.fg}`, borderRadius: '8px', boxShadow: '0 12px 28px rgba(0,0,0,0.4)', zIndex: 60, padding: '4px' }}>
           {filtered.slice(0, 50).map(o => (
             <div key={o} onClick={() => { onChange(o); setOpen(false) }}
               style={{ padding: '8px 10px', fontSize: '14px', color: D.fg, cursor: 'pointer', borderRadius: '6px' }}

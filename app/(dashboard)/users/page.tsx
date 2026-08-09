@@ -45,6 +45,19 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
 
 
 
+// Main page dark theme (matches TopNav's Users group = purple)
+const D = {
+  bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
+  fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
+  accent: '#a371f7', accentSoft: 'rgba(163,113,247,0.10)',
+  success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
+  warning: '#d29922', warningSoft: 'rgba(210,153,34,0.10)',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
+  cyan: '#39d2c0', cyanSoft: 'rgba(57,210,192,0.10)',
+}
+
+
+
 // ── Avatar component ───────────────────────────────────────
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg, #3b82f6, #2563eb)',
@@ -227,118 +240,98 @@ export default function UsersPage() {
   const inp = { width:'100%', padding:'8px 12px', fontSize:'13px', border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.text, outline:'none', boxSizing:'border-box' as const }
 
   return (
-    <div style={{fontFamily:"Inter, system-ui, sans-serif", background:'#f1f5f9', minHeight:'100vh'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
+      <div style={{padding:'32px 28px 40px'}}>
 
-      {/* ── Page Header ── */}
-      <div style={{padding:'20px 28px', marginBottom:'24px'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'12px'}}>
+        {/* Header */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'22px'}}>
           <div>
-            <h1 style={{fontSize:'30px', fontWeight:700, color:'#1e293b', margin:0, letterSpacing:'-0.02em'}}>Users</h1>
-         
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>Users</h1>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>User accounts and access management</p>
           </div>
           {isAdmin && (
-            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
               <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', opacity:filtered.length===0?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:filtered.length===0?0.4:1}}
+                onMouseOver={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.fg }}
+                onMouseOut={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.color=D.fgMuted }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export xlsx
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'#1e293b', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.boxShadow='0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.boxShadow='none' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer'}}
+                onMouseOver={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.fg }}
+                onMouseOut={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.color=D.fgMuted }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Import xlsx
               </button>
               <button onClick={openAdd}
-                style={{display:'flex', alignItems:'center', gap:'8px', padding:'10px 20px', background:'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)', border:'none', borderRadius:'8px', fontSize:'18px', fontWeight:500, color:'white', cursor:'pointer', boxShadow:'0 4px 14px 0 rgba(26, 95, 60, 0.3)', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px 0 rgba(26, 95, 60, 0.4)' }}
-                onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px 0 rgba(26, 95, 60, 0.3)' }}>
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1.5px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add User
               </button>
             </div>
           )}
         </div>
-      </div>
 
-      <div style={{padding:'0 28px 28px'}}>
-
-        {/* ── Stats row ── */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'20px', marginBottom:'24px'}}>
+        {/* Stats — real counts, all from the actual status/ota_client fields */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:'16px', marginBottom:'22px'}}>
           {[
-            { label:'Total Users', value: users.length, sub:'', icon:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', iconColor:'#3b82f6', iconBg:'#eff6ff',highlighted:true },
-            { label:'Active', value: activeCount, sub:'', icon:'M9 12l2 2 4-4', iconColor:'#22c55e', iconBg:'#f0fdf4',highlighted:true },
-            { label:'Inactive', value: inactiveCount, sub:'', icon:'M18 6L6 18M6 6l12 12', iconColor:'#ef4444', iconBg:'#fef2f2',highlighted:true },
-            { label:'Suspended', value: suspendedCount, sub:'', icon:'M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z', iconColor:'#f59e0b', iconBg:'#fffbeb',highlighted:true },
-            { label:'OTA users', value: otaCount, sub:'', icon:'M3 9l2-6h14l2 6M3 9a2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0 2 2 2 2 0 0 0 2-2M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', highlighted:true },
+            { label: 'Total Users', value: users.length, color: D.accent, soft: D.accentSoft, icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></> },
+            { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
+            { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
+            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
+            { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
           ].map((s, i) => (
-            <div key={i}
-              style={{
-                position:'relative', overflow:'hidden',
-                background: s.highlighted ? 'linear-gradient(135deg, #2d8a5e 0%, #10b981 100%)' : '#ffffff',
-                border: s.highlighted ? 'none' : '1px solid #e2e8f0',
-                borderRadius:'12px', padding:'20px',
-                display:'flex', alignItems:'center', justifyContent:'space-between',
-                boxShadow: s.highlighted ? '0 4px 14px 0 rgba(16, 185, 129, 0.3)' : 'none',
-                transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-              }}
-              onMouseOver={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'; e.currentTarget.style.borderColor='transparent' } }}
-              onMouseOut={e => { if (!s.highlighted) { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#e2e8f0' } }}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8', marginBottom:'8px'}}>{s.label}</div>
-                <div style={{fontSize:'26px', fontWeight:700, color: s.highlighted ? 'white' : '#1e293b', lineHeight:1, marginBottom:'4px'}}>{s.value}</div>
-                <div style={{fontSize:'12px', color: s.highlighted ? 'rgba(255,255,255,0.85)' : '#94a3b8'}}>{s.sub}</div>
+            <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
+              <div style={{width:'36px', height:'36px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:s.soft, color:s.color}}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{s.icon}</svg>
               </div>
-              <div style={{width:'44px', height:'44px', borderRadius:'8px', background: s.highlighted ? 'rgba(255,255,255,0.2)' : s.iconBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={s.highlighted ? 'white' : s.iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.icon}/></svg>
+              <div>
+                <div style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'20px', fontWeight:700, lineHeight:1.1, color:D.fg}}>{s.value}</div>
+                <div style={{fontSize:'11px', color:D.fgMuted, marginTop:'2px'}}>{s.label}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* ── Search & filter bar ── */}
-        <div style={{display:'flex', alignItems:'center', gap:'16px', marginBottom:'20px', flexWrap:'wrap'}}>
-          <div style={{position:'relative', flex:'1', minWidth:'280px'}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke='#94a3b8' strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'16px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        {/* Search & filter */}
+        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
+          <div style={{position:'relative', flex:1, minWidth:'240px'}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search by name, email or OTA status..." value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
-              style={{width:'100%', padding:'12px 16px 12px 44px', fontSize:'16px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', outline:'none', boxSizing:'border-box', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-              onFocus={e => { e.target.style.borderColor='#2d8a5e'; e.target.style.boxShadow='0 0 0 3px rgba(45, 138, 94, 0.1)' }}
-              onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none' }} />
+              style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
+              onFocus={e => { e.target.style.borderColor=D.accent; e.target.style.boxShadow=`0 0 0 3px ${D.accentSoft}` }}
+              onBlur={e => { e.target.style.borderColor=D.borderLight; e.target.style.boxShadow='none' }} />
           </div>
           <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
-            style={{padding:'12px 40px 12px 16px', fontSize:'14px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', color:'#1e293b', cursor:'pointer', outline:'none', appearance:'none', backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 16px center'}}>
+            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none'}}>
             <option value="all">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
             <option value="Suspended">Suspended</option>
           </select>
-          {/*<span style={{fontSize:'14px', color:'#64748b', fontWeight:500}}>
-            {filtered.length} user{filtered.length !== 1 ? 's' : ''}{search && ` matching "${search}"`}
-          </span>*/}
           {(search || filterStatus !== 'all') && (
             <button onClick={() => { setSearch(''); setFilterStatus('all'); setCurrentPage(1) }}
-              style={{padding:'8px 14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', fontSize:'13px', color:'#1a5f3c', cursor:'pointer', fontWeight:500}}>
+              style={{padding:'8px 14px', background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'13px', color:D.accent, cursor:'pointer', fontWeight:600}}>
               Clear
             </button>
           )}
         </div>
 
-        {/* ── Top record bar ── */}
-        <div style={{display:'flex', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'16px'}}>
-          <div style={{fontSize:'16px', color:'#64748b'}}>
+        {/* Top record bar */}
+        <div style={{display:'flex', alignItems:'center', marginBottom:'12px', flexWrap:'wrap', gap:'16px'}}>
+          <div style={{fontSize:'14px', color:D.fgMuted}}>
             {pageSize === 0
-              ? <>Showing <strong style={{color:'#1e293b'}}>all {filtered.length}</strong> users</>
-              : <>Showing <strong style={{color:'#1e293b'}}>{Math.min((currentPage-1)*pageSize+1, filtered.length)}-{Math.min(currentPage*pageSize, filtered.length)}</strong> of <strong style={{color:'#1e293b'}}>{filtered.length} users</strong></>}
+              ? <>Showing <strong style={{color:D.fg}}>all {filtered.length}</strong> users</>
+              : <>Showing <strong style={{color:D.fg}}>{Math.min((currentPage-1)*pageSize+1, filtered.length)}-{Math.min(currentPage*pageSize, filtered.length)}</strong> of <strong style={{color:D.fg}}>{filtered.length} users</strong></>}
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-            <span style={{fontSize:'16px', color:'#64748b'}}>Per page:</span>
+            <span style={{fontSize:'13px', color:D.fgMuted}}>Per page:</span>
             <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-              style={{padding:'6px 28px 6px 12px', fontSize:'16px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#ffffff', color:'#1e293b', cursor:'pointer', outline:'none', appearance:'none', backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 8px center'}}>
+              style={{padding:'6px 12px', fontSize:'13px', border:`1px solid ${D.border}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none'}}>
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -347,94 +340,80 @@ export default function UsersPage() {
             </select>
           </div>
         </div>
-        {/* ── Data Table ── */}
-        <div style={{background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'12px', overflowX:'auto', boxShadow:'0 1px 2px 0 rgb(0 0 0 / 0.05)'}}>
-          {/* Header */}
-          <div style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(140px,1fr) minmax(170px,170px)', minWidth:'770px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
+
+        {/* Table */}
+        <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
+          <div style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(150px,1fr) minmax(170px,170px)', minWidth:'770px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
             {['User', 'Status', 'OTA Client', 'Created', 'Actions'].map((h, i) => (
-              <div key={h} style={{padding:'14px 20px', fontSize:'16px', fontWeight:700, color:'#000000ff', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i === 4 ? 'right' : 'left', borderRight: i < 4 ? '1px solid #e2e8f0' : 'none'}}>
+              <div key={h} style={{padding:'12px 18px', fontSize:'14px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i === 4 ? 'right' : 'left'}}>
                 {h}
               </div>
             ))}
           </div>
 
-          {/* Body */}
           {loading ? (
-            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>Loading...</div>
+            <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>Loading...</div>
           ) : paginated.length === 0 ? (
-            <div style={{padding:'60px', textAlign:'center', color:T.textLight, fontSize:'14px'}}>
+            <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>
               {search ? `No users match "${search}"` : 'No users found. Click Add User to get started.'}
             </div>
           ) : (
             paginated.map((u, i) => {
               const fullName = `${u.first_name} ${u.last_name}`
+              const status = u.status ?? 'Active'
+              const statusStyle = status === 'Active' ? { soft: D.successSoft, color: D.success }
+                : status === 'Suspended' ? { soft: D.dangerSoft, color: D.danger }
+                : { soft: D.warningSoft, color: D.warning }
               return (
                 <div key={u.id}
-                  style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(140px,1fr) minmax(170px,170px)', minWidth:'770px', borderBottom: i < paginated.length - 1 ? '1px solid #e2e8f0' : 'none', transition:'background 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                  style={{display:'grid', gridTemplateColumns:'minmax(220px,2.5fr) minmax(120px,1fr) minmax(120px,1fr) minmax(150px,1fr) minmax(170px,170px)', minWidth:'770px', borderBottom: i < paginated.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                  onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                  {/* User — name + email stacked */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'14px', borderRight:'1px solid #e2e8f0'}}>
+                  <div style={{padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
                     <Avatar name={fullName} />
                     <div>
-                      <div style={{fontSize:'16px', fontWeight:600, color:'#1e293b'}}>{fullName}</div>
-                      <div style={{fontSize:'16px', color:'#94a3b8', marginTop:'1px'}}>{u.email_address}</div>
+                      <div style={{fontSize:'16px', fontWeight:600, color:D.fg}}>{fullName}</div>
+                      <div style={{fontSize:'13px', color:D.fgDim, marginTop:'1px'}}>{u.email_address}</div>
                     </div>
                   </div>
 
-                  {/* Status */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #e2e8f0'}}>
-                    {(() => {
-                      const status = u.status ?? 'Active'
-                      const statusStyle = status === 'Active'
-                        ? { bg:'#d7f8dfff', color:'#16a34a', dot:'#37610fff' }
-                        : status === 'Suspended'
-                        ? { bg:'#fffbeb', color:'#b45309', dot:'#f59e0b' }
-                        : { bg:'#f1f5f9', color:'#94a3b8', dot:'#bbf7d0' }
-                      return (
-                        <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'15px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
-                          background: statusStyle.bg, color: statusStyle.color}}>
-                          <span style={{width:'6px', height:'6px', borderRadius:'50%', background: statusStyle.dot, flexShrink:0}} />
-                          {status}
-                        </span>
-                      )
-                    })()}
+                  <div style={{padding:'14px 18px', display:'flex', alignItems:'center'}}>
+                    <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color}}>
+                      <span style={{width:'6px', height:'6px', borderRadius:'50%', background:statusStyle.color, flexShrink:0}} />
+                      {status}
+                    </span>
                   </div>
 
-                  {/* OTA Client */}
-                  <div style={{padding:'16px 20px', display:'flex', alignItems:'center', borderRight:'1px solid #e2e8f0'}}>
-                    <span style={{fontSize:'15px', fontWeight:600, padding:'6px 14px', borderRadius:'9999px',
-                      background: u.ota_client ? '#d7f8dfff' : '#f1f5f9',
-                      color:      u.ota_client ? '#16a34a' : '#94a3b8',
-                      border:     `1px solid ${u.ota_client ? '#bbf7d0' : '#e2e8f0'}`}}>
+                  <div style={{padding:'14px 18px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px',
+                      background: u.ota_client ? D.cyanSoft : 'rgba(139,148,158,0.10)',
+                      color: u.ota_client ? D.cyan : D.fgMuted}}>
                       {u.ota_client ? 'Yes' : 'No'}
                     </span>
                   </div>
 
-                  {/* Created + last modified sub-text */}
-                  <div style={{padding:'16px 20px', display:'flex', flexDirection:'column', justifyContent:'center', borderRight:'1px solid #e2e8f0'}}>
-                    <div style={{fontSize:'15px', color:'#1e293b'}}>{new Date(u.created_at).toLocaleDateString('en-GB')}</div>
+                  <div style={{padding:'14px 18px', display:'flex', flexDirection:'column', justifyContent:'center'}}>
+                    <div style={{fontSize:'14px', color:D.fgMuted}}>{new Date(u.created_at).toLocaleDateString('en-GB')}</div>
                     {u.modified_at && (
-                      <div style={{fontSize:'12px', color:'#94a3b8', marginTop:'2px'}}>
+                      <div style={{fontSize:'11px', color:D.fgDim, marginTop:'2px'}}>
                         Edited {new Date(u.modified_at).toLocaleDateString('en-GB')}
                       </div>
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div style={{padding:'16px 16px 16px 20px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
+                  <div style={{padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'8px'}}>
                     {isAdmin && (<>
                       <button onClick={() => openEdit(u)}
-                        style={{padding:'6px 14px', fontSize:'15px', fontWeight:500, color:'#64748b', background:'#ffffff', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.color='#1e293b'; e.currentTarget.style.boxShadow='0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.color='#64748b'; e.currentTarget.style.boxShadow='none' }}>
+                        style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                        onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
+                        onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Edit
                       </button>
                       <button onClick={() => openDelete(u)}
-                        style={{padding:'6px 14px', fontSize:'15px', fontWeight:500, color:'#ef4444', background:'#ffffff', border:'1px solid #fecaca', borderRadius:'8px', cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                        onMouseOver={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#ef4444' }}
-                        onMouseOut={e => { e.currentTarget.style.background='#ffffff'; e.currentTarget.style.borderColor='#fecaca' }}>
+                        style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
+                        onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                        onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Delete
                       </button>
                     </>)}
@@ -444,35 +423,32 @@ export default function UsersPage() {
             })
           )}
 
-          {/* ── Pagination (inside table container, bottom) ── */}
           {pageSize !== 0 && totalPages > 1 && (
-            <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'16px 20px', gap:'4px', borderTop:'1px solid #e2e8f0'}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'14px 18px', gap:'4px', borderTop:`1px solid ${D.border}`}}>
               <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage===1}
-                style={{padding:'0 12px', height:'32px', fontSize:'14px', fontWeight:500, border:'1px solid transparent', borderRadius:'8px', background:'transparent', color:'#64748b', cursor:'pointer', opacity:currentPage===1?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { if(currentPage!==1){ e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#e2e8f0' } }}
-                onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor='transparent' }}>Previous</button>
+                style={{padding:'0 12px', height:'32px', fontSize:'13px', fontWeight:600, border:'1px solid transparent', borderRadius:'8px', background:'transparent', color:D.fgMuted, cursor:'pointer', opacity:currentPage===1?0.4:1}}>
+                Previous
+              </button>
               {Array.from({length: Math.min(totalPages, 9)}, (_,i) => i+1).map(p => (
                 <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{minWidth:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:500, borderRadius:'8px',
-                    border: p===currentPage ? 'none' : '1px solid transparent',
-                    background: p===currentPage ? 'linear-gradient(135deg, #1a5f3c 0%, #2d8a5e 100%)' : 'transparent',
-                    color: p===currentPage ? 'white' : '#64748b',
-                    boxShadow: p===currentPage ? '0 2px 8px rgba(26, 95, 60, 0.3)' : 'none',
-                    cursor:'pointer', transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseOver={e => { if(p!==currentPage){ e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#e2e8f0' } }}
-                  onMouseOut={e => { if(p!==currentPage){ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor='transparent' } }}>{p}</button>
+                  style={{minWidth:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:600, borderRadius:'8px',
+                    border: p===currentPage ? `1px solid ${D.accent}` : '1px solid transparent',
+                    background: p===currentPage ? D.accentSoft : 'transparent',
+                    color: p===currentPage ? D.accent : D.fgMuted,
+                    cursor:'pointer'}}>
+                  {p}
+                </button>
               ))}
-              {totalPages > 9 && <span style={{padding:'0 6px', fontSize:'14px', color:'#94a3b8'}}>…{totalPages}</span>}
+              {totalPages > 9 && <span style={{padding:'0 6px', fontSize:'13px', color:D.fgDim}}>…{totalPages}</span>}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage===totalPages}
-                style={{padding:'0 12px', height:'32px', fontSize:'14px', fontWeight:500, border:'1px solid transparent', borderRadius:'8px', background:'transparent', color:'#64748b', cursor:'pointer', opacity:currentPage===totalPages?0.4:1, transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
-                onMouseOver={e => { if(currentPage!==totalPages){ e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#e2e8f0' } }}
-                onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor='transparent' }}>Next</button>
+                style={{padding:'0 12px', height:'32px', fontSize:'13px', fontWeight:600, border:'1px solid transparent', borderRadius:'8px', background:'transparent', color:D.fgMuted, cursor:'pointer', opacity:currentPage===totalPages?0.4:1}}>
+                Next
+              </button>
             </div>
           )}
         </div>
 
       </div>
-
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit User' : 'Add User'}>
         <div className="space-y-4">

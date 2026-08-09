@@ -27,6 +27,24 @@ const GDS_COLORS: Record<string, string> = {
   Travelport: '#dcfce7',
 }
 
+// Main page dark theme (matches TopNav's System group = coral)
+const D = {
+  bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
+  fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
+  accent: '#f78166', accentSoft: 'rgba(247,129,102,0.10)',
+  cyan: '#39d2c0', cyanSoft: 'rgba(57,210,192,0.10)',
+  success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
+  warning: '#d29922', warningSoft: 'rgba(210,153,34,0.10)',
+  danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
+  purple: '#a371f7', purpleSoft: 'rgba(163,113,247,0.10)',
+  blue: '#58a6ff', blueSoft: 'rgba(88,166,255,0.10)',
+}
+const GDS_DARK: Record<string, { color: string; soft: string }> = {
+  Amadeus:    { color: D.purple, soft: D.purpleSoft },
+  Sabre:      { color: D.accent, soft: D.accentSoft },
+  Travelport: { color: D.blue,   soft: D.blueSoft },
+}
+
 type GDS = { id: number; name: string }
 
 type CountRow = {
@@ -50,7 +68,7 @@ type MonthlyCreationRow = {
 type MonthColumn = { key: string; label: string; endDate: Date }
 type PccMonthlyRow = { pcc: string; gds: string; counts: number[] } // counts aligned with monthColumns
 
-type FilterState = { email: string; pcc_oid: string; status: string; ota: string; gds_id: string }
+type FilterState = { email: string; pcc_oid: string; status: string; ota: string; gds_id: string; organisation: string }
 type ReportTemplate = { id: number; name: string; filters: FilterState; months_back: number; created_at: string }
 
 //  Component 
@@ -60,6 +78,7 @@ export default function ReportingPage() {
   const [loading, setLoading]   = useState(true)
   const [isAdmin, setIsAdmin]   = useState(false)
   const [gdsList, setGdsList]   = useState<GDS[]>([])
+  const [orgList, setOrgList]   = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated]   = useState(false)
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null)
@@ -81,7 +100,7 @@ export default function ReportingPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('')
 
   // Filters
-  const blankFilters = { email: '', pcc_oid: '', status: '', ota: '', gds_id: '' }
+  const blankFilters = { email: '', pcc_oid: '', status: '', ota: '', gds_id: '', organisation: '' }
   const [filters, setFilters] = useState(blankFilters)
 
   //  Load GDS list, admin status, and saved templates 
@@ -94,6 +113,8 @@ export default function ReportingPage() {
     async function init() {
       const { data: g } = await supabase.from('gds').select('id, name').order('name')
       setGdsList(g ?? [])
+      const { data: oc } = await supabase.from('ota_client').select('company_name').order('company_name')
+      setOrgList(Array.from(new Set((oc ?? []).map(o => o.company_name).filter(Boolean))) as string[])
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -119,12 +140,13 @@ export default function ReportingPage() {
     const filterStatus = f.status.toLowerCase().trim()
     const filterOta     = f.ota.toLowerCase().trim() // 'yes' | 'no' | ''
     const filterGdsId   = f.gds_id ? Number(f.gds_id) : null
+    const filterOrg     = f.organisation.trim()
 
     const [{ data: amadeusRaw, error: e1 }, { data: sabreRaw, error: e2 }, { data: travelportRaw, error: e3 }, { data: resignedRaw, error: e4 }] = await Promise.all([
       supabase.from('amadeus_user').select('id, login, sign_on_id, initial, duty_code, oid, ota, status, created_at, users:user_id(first_name, last_name, email_address), ota_client:ota_client_id(company_name)'),
       supabase.from('sabre_user').select('id, epr, pcc, initial, status, created_at, ota, users:user_id(first_name, last_name, email_address), ota_client:ota_client_id(company_name)'),
       supabase.from('travelport_user').select('id, sign_on_id, cid, gtid, pcc, status, created_at, ota, users:user_id(first_name, last_name, email_address), ota_client:ota_client_id(company_name)'),
-      supabase.from('resigned_user').select('pcc, source_gds, email, date_created_in_gds, date_resigned'),
+      supabase.from('resigned_user').select('pcc, source_gds, email, organisation, date_created_in_gds, date_resigned'),
     ])
     if (e1 || e2 || e3 || e4) { setError((e1 ?? e2 ?? e3 ?? e4)!.message); setGenerating(false); return }
 
@@ -137,31 +159,35 @@ export default function ReportingPage() {
     const sabreScoped      = filterGdsId && filterGdsId !== sabreGdsId   ? [] : (sabreRaw ?? [])
     const travelportScoped = filterGdsId && filterGdsId !== tpGdsId      ? [] : (travelportRaw ?? [])
 
-    // Apply email / PCC-OID / status / OTA filters
-    function passes(email?: string, pccOid?: string, status?: string, ota?: boolean) {
+    // Apply email / PCC-OID / status / OTA / organisation filters
+    function passes(email?: string, pccOid?: string, status?: string, ota?: boolean, org?: string) {
       if (filterEmail && !(email ?? '').toLowerCase().includes(filterEmail)) return false
       if (filterPccOid && !(pccOid ?? '').toLowerCase().includes(filterPccOid)) return false
       if (filterStatus && (status ?? '').toLowerCase() !== filterStatus) return false
       if (filterOta === 'yes' && !ota) return false
       if (filterOta === 'no' && ota) return false
+      if (filterOrg && org !== filterOrg) return false
       return true
     }
 
     const amadeus = amadeusScoped.filter(r => {
       const u = (r as {users?: RawUser}).users as RawUser
-      return passes(u?.email_address, (r as {oid?: string}).oid, (r as {status?: string}).status, (r as {ota?: boolean}).ota)
+      const oc = (r as {ota_client?: RawOtaClient}).ota_client as RawOtaClient
+      return passes(u?.email_address, (r as {oid?: string}).oid, (r as {status?: string}).status, (r as {ota?: boolean}).ota, oc?.company_name)
     })
     const sabre = sabreScoped.filter(r => {
       const u = (r as {users?: RawUser}).users as RawUser
-      return passes(u?.email_address, (r as {pcc?: string}).pcc, (r as {status?: string}).status, (r as {ota?: boolean}).ota)
+      const oc = (r as {ota_client?: RawOtaClient}).ota_client as RawOtaClient
+      return passes(u?.email_address, (r as {pcc?: string}).pcc, (r as {status?: string}).status, (r as {ota?: boolean}).ota, oc?.company_name)
     })
     const travelport = travelportScoped.filter(r => {
       const u = (r as {users?: RawUser}).users as RawUser
-      return passes(u?.email_address, (r as {pcc?: string}).pcc, (r as {status?: string}).status, (r as {ota?: boolean}).ota)
+      const oc = (r as {ota_client?: RawOtaClient}).ota_client as RawOtaClient
+      return passes(u?.email_address, (r as {pcc?: string}).pcc, (r as {status?: string}).status, (r as {ota?: boolean}).ota, oc?.company_name)
     })
 
     // Resigned users — needed to reconstruct historical headcounts (status/OTA filters don't apply to past records)
-    type RawResigned = { pcc?: string; source_gds?: string; email?: string; date_created_in_gds?: string; date_resigned?: string }
+    type RawResigned = { pcc?: string; source_gds?: string; email?: string; organisation?: string; date_created_in_gds?: string; date_resigned?: string }
     const resigned = (resignedRaw ?? []).filter(r => {
       const rr = r as RawResigned
       if (filterGdsId) {
@@ -170,6 +196,7 @@ export default function ReportingPage() {
       }
       if (filterEmail && !(rr.email ?? '').toLowerCase().includes(filterEmail)) return false
       if (filterPccOid && !(rr.pcc ?? '').toLowerCase().includes(filterPccOid)) return false
+      if (filterOrg && rr.organisation !== filterOrg) return false
       return true
     })
 
@@ -362,6 +389,7 @@ export default function ReportingPage() {
       ['Status filter', filters.status || '(all)'],
       ['OTA filter', filters.ota || '(all)'],
       ['GDS', gdsName],
+      ['Organisation filter', filters.organisation || '(none)'],
     ]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Summary')
     if (counts.length > 0) {
@@ -395,69 +423,79 @@ export default function ReportingPage() {
   }
 
   //  Input style helper 
+  // Modal keeps light styling (inp/lbl) — main page filter fields use these dark, colorful versions
+  const inpDark = (extra?: object) => ({ padding:'10px 14px', fontSize:'15px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, transition:'border-color 0.15s, box-shadow 0.15s', ...extra })
+  const lblDark = (color: string) => ({ fontSize:'13px', fontWeight:700, color, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' })
   const inp = (extra?: object) => ({ padding:'7px 10px', fontSize:'13px', border:'1px solid #e2e8f0', borderRadius:'7px', background:T.card, color:'#334155', outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lbl = { fontSize:'11px', fontWeight:600, color:'#475569', textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'4px', display:'block' }
 
   if (loading) return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',color:'#94a3b8',fontSize:'14px'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',background:D.bg,color:D.fgMuted,fontSize:'14px'}}>
       Loading reporting module
     </div>
   )
 
   return (
-    <div style={{fontFamily:'Inter,system-ui,sans-serif'}}>
+    <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg, padding:'32px 28px 40px'}}>
 
-      {/*  Page Header  */}
-      <div style={{marginBottom:'20px',display:'flex',justifyContent:'space-between',alignItems:'flex-end',flexWrap:'wrap',gap:'12px'}}>
+      {/* Header */}
+      <div style={{marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'flex-end', flexWrap:'wrap', gap:'12px'}}>
         <div>
-          <h1 style={{fontSize:'24px',fontWeight:800,color:T.text,margin:0,letterSpacing:'-0.025em'}}>Reporting</h1>
-          <p style={{fontSize:'14px',color:'#64748b',marginTop:'4px'}}>Live GDS user report - set filters and generate</p>
+          <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'30px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>Report</h1>
+          <p style={{fontSize:'15px', color:D.fgMuted, marginTop:'5px'}}>Live GDS user report — set filters and generate real-time reports</p>
         </div>
       </div>
 
-      {/*  Saved templates  */}
-      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',flexWrap:'wrap'}}>
-        <label style={{fontSize:'12px',fontWeight:600,color:'#475569'}}>Saved Report:</label>
+      {/* Saved templates */}
+      <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'14px', flexWrap:'wrap'}}>
+        <label style={{fontSize:'15px', fontWeight:600, color:D.fgMuted}}>Saved Report:</label>
         <select value={selectedTemplateId} onChange={e => applyTemplate(e.target.value ? Number(e.target.value) : '')}
-          style={{padding:'6px 10px',fontSize:'13px',border:'1px solid #e2e8f0',borderRadius:'7px',background:T.card,color:'#334155',minWidth:'220px'}}>
+          style={{padding:'9px 14px', fontSize:'15px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, minWidth:'220px', outline:'none', cursor:'pointer'}}>
           <option value="">— Choose a saved template —</option>
           {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         {selectedTemplateId !== '' && isAdmin && (
           <button onClick={() => deleteTemplate(selectedTemplateId as number)}
-            style={{fontSize:'12px',color:'#dc2626',background:'none',border:'1px solid #fecaca',borderRadius:'6px',padding:'5px 10px',cursor:'pointer'}}>
+            style={{fontSize:'14px', color:D.danger, background:'transparent', border:`1px solid ${D.danger}`, borderRadius:'6px', padding:'6px 12px', cursor:'pointer'}}>
             Delete Template
           </button>
         )}
         {isAdmin && (
           <button onClick={() => { setTemplateName(''); setShowSaveTemplate(true) }}
-            style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:600,color:'#4f46e5',background:'#eef2ff',border:'1px solid #c7d2fe',borderRadius:'7px',padding:'6px 12px',cursor:'pointer'}}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px', fontSize:'15px', fontWeight:600, color:D.accent, background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', padding:'8px 14px', cursor:'pointer'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             Save current filters as template
           </button>
         )}
       </div>
 
-      {/*  Toast messages  */}
-      {error && <div style={{background:'#fef2f2',border:'1px solid #fecaca',color:'#dc2626',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{error}</div>}
-      {success && <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#166534',padding:'10px 14px',borderRadius:'8px',fontSize:'13px',marginBottom:'14px'}}>{success}</div>}
+      {/* Toast messages */}
+      {error && <div style={{background:D.dangerSoft, border:`1px solid ${D.danger}`, color:D.danger, padding:'10px 14px', borderRadius:'8px', fontSize:'13px', marginBottom:'14px'}}>{error}</div>}
+      {success && <div style={{background:D.successSoft, border:`1px solid ${D.success}`, color:D.success, padding:'10px 14px', borderRadius:'8px', fontSize:'13px', marginBottom:'14px'}}>{success}</div>}
 
-      {/*  Filter bar  */}
-      <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',padding:'18px 20px',marginBottom:'16px',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5, 1fr)',gap:'12px',marginBottom:'14px'}}>
+      {/* Report Filters */}
+      <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'20px 22px', marginBottom:'18px'}}>
+        <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:'0 0 16px'}}>Report Filters</h2>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'16px', marginBottom:'16px'}}>
           <div>
-            <label style={lbl}>Email Address</label>
+            <label style={lblDark(D.accent)}>Email Address</label>
             <input value={filters.email} onChange={e => setFilters(s => ({...s, email: e.target.value}))}
-              placeholder="Contains e.g. psttravel.com" style={inp()} />
+              placeholder="e.g. user@company.com" style={inpDark()}
+              onFocus={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.accentSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }} />
           </div>
           <div>
-            <label style={lbl}>PCC / OID</label>
+            <label style={lblDark(D.cyan)}>PCC / OID</label>
             <input value={filters.pcc_oid} onChange={e => setFilters(s => ({...s, pcc_oid: e.target.value}))}
-              placeholder="Contains e.g. KULMY217Z" style={inp()} />
+              placeholder="e.g. KULMY217Z" style={inpDark()}
+              onFocus={e => { e.currentTarget.style.borderColor=D.cyan; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.cyanSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }} />
           </div>
           <div>
-            <label style={lbl}>User Status</label>
-            <select value={filters.status} onChange={e => setFilters(s => ({...s, status: e.target.value}))} style={inp()}>
+            <label style={lblDark(D.success)}>User Status</label>
+            <select value={filters.status} onChange={e => setFilters(s => ({...s, status: e.target.value}))} style={inpDark({cursor:'pointer'})}
+              onFocus={e => { e.currentTarget.style.borderColor=D.success; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.successSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }}>
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -465,35 +503,51 @@ export default function ReportingPage() {
             </select>
           </div>
           <div>
-            <label style={lbl}>OTA</label>
-            <select value={filters.ota} onChange={e => setFilters(s => ({...s, ota: e.target.value}))} style={inp()}>
-              <option value="">All</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>GDS</label>
-            <select value={filters.gds_id} onChange={e => setFilters(s => ({...s, gds_id: e.target.value}))} style={inp()}>
-              <option value="">All GDS</option>
+            <label style={lblDark(D.blue)}>GDS Provider</label>
+            <select value={filters.gds_id} onChange={e => setFilters(s => ({...s, gds_id: e.target.value}))} style={inpDark({cursor:'pointer'})}
+              onFocus={e => { e.currentTarget.style.borderColor=D.blue; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.blueSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }}>
+              <option value="">All Providers</option>
               {gdsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
+          <div>
+            <label style={lblDark(D.purple)}>Organisation</label>
+            <select value={filters.organisation} onChange={e => setFilters(s => ({...s, organisation: e.target.value}))} style={inpDark({cursor:'pointer'})}
+              onFocus={e => { e.currentTarget.style.borderColor=D.purple; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.purpleSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }}>
+              <option value="">All Organisations</option>
+              {orgList.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lblDark(D.warning)}>OTA</label>
+            <select value={filters.ota} onChange={e => setFilters(s => ({...s, ota: e.target.value}))} style={inpDark({cursor:'pointer'})}
+              onFocus={e => { e.currentTarget.style.borderColor=D.warning; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.warningSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }}>
+              <option value="">All Users</option>
+              <option value="yes">OTA Users</option>
+              <option value="no">Non-OTA</option>
+            </select>
+          </div>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-            <label style={{...lbl, marginBottom:0}}>PCC Headcount: months back</label>
-            <select value={monthsBack} onChange={e => setMonthsBack(Number(e.target.value))} style={inp({width:'80px'})}>
+
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:'12px', flexWrap:'wrap', paddingTop:'16px', borderTop:`1px solid ${D.border}`}}>
+          <div style={{maxWidth:'200px'}}>
+            <label style={lblDark(D.fgMuted)}>PCC Headcount: Months Back</label>
+            <select value={monthsBack} onChange={e => setMonthsBack(Number(e.target.value))} style={inpDark({cursor:'pointer'})}
+              onFocus={e => { e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.boxShadow=`0 0 0 3px ${D.accentSoft}` }}
+              onBlur={e => { e.currentTarget.style.borderColor=D.borderLight; e.currentTarget.style.boxShadow='none' }}>
               {[3,6,9,12].map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
-          <div style={{display:'flex',gap:'8px'}}>
+          <div style={{display:'flex', gap:'8px'}}>
             <button onClick={resetFilters}
-              style={{padding:'8px 16px',background:T.card,border:'1px solid #e2e8f0',borderRadius:'8px',fontSize:'13px',color:'#475569',cursor:'pointer',fontWeight:500}}>
+              style={{padding:'9px 18px', background:D.card, border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'15px', color:D.fgMuted, cursor:'pointer', fontWeight:600}}>
               Reset
             </button>
             <button onClick={() => generateReport()} disabled={generating}
-              style={{display:'flex',alignItems:'center',gap:'7px',padding:'8px 18px',background:'#0f172a',color:'white',border:'none',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',opacity:generating?0.6:1}}>
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 20px', background:D.accent, color:'#fff', border:`1.5px solid ${D.accent}`, borderRadius:'8px', fontSize:'15px', fontWeight:600, cursor:'pointer', opacity:generating?0.6:1}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               {generating ? 'Generating' : 'Generate Report'}
             </button>
@@ -501,34 +555,36 @@ export default function ReportingPage() {
         </div>
       </div>
 
-      {/*  Results  */}
+      {/* Results */}
       {!generated ? (
-        <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',padding:'60px 24px',textAlign:'center',color:'#94a3b8',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{margin:'0 auto 12px'}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <p style={{fontSize:'14px',margin:0}}>Set your filters above and click Generate Report to view results</p>
+        <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'60px 24px', textAlign:'center', color:D.fgMuted}}>
+          <div style={{width:'56px', height:'56px', borderRadius:'14px', background:D.accentSoft, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px'}}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={D.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <p style={{fontSize:'16px', margin:0}}>Set your filters above and click Generate Report to view results</p>
         </div>
       ) : (
-        <div style={{background:T.card,border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+        <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden'}}>
 
           {/* Detail header */}
-          <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
-            <div style={{fontSize:'12px',color:'#64748b'}}>
+          <div style={{padding:'14px 18px', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px'}}>
+            <div style={{fontSize:'12px', color:D.fgDim}}>
               Generated {generatedAt?.toLocaleString('en-GB')}
             </div>
             <button onClick={exportExcel}
-              style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+              style={{display:'flex', alignItems:'center', gap:'6px', padding:'6px 12px', background:D.success, color:'#fff', border:'none', borderRadius:'7px', fontSize:'12px', fontWeight:600, cursor:'pointer'}}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Export
             </button>
           </div>
 
           {/* Tabs */}
-          <div style={{display:'flex',borderBottom:'1px solid #e2e8f0',background:T.card}}>
+          <div style={{display:'flex', borderBottom:`1px solid ${D.border}`, background:D.card, overflowX:'auto'}}>
             {(['counts','users','monthly','pcc'] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                style={{padding:'10px 20px',fontSize:'13px',fontWeight:600,border:'none',background:'none',cursor:'pointer',
-                  color: activeTab===tab ? '#4f46e5' : '#64748b',
-                  borderBottom: activeTab===tab ? '2px solid #4f46e5' : '2px solid transparent',
+                style={{padding:'12px 20px', fontSize:'13px', fontWeight:600, border:'none', background:'none', cursor:'pointer', whiteSpace:'nowrap',
+                  color: activeTab===tab ? D.accent : D.fgMuted,
+                  borderBottom: activeTab===tab ? `2px solid ${D.accent}` : '2px solid transparent',
                   transition:'all 0.15s'}}>
                 {tab === 'counts' ? `Monthly Count (${counts.length})` : tab === 'users' ? `User Detail (${details.length})` : tab === 'monthly' ? `Monthly Creation (${monthlyCreation.length})` : `PCC Headcount (${pccMonthly.length})`}
               </button>
@@ -536,46 +592,46 @@ export default function ReportingPage() {
           </div>
 
           {/* Tab content */}
-          <div style={{padding:'16px 18px'}}>
+          <div style={{padding:'18px'}}>
 
-            {/*  Monthly Count Tab  */}
+            {/* Monthly Count Tab */}
             {activeTab === 'counts' && (
               counts.length === 0 ? (
-                <div style={{textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:'13px'}}>No users matched these filters.</div>
+                <div style={{textAlign:'center', padding:'40px', color:D.fgDim, fontSize:'13px'}}>No users matched these filters.</div>
               ) : (
                 <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px',minWidth:'700px'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:'700px'}}>
                     <thead>
-                      <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
+                      <tr style={{background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
                         {['GDS','PCC','Organisation','Total','Active','Inactive','OTA'].map(h => (
-                          <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
+                          <th key={h} style={{padding:'10px 12px', textAlign:'left', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {counts.map((c, i) => (
-                        <tr key={`${c.gds_name}-${c.pcc}-${c.organisation}-${i}`} style={{borderBottom: i < counts.length - 1 ? '1px solid #f1f5f9' : 'none'}}
-                          onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
-                          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+                        <tr key={`${c.gds_name}-${c.pcc}-${c.organisation}-${i}`} style={{borderBottom: i < counts.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                          onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                           <td style={{padding:'10px 12px'}}>
-                            <span style={{padding:'2px 8px',borderRadius:T.radiusSm,background: GDS_COLORS[c.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{c.gds_name}</span>
+                            <span style={{padding:'3px 9px', borderRadius:'6px', background: GDS_DARK[c.gds_name]?.soft ?? 'rgba(139,148,158,0.10)', color: GDS_DARK[c.gds_name]?.color ?? D.fgMuted, fontSize:'11px', fontWeight:600}}>{c.gds_name}</span>
                           </td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{c.pcc}</td>
-                          <td style={{padding:'10px 12px',color:'#334155'}}>{c.organisation}</td>
-                          <td style={{padding:'10px 12px',fontWeight:700,color:'#0f172a',textAlign:'center'}}>{c.total_users}</td>
-                          <td style={{padding:'10px 12px',color:'#16a34a',fontWeight:600,textAlign:'center'}}>{c.active_users}</td>
-                          <td style={{padding:'10px 12px',color:'#dc2626',fontWeight:600,textAlign:'center'}}>{c.inactive_users}</td>
-                          <td style={{padding:'10px 12px',color:'#7c3aed',fontWeight:600,textAlign:'center'}}>{c.ota_users}</td>
+                          <td style={{padding:'10px 12px', fontFamily:'monospace', fontWeight:600, color:D.fg}}>{c.pcc}</td>
+                          <td style={{padding:'10px 12px', color:D.fgMuted}}>{c.organisation}</td>
+                          <td style={{padding:'10px 12px', fontWeight:700, color:D.fg, textAlign:'center'}}>{c.total_users}</td>
+                          <td style={{padding:'10px 12px', color:D.success, fontWeight:600, textAlign:'center'}}>{c.active_users}</td>
+                          <td style={{padding:'10px 12px', color:D.danger, fontWeight:600, textAlign:'center'}}>{c.inactive_users}</td>
+                          <td style={{padding:'10px 12px', color:D.purple, fontWeight:600, textAlign:'center'}}>{c.ota_users}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{borderTop:'2px solid #e2e8f0',background:'#f8fafc'}}>
-                        <td colSpan={3} style={{padding:'10px 12px',fontSize:'12px',fontWeight:700,color:'#475569'}}>TOTAL</td>
-                        <td style={{padding:'10px 12px',fontWeight:800,color:'#0f172a',textAlign:'center'}}>{counts.reduce((s,c) => s + c.total_users, 0)}</td>
-                        <td style={{padding:'10px 12px',fontWeight:700,color:'#16a34a',textAlign:'center'}}>{counts.reduce((s,c) => s + c.active_users, 0)}</td>
-                        <td style={{padding:'10px 12px',fontWeight:700,color:'#dc2626',textAlign:'center'}}>{counts.reduce((s,c) => s + c.inactive_users, 0)}</td>
-                        <td style={{padding:'10px 12px',fontWeight:700,color:'#7c3aed',textAlign:'center'}}>{counts.reduce((s,c) => s + c.ota_users, 0)}</td>
+                      <tr style={{borderTop:`2px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>
+                        <td colSpan={3} style={{padding:'10px 12px', fontSize:'12px', fontWeight:700, color:D.fgMuted}}>TOTAL</td>
+                        <td style={{padding:'10px 12px', fontWeight:800, color:D.fg, textAlign:'center'}}>{counts.reduce((s,c) => s + c.total_users, 0)}</td>
+                        <td style={{padding:'10px 12px', fontWeight:700, color:D.success, textAlign:'center'}}>{counts.reduce((s,c) => s + c.active_users, 0)}</td>
+                        <td style={{padding:'10px 12px', fontWeight:700, color:D.danger, textAlign:'center'}}>{counts.reduce((s,c) => s + c.inactive_users, 0)}</td>
+                        <td style={{padding:'10px 12px', fontWeight:700, color:D.purple, textAlign:'center'}}>{counts.reduce((s,c) => s + c.ota_users, 0)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -583,100 +639,101 @@ export default function ReportingPage() {
               )
             )}
 
-            {/*  User Detail Tab  */}
+            {/* User Detail Tab */}
             {activeTab === 'users' && (
               details.length === 0 ? (
-                <div style={{textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:'13px'}}>No users matched these filters.</div>
+                <div style={{textAlign:'center', padding:'40px', color:D.fgDim, fontSize:'13px'}}>No users matched these filters.</div>
               ) : (
                 <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px',minWidth:'900px'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:'900px'}}>
                     <thead>
-                      <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
+                      <tr style={{background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
                         {['GDS','PCC','Organisation','Initial','Name','Email','Login ID','Sign-On','Status'].map(h => (
-                          <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
+                          <th key={h} style={{padding:'10px 12px', textAlign:'left', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {details.map((u, i) => (
-                        <tr key={`${u.gds_name}-${u.email}-${i}`} style={{borderBottom: i < details.length - 1 ? '1px solid #f1f5f9' : 'none'}}
-                          onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
-                          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
-                          <td style={{padding:'10px 12px'}}>
-                            <span style={{padding:'2px 8px',borderRadius:T.radiusSm,background: GDS_COLORS[u.gds_name] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{u.gds_name}</span>
-                          </td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{u.pcc}</td>
-                          <td style={{padding:'10px 12px',color:'#334155'}}>{u.organisation}</td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#7c3aed'}}>{u.initial ?? ''}</td>
-                          <td style={{padding:'10px 12px',color:'#334155'}}>{[u.first_name, u.last_name].filter(Boolean).join(' ') || ''}</td>
-                          <td style={{padding:'10px 12px',color:'#0369a1',fontSize:'12px'}}>{u.email ?? ''}</td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.login_id ?? ''}</td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'12px'}}>{u.sign_on_id ?? ''}</td>
-                          <td style={{padding:'10px 12px'}}>
-                            <span style={{fontSize:'11px',fontWeight:600,padding:'2px 8px',borderRadius:'20px',
-                              background: u.user_status==='active' ? '#dcfce7' : u.user_status==='inactive' ? '#fee2e2' : '#fef9c3',
-                              color:      u.user_status==='active' ? '#166534' : u.user_status==='inactive' ? '#dc2626' : '#854d0e'}}>
-                              {u.user_status ?? ''}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {details.map((u, i) => {
+                        const statusStyle = (u.user_status ?? '').toLowerCase() === 'active' ? { soft: D.successSoft, color: D.success }
+                          : (u.user_status ?? '').toLowerCase() === 'inactive' ? { soft: D.dangerSoft, color: D.danger }
+                          : { soft: D.warningSoft, color: D.warning }
+                        return (
+                          <tr key={`${u.gds_name}-${u.email}-${i}`} style={{borderBottom: i < details.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                            onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            <td style={{padding:'10px 12px'}}>
+                              <span style={{padding:'3px 9px', borderRadius:'6px', background: GDS_DARK[u.gds_name]?.soft ?? 'rgba(139,148,158,0.10)', color: GDS_DARK[u.gds_name]?.color ?? D.fgMuted, fontSize:'11px', fontWeight:600}}>{u.gds_name}</span>
+                            </td>
+                            <td style={{padding:'10px 12px', fontFamily:'monospace', fontWeight:600, color:D.fg}}>{u.pcc}</td>
+                            <td style={{padding:'10px 12px', color:D.fgMuted}}>{u.organisation}</td>
+                            <td style={{padding:'10px 12px', fontFamily:'monospace', fontWeight:600, color:D.purple}}>{u.initial ?? ''}</td>
+                            <td style={{padding:'10px 12px', color:D.fgMuted}}>{[u.first_name, u.last_name].filter(Boolean).join(' ') || ''}</td>
+                            <td style={{padding:'10px 12px', color:D.blue, fontSize:'12px'}}>{u.email ?? ''}</td>
+                            <td style={{padding:'10px 12px', fontFamily:'monospace', fontSize:'12px', color:D.fgMuted}}>{u.login_id ?? ''}</td>
+                            <td style={{padding:'10px 12px', fontFamily:'monospace', fontSize:'12px', color:D.fgMuted}}>{u.sign_on_id ?? ''}</td>
+                            <td style={{padding:'10px 12px'}}>
+                              <span style={{fontSize:'11px', fontWeight:600, padding:'2px 8px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color}}>
+                                {u.user_status ?? ''}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               )
             )}
 
-            {/*  Monthly Creation Tab  */}
+            {/* Monthly Creation Tab */}
             {activeTab === 'monthly' && (
               monthlyCreation.length === 0 ? (
-                <div style={{textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:'13px'}}>No users matched these filters.</div>
+                <div style={{textAlign:'center', padding:'40px', color:D.fgDim, fontSize:'13px'}}>No users matched these filters.</div>
               ) : (
                 <div>
-                  {/* Bar chart */}
-                  <div style={{display:'flex',alignItems:'flex-end',gap:'10px',height:'160px',padding:'10px 4px 0',marginBottom:'20px',borderBottom:'1px solid #e2e8f0',overflowX:'auto'}}>
+                  <div style={{display:'flex', alignItems:'flex-end', gap:'10px', height:'160px', padding:'10px 4px 0', marginBottom:'20px', borderBottom:`1px solid ${D.border}`, overflowX:'auto'}}>
                     {(() => {
                       const maxTotal = Math.max(...monthlyCreation.map(m => m.total), 1)
                       return monthlyCreation.map(m => (
-                        <div key={m.month} style={{display:'flex',flexDirection:'column',alignItems:'center',minWidth:'52px',flexShrink:0}}>
-                          <div style={{fontSize:'11px',fontWeight:700,color:'#0f172a',marginBottom:'4px'}}>{m.total}</div>
-                          <div style={{width:'28px',height:`${Math.max((m.total / maxTotal) * 120, 3)}px`,background:'linear-gradient(180deg,#818cf8,#4f46e5)',borderRadius:'4px 4px 0 0'}} />
-                          <div style={{fontSize:'10px',color:'#94a3b8',marginTop:'6px',whiteSpace:'nowrap'}}>{m.monthLabel}</div>
+                        <div key={m.month} style={{display:'flex', flexDirection:'column', alignItems:'center', minWidth:'52px', flexShrink:0}}>
+                          <div style={{fontSize:'11px', fontWeight:700, color:D.fg, marginBottom:'4px'}}>{m.total}</div>
+                          <div style={{width:'28px', height:`${Math.max((m.total / maxTotal) * 120, 3)}px`, background:`linear-gradient(180deg, ${D.accent}, #da6b50)`, borderRadius:'4px 4px 0 0'}} />
+                          <div style={{fontSize:'10px', color:D.fgDim, marginTop:'6px', whiteSpace:'nowrap'}}>{m.monthLabel}</div>
                         </div>
                       ))
                     })()}
                   </div>
 
-                  {/* Table */}
                   <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px',minWidth:'560px'}}>
+                    <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:'560px'}}>
                       <thead>
-                        <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
+                        <tr style={{background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
                           {['Month','Amadeus','Sabre','Travelport','Total'].map(h => (
-                            <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
+                            <th key={h} style={{padding:'10px 12px', textAlign:'left', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {monthlyCreation.map((m, i) => (
-                          <tr key={m.month} style={{borderBottom: i < monthlyCreation.length - 1 ? '1px solid #f1f5f9' : 'none'}}
-                            onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
-                            onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
-                            <td style={{padding:'10px 12px',fontWeight:600,color:'#0f172a'}}>{m.monthLabel}</td>
-                            <td style={{padding:'10px 12px',color:'#7c3aed',fontWeight:600,textAlign:'center'}}>{m.amadeus}</td>
-                            <td style={{padding:'10px 12px',color:'#0369a1',fontWeight:600,textAlign:'center'}}>{m.sabre}</td>
-                            <td style={{padding:'10px 12px',color:'#16a34a',fontWeight:600,textAlign:'center'}}>{m.travelport}</td>
-                            <td style={{padding:'10px 12px',fontWeight:800,color:'#0f172a',textAlign:'center'}}>{m.total}</td>
+                          <tr key={m.month} style={{borderBottom: i < monthlyCreation.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                            onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            <td style={{padding:'10px 12px', fontWeight:600, color:D.fg}}>{m.monthLabel}</td>
+                            <td style={{padding:'10px 12px', color:D.purple, fontWeight:600, textAlign:'center'}}>{m.amadeus}</td>
+                            <td style={{padding:'10px 12px', color:D.accent, fontWeight:600, textAlign:'center'}}>{m.sabre}</td>
+                            <td style={{padding:'10px 12px', color:D.blue, fontWeight:600, textAlign:'center'}}>{m.travelport}</td>
+                            <td style={{padding:'10px 12px', fontWeight:800, color:D.fg, textAlign:'center'}}>{m.total}</td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr style={{borderTop:'2px solid #e2e8f0',background:'#f8fafc'}}>
-                          <td style={{padding:'10px 12px',fontSize:'12px',fontWeight:700,color:'#475569'}}>TOTAL</td>
-                          <td style={{padding:'10px 12px',fontWeight:700,color:'#7c3aed',textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.amadeus, 0)}</td>
-                          <td style={{padding:'10px 12px',fontWeight:700,color:'#0369a1',textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.sabre, 0)}</td>
-                          <td style={{padding:'10px 12px',fontWeight:700,color:'#16a34a',textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.travelport, 0)}</td>
-                          <td style={{padding:'10px 12px',fontWeight:800,color:'#0f172a',textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.total, 0)}</td>
+                        <tr style={{borderTop:`2px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>
+                          <td style={{padding:'10px 12px', fontSize:'12px', fontWeight:700, color:D.fgMuted}}>TOTAL</td>
+                          <td style={{padding:'10px 12px', fontWeight:700, color:D.purple, textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.amadeus, 0)}</td>
+                          <td style={{padding:'10px 12px', fontWeight:700, color:D.accent, textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.sabre, 0)}</td>
+                          <td style={{padding:'10px 12px', fontWeight:700, color:D.blue, textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.travelport, 0)}</td>
+                          <td style={{padding:'10px 12px', fontWeight:800, color:D.fg, textAlign:'center'}}>{monthlyCreation.reduce((s,m) => s + m.total, 0)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -685,43 +742,43 @@ export default function ReportingPage() {
               )
             )}
 
-            {/*  PCC Monthly Headcount Tab  */}
+            {/* PCC Monthly Headcount Tab */}
             {activeTab === 'pcc' && (
               pccMonthly.length === 0 || monthColumns.length === 0 ? (
-                <div style={{textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:'13px'}}>No PCC/OID records matched these filters.</div>
+                <div style={{textAlign:'center', padding:'40px', color:D.fgDim, fontSize:'13px'}}>No PCC/OID records matched these filters.</div>
               ) : (
                 <div style={{overflowX:'auto'}}>
-                  <p style={{fontSize:'12px',color:'#94a3b8',marginBottom:'10px'}}>Total users present at each PCC / OID, reconstructed as of the end of each month (includes users who later resigned).</p>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px',minWidth: `${360 + monthColumns.length * 70}px`}}>
+                  <p style={{fontSize:'12px', color:D.fgDim, marginBottom:'10px'}}>Total users present at each PCC / OID, reconstructed as of the end of each month (includes users who later resigned).</p>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth: `${360 + monthColumns.length * 70}px`}}>
                     <thead>
-                      <tr style={{background:'#f1f5f9',borderBottom:'2px solid #e2e8f0'}}>
-                        <th style={{padding:'9px 12px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>GDS</th>
-                        <th style={{padding:'9px 12px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>PCC / OID</th>
+                      <tr style={{background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+                        <th style={{padding:'10px 12px', textAlign:'left', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>GDS</th>
+                        <th style={{padding:'10px 12px', textAlign:'left', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>PCC / OID</th>
                         {monthColumns.map(c => (
-                          <th key={c.key} style={{padding:'9px 12px',textAlign:'center',fontSize:'11px',fontWeight:700,color:'#4f46e5',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{c.label}</th>
+                          <th key={c.key} style={{padding:'10px 12px', textAlign:'center', fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap'}}>{c.label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {pccMonthly.map((p, i) => (
-                        <tr key={`${p.gds}-${p.pcc}`} style={{borderBottom: i < pccMonthly.length - 1 ? '1px solid #f1f5f9' : 'none'}}
-                          onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
-                          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+                        <tr key={`${p.gds}-${p.pcc}`} style={{borderBottom: i < pccMonthly.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                          onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                           <td style={{padding:'10px 12px'}}>
-                            <span style={{padding:'2px 8px',borderRadius:T.radiusSm,background: GDS_COLORS[p.gds] ?? '#f1f5f9',fontSize:'11px',fontWeight:600}}>{p.gds}</span>
+                            <span style={{padding:'3px 9px', borderRadius:'6px', background: GDS_DARK[p.gds]?.soft ?? 'rgba(139,148,158,0.10)', color: GDS_DARK[p.gds]?.color ?? D.fgMuted, fontSize:'11px', fontWeight:600}}>{p.gds}</span>
                           </td>
-                          <td style={{padding:'10px 12px',fontFamily:'monospace',fontWeight:600,color:'#0f172a'}}>{p.pcc}</td>
+                          <td style={{padding:'10px 12px', fontFamily:'monospace', fontWeight:600, color:D.fg}}>{p.pcc}</td>
                           {p.counts.map((c, idx) => (
-                            <td key={idx} style={{padding:'10px 12px',textAlign:'center',fontWeight: idx === p.counts.length - 1 ? 800 : 500, color: idx === p.counts.length - 1 ? '#0f172a' : '#475569'}}>{c}</td>
+                            <td key={idx} style={{padding:'10px 12px', textAlign:'center', fontWeight: idx === p.counts.length - 1 ? 800 : 500, color: idx === p.counts.length - 1 ? D.fg : D.fgMuted}}>{c}</td>
                           ))}
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{borderTop:'2px solid #e2e8f0',background:'#f8fafc'}}>
-                        <td colSpan={2} style={{padding:'10px 12px',fontSize:'12px',fontWeight:700,color:'#475569'}}>TOTAL</td>
+                      <tr style={{borderTop:`2px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>
+                        <td colSpan={2} style={{padding:'10px 12px', fontSize:'12px', fontWeight:700, color:D.fgMuted}}>TOTAL</td>
                         {monthColumns.map((c, idx) => (
-                          <td key={c.key} style={{padding:'10px 12px',textAlign:'center',fontWeight:800,color:'#0f172a'}}>{pccMonthly.reduce((s,p) => s + p.counts[idx], 0)}</td>
+                          <td key={c.key} style={{padding:'10px 12px', textAlign:'center', fontWeight:800, color:D.fg}}>{pccMonthly.reduce((s,p) => s + p.counts[idx], 0)}</td>
                         ))}
                       </tr>
                     </tfoot>

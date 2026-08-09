@@ -38,10 +38,8 @@ const GROUPS: NavGroup[] = [
     desc: 'Global Distribution Systems & features',
     items: [
       { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
-      { label: 'GDS Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} color="#3fb950" /> },
       { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
-      { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
     ],
   },
   {
@@ -59,6 +57,8 @@ const GROUPS: NavGroup[] = [
     key: 'system', label: 'System', color: '#f78166', soft: 'rgba(247,129,102,0.10)', glow: 'rgba(247,129,102,0.06)', border: 'rgba(247,129,102,0.20)',
     desc: 'Reports & administration',
     items: [
+      { label: 'Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} color="#3fb950" /> },
+      { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
       { label: 'Report', href: '/report', module: 'reporting', icon: <Ic path={ICONS.report} color="#a371f7" /> },
       { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} color="#db61a2" /> },
     ],
@@ -146,7 +146,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                   {gi > 0 && <div style={{ width: '1px', height: '20px', background: T.border, margin: '0 6px', flexShrink: 0 }} />}
                   {isSingle ? (
                     <Link href={g.items[0].href}
-                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 16px', fontSize: '15px', fontWeight: 600,
+                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 18px', fontSize: '18px', fontWeight: 600,
                         color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', textDecoration: 'none', whiteSpace: 'nowrap',
                         background: isActiveGroup ? g.soft : 'transparent', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}` }}>
                       {g.items[0].icon} {g.label}
@@ -156,11 +156,11 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                       onMouseEnter={() => setOpenGroup(g.key)}
                       onMouseLeave={() => setOpenGroup(null)}>
                       <button type="button" onClick={() => setOpenGroup(o => o === g.key ? null : g.key)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 16px', fontSize: '15px', fontWeight: 600,
+                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 18px', fontSize: '18px', fontWeight: 600,
                           color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}`,
                           background: isActiveGroup ? g.soft : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         {g.items[0].icon} {g.label}
-                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={13} /></span>
+                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={15} /></span>
                       </button>
                       {openGroup === g.key && (
                         <div style={{ position: 'absolute', top: '100%', left: 0, paddingTop: '6px', minWidth: '230px', zIndex: 50 }}>
