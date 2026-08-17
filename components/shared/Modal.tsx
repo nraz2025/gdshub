@@ -29,11 +29,12 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       />
       {/* Dialog */}
       <div className={cn(
-        'relative bg-white rounded-2xl shadow-xl w-full z-10 flex flex-col max-h-[90vh]',
+        'relative bg-white text-slate-900 rounded-2xl shadow-xl w-full z-10 flex flex-col max-h-[90vh]',
         size === 'sm' && 'max-w-sm',
         size === 'md' && 'max-w-lg',
         size === 'lg' && 'max-w-2xl',
-      )}>
+      )}
+      style={{ colorScheme: 'light' }}>
         {/* Fixed header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
           <h2 className="font-semibold text-slate-900">{title}</h2>

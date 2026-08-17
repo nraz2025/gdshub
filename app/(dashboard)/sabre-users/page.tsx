@@ -688,7 +688,7 @@ export default function SabreUsersPage() {
         )}
       {/*  Add / Edit Modal  */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Sabre User' : 'Add Sabre User'}>
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
 
           {/* 1. Category selector — add only */}
           {!editing && (
@@ -826,7 +826,7 @@ export default function SabreUsersPage() {
 
       {/*  Delete Modal  */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Sabre User" size="sm">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           <p className="text-sm text-slate-600">Delete Sabre user <strong className="font-mono">{editing?.epr}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
             <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
@@ -837,7 +837,7 @@ export default function SabreUsersPage() {
 
       {/*  Import Modal  */}
       <Modal open={importOpen} onClose={closeImport} title="Import Sabre Users" size="lg">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           {importResult ? (
             <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
               {importResult.failed === 0

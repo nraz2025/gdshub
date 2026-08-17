@@ -423,7 +423,7 @@ export default function TravelportUsersPage() {
 
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Travelport User' : 'Add Travelport User'}>
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
 
           {/* 1. Create & Link a New User — top */}
           <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
@@ -494,7 +494,7 @@ export default function TravelportUsersPage() {
 
       {/* Delete Modal */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Travelport User" size="sm">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           <p className="text-sm text-slate-600">Delete Travelport user <strong className="font-mono">{editing?.sign_on_id ?? editing?.cid}</strong>? This cannot be undone.</p>
           <div className="flex gap-3">
             <button onClick={() => setDeleteOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
@@ -505,7 +505,7 @@ export default function TravelportUsersPage() {
 
       {/* Import Modal */}
       <Modal open={importOpen} onClose={closeImport} title="Import Travelport Users" size="lg">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           {importResult ? (
             <div className={`rounded-lg px-4 py-3 text-sm ${importResult.failed === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
               {importResult.failed === 0 ? <p className="font-medium"> Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p> : (

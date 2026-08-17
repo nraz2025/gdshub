@@ -451,7 +451,7 @@ export default function UsersPage() {
       </div>
       {/* ── Add/Edit Modal ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit User' : 'Add User'}>
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label style={lbl}>First Name <span style={{color:T.danger}}>*</span></label>
@@ -502,7 +502,7 @@ export default function UsersPage() {
 
       {/* ── Delete Modal ── */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete User" size="sm">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           <p style={{fontSize:'14px', color:T.textMid}}>Delete <strong style={{color:T.text}}>{editing?.first_name} {editing?.last_name}</strong>? This action cannot be undone.</p>
           <div style={{display:'flex', gap:'10px'}}>
             <button onClick={() => setDeleteOpen(false)} style={{flex:1, padding:'9px', fontSize:'13px', fontWeight:500, border:`1px solid ${T.border}`, borderRadius:T.radius, background:T.card, color:T.textMid, cursor:'pointer'}}>Cancel</button>
@@ -515,7 +515,7 @@ export default function UsersPage() {
 
       {/* ── Import Modal ── */}
       <Modal open={importOpen} onClose={closeImport} title="Import Users" size="lg">
-        <div className="space-y-4">
+        <div className="space-y-4" style={{color:"#1e293b"}}>
           {importResult ? (
             <div style={{borderRadius:T.radius, padding:'12px 16px', fontSize:'13px', background: importResult.failed===0 ? '#f0fdf4' : '#fffbeb', border: `1px solid ${importResult.failed===0 ? '#bbf7d0' : '#fde68a'}`, color: importResult.failed===0 ? '#166534' : '#92400e'}}>
               {importResult.failed === 0

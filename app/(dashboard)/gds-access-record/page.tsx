@@ -539,6 +539,9 @@ export default function GDSAccessRecordPage() {
   const [addingFunctionality, setAddingFunctionality] = useState(false)
   const [newFunctionalityName, setNewFunctionalityName] = useState('')
   const [savingFunctionality, setSavingFunctionality] = useState(false)
+  const [addingOtaClient, setAddingOtaClient] = useState(false)
+  const [newOtaClientName, setNewOtaClientName] = useState('')
+  const [savingOtaClient, setSavingOtaClient] = useState(false)
 
   // Look up the proper unit-of-measure label from the billing_cycles table.
   // Falls back to a prettified version of the raw code for legacy values that were
@@ -577,6 +580,25 @@ export default function GDSAccessRecordPage() {
     }
     setPccFunctionalityOptions(prev => [...prev, data])
     return data.name
+  }
+
+  async function addOtaClientOption(name: string): Promise<number | null> {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    setSavingOtaClient(true)
+    const { data, error: e } = await supabase.from('ota_client')
+      .insert({ company_name: trimmed })
+      .select('id, company_name').single()
+    setSavingOtaClient(false)
+    if (e) {
+      // Unique violation just means it already exists — use the existing one instead of failing.
+      const existing = otaClients.find(o => o.company_name.toLowerCase() === trimmed.toLowerCase())
+      if (existing) return existing.id
+      alert(`Could not add OTA client: ${e.message}`)
+      return null
+    }
+    setOtaClients(prev => [...prev, data as OTAClient].sort((a, b) => a.company_name.localeCompare(b.company_name)))
+    return data.id
   }
 
   // Features for popup  only those matching the PCC's GDS
@@ -1109,10 +1131,52 @@ export default function GDSAccessRecordPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
-            <select value={form.ota_client_id ?? ''} onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value=""> None </option>
-              {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
-            </select>
+            {!addingOtaClient ? (
+              <select
+                value={form.ota_client_id ?? ''}
+                onChange={e => {
+                  if (e.target.value === '__add_new__') { setNewOtaClientName(''); setAddingOtaClient(true); return }
+                  setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))
+                }}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+              >
+                <option value=""> None </option>
+                {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+                <option value="__add_new__">+ Add New OTA Client…</option>
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text" autoFocus value={newOtaClientName}
+                  onChange={e => setNewOtaClientName(e.target.value)}
+                  placeholder="e.g. Acme Travel"
+                  className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter') {
+                      const saved = await addOtaClientOption(newOtaClientName)
+                      if (saved) { setForm(f => ({ ...f, ota_client_id: saved })); setAddingOtaClient(false) }
+                    }
+                    if (e.key === 'Escape') setAddingOtaClient(false)
+                  }}
+                />
+                <button
+                  type="button" disabled={savingOtaClient || !newOtaClientName.trim()}
+                  onClick={async () => {
+                    const saved = await addOtaClientOption(newOtaClientName)
+                    if (saved) { setForm(f => ({ ...f, ota_client_id: saved })); setAddingOtaClient(false) }
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {savingOtaClient ? 'Saving' : 'Add'}
+                </button>
+                <button
+                  type="button" onClick={() => setAddingOtaClient(false)}
+                  className="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Remarks</label>
