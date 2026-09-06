@@ -787,20 +787,7 @@ export default function SabreUsersPage() {
             </div>
           </div>
 
-          {/* 5. OTA toggle */}
-          <div style={{marginBottom:'14px'}}>
-            <label style={lblDark}>OTA</label>
-            <div style={{display:'flex', gap:'20px'}}>
-              {[true, false].map(v => (
-                <label key={String(v)} style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer'}}>
-                  <input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} style={{accentColor:D.accent}} />
-                  <span style={{fontSize:'14px', color:D.fg}}>{v ? 'Yes' : 'No'}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* 6. Linked User — edit only */}
+          {/* 5. Linked User — edit only */}
           {editing && (
             <div style={{marginBottom:'14px'}}>
               <label style={lblDark}>Linked User</label>
@@ -811,7 +798,7 @@ export default function SabreUsersPage() {
             </div>
           )}
 
-          {/* 7. CTA, PTA, Minicom */}
+          {/* 6. CTA, PTA, Minicom */}
           <div style={{marginBottom:'14px'}}>
             <label style={lblDark}>CTA License</label>
             <input type="text" value={form.cta} onChange={e => setForm(f => ({ ...f, cta: e.target.value }))} placeholder="e.g. CTA-2024-001" style={{...inpDark(), fontFamily:'monospace'}} />
@@ -820,9 +807,22 @@ export default function SabreUsersPage() {
             <label style={lblDark}>PTA License</label>
             <input type="text" value={form.pta} onChange={e => setForm(f => ({ ...f, pta: e.target.value }))} placeholder="e.g. PTA-88" style={{...inpDark(), fontFamily:'monospace'}} />
           </div>
-          <div style={{marginBottom:'18px'}}>
+          <div style={{marginBottom:'14px'}}>
             <label style={lblDark}>Minicom License</label>
             <input type="text" value={form.minicom} onChange={e => setForm(f => ({ ...f, minicom: e.target.value }))} placeholder="e.g. MC-456" style={{...inpDark(), fontFamily:'monospace'}} />
+          </div>
+
+          {/* 7. OTA toggle */}
+          <div style={{marginBottom:'18px'}}>
+            <label style={lblDark}>OTA</label>
+            <div style={{display:'flex', gap:'20px'}}>
+              {[true, false].map(v => (
+                <label key={String(v)} style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer'}}>
+                  <input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} style={{accentColor:D.accent}} />
+                  <span style={{fontSize:'14px', color:D.fg}}>{v ? 'Yes' : 'No'}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
