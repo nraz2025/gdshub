@@ -21,6 +21,7 @@ const ICONS = {
   offboard: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></>,
   report: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
   admin: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  queue: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
   chevron: <polyline points="6 9 12 15 18 9" />,
 }
 function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?: string }) {
@@ -40,6 +41,7 @@ const GROUPS: NavGroup[] = [
       { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
       { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
+      { label: 'Queue Management', href: '/queue-management', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#3fb950" /> },
     ],
   },
   {
