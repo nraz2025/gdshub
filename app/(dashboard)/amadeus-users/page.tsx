@@ -364,6 +364,9 @@ export default function AmadeusUsersPage() {
     { key: 'created_at', label: 'Created', render: (row: AmadeusUser) => new Date(row.created_at).toLocaleDateString('en-MY') },
   ]
 
+  const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
+  const lblDark = { fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' as const }
+
   return (
     <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
       <div style={{padding:'32px 28px 40px'}}>
@@ -513,86 +516,92 @@ export default function AmadeusUsersPage() {
       </div>
 
       {/* Add/Edit Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Amadeus User' : 'Add Amadeus User'}>
-        <div className="space-y-4" style={{color:"#1e293b"}}>
+      {modalOpen && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+        <div style={{width:'100%', maxWidth:'640px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${D.accent}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${D.accentSoft}`}}>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'18px'}}>
+            <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editing ? 'Edit Amadeus User' : 'Add Amadeus User'}</h2>
+            <button onClick={() => setModalOpen(false)} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
+          </div>
 
           {/* 1. Category selector — add only */}
           {!editing && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>Category <span style={{color:D.danger}}>*</span></label>
               <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'8px'}}>
                 {EPR_CATEGORIES.map(cat => (
                   <button key={cat.value} type="button"
                     onClick={() => { setForm(f => ({ ...f, category: cat.value })); fetchNextEpr(cat.value, form.initial) }}
                     style={{
-                      padding: '8px 4px', fontSize: '12px', fontWeight: 700, textAlign: 'center',
-                      border: `2px solid ${(form as {category?: string}).category === cat.value ? cat.color : '#E2E8F0'}`,
+                      padding: '8px 4px', fontSize: '13px', fontWeight: 700, textAlign: 'center',
+                      border: `2px solid ${(form as {category?: string}).category === cat.value ? cat.color : D.borderLight}`,
                       borderRadius: '8px',
-                      background: (form as {category?: string}).category === cat.value ? cat.color + '18' : '#fff',
-                      color: (form as {category?: string}).category === cat.value ? cat.color : '#64748B',
+                      background: (form as {category?: string}).category === cat.value ? cat.color + '18' : D.bg,
+                      color: (form as {category?: string}).category === cat.value ? cat.color : D.fgMuted,
                       cursor: 'pointer', transition: 'all 0.15s',
                       minWidth: 0,
                     }}
                   >
-                    <div style={{ fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
-                    <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '2px', whiteSpace: 'nowrap' }}>{cat.min}–{cat.max}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, whiteSpace: 'nowrap' }}>{cat.label}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '2px', whiteSpace: 'nowrap' }}>{cat.min}–{cat.max}</div>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* 2. Or Create & Link a New User — add only, moved up */}
+          {/* 2. Or Create & Link a New User — add only */}
           {!editing && (
-            <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create &amp; link a new user</p>
-              <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
-                <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+            <div style={{border:`1px dashed ${D.borderLight}`, borderRadius:'8px', padding:'14px', marginBottom:'14px', background:'rgba(0,0,0,0.15)'}}>
+              <p style={{fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px'}}>Or create &amp; link a new user</p>
+              <p style={{fontSize:'12px', color:D.fgDim, marginBottom:'10px'}}>If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+              <div style={{marginBottom:'10px'}}>
+                <label style={lblDark}>Email Address</label>
+                <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" style={inpDark()} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
-                  <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                  <label style={lblDark}>First Name</label>
+                  <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" style={inpDark()} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-                  <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                  <label style={lblDark}>Last Name</label>
+                  <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" style={inpDark()} />
                 </div>
               </div>
             </div>
           )}
 
           {/* 3. Login + Sign-On ID */}
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Login <span className="text-red-500">*</span></label>
+              <label style={lblDark}>Login <span style={{color:D.danger}}>*</span></label>
               <input type="text" value={form.login}
                 onChange={e => setForm(f => ({ ...f, login: e.target.value }))}
                 placeholder={loadingEpr ? 'Loading...' : 'e.g. 1001'}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono"
+                style={{...inpDark(), fontFamily:'monospace'}}
                 readOnly={loadingEpr}
               />
               {!editing && (form as {category?: string}).category && !nextEpr && !loadingEpr && (
-                <p className="text-xs text-red-500 mt-1">Range full — no EPR available in this tier</p>
+                <p style={{fontSize:'12px', color:D.danger, marginTop:'4px'}}>Range full — no EPR available in this tier</p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
-              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. 4042GY" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+              <label style={lblDark}>Sign-On ID</label>
+              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. 4042GY" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} />
               {!editing && nextSignOnNum && (
-                <p className="text-xs text-emerald-600 mt-1 font-medium">
-                  ✓ Next: {nextSignOnNum}{form.initial ? form.initial.trim().toUpperCase() : <span className="text-slate-400"> + initial</span>}
+                <p style={{fontSize:'12px', color:D.success, marginTop:'4px', fontWeight:600}}>
+                  ✓ Next: {nextSignOnNum}{form.initial ? form.initial.trim().toUpperCase() : <span style={{color:D.fgDim}}> + initial</span>}
                 </p>
               )}
             </div>
           </div>
 
           {/* 4. Initial + Duty Code */}
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial</label>
+              <label style={lblDark}>Initial</label>
               <input type="text" value={form.initial}
                 onChange={e => {
                   const ini = e.target.value.toUpperCase()
@@ -602,27 +611,27 @@ export default function AmadeusUsersPage() {
                     ...(!editing && nextSignOnNum ? { sign_on_id: `${nextSignOnNum}${ini}` } : {}),
                   }))
                 }}
-                placeholder="e.g. JS" maxLength={5} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+                placeholder="e.g. JS" maxLength={5} style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Duty Code</label>
-              <input type="text" value={form.duty_code} onChange={e => setForm(f => ({ ...f, duty_code: e.target.value.toUpperCase() }))} placeholder="e.g. TP" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" />
+              <label style={lblDark}>Duty Code</label>
+              <input type="text" value={form.duty_code} onChange={e => setForm(f => ({ ...f, duty_code: e.target.value.toUpperCase() }))} placeholder="e.g. TP" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} />
             </div>
           </div>
 
           {/* 5. OID */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OID</label>
-            <select value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
+          <div style={{marginBottom:'14px'}}>
+            <label style={lblDark}>OID</label>
+            <select value={form.oid} onChange={e => setForm(f => ({ ...f, oid: e.target.value }))} style={{...inpDark({cursor:'pointer'}), fontFamily:'monospace', textTransform:'uppercase'}}>
               <option value="">- Select OID -</option>
               {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
             </select>
           </div>
 
           {/* 6. Status */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+          <div style={{marginBottom:'14px'}}>
+            <label style={lblDark}>Status</label>
+            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="suspended">Suspended</option>
@@ -630,34 +639,37 @@ export default function AmadeusUsersPage() {
           </div>
 
           {/* 7. Linked User */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
-            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+          <div style={{marginBottom:'14px'}}>
+            <label style={lblDark}>Linked User</label>
+            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="">- None -</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
             </select>
           </div>
 
           {/* 8. OTA toggle */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
-            <div className="flex gap-4">
+          <div style={{marginBottom:'18px'}}>
+            <label style={lblDark}>OTA</label>
+            <div style={{display:'flex', gap:'20px'}}>
               {[true, false].map(v => (
-                <label key={String(v)} className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" />
-                  <span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span>
+                <label key={String(v)} style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer'}}>
+                  <input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} style={{accentColor:D.accent}} />
+                  <span style={{fontSize:'14px', color:D.fg}}>{v ? 'Yes' : 'No'}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}</button>
+          {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
+          <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+            <button onClick={() => setModalOpen(false)} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'8px', color:D.fgMuted, cursor:'pointer'}}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{padding:'9px 20px', fontSize:'14px', fontWeight:600, background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', color:'#fff', cursor:'pointer', opacity:saving?0.6:1}}>
+              {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}
+            </button>
           </div>
         </div>
-      </Modal>
+        </div>
+      )}
 
       {/* Delete Modal */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Amadeus User" size="sm">

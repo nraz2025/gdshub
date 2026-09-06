@@ -282,6 +282,9 @@ export default function TravelportUsersPage() {
   const suspendedCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='suspended').length
   const otaCount = records.filter(r=>r.ota).length
 
+  const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
+  const lblDark = { fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' as const }
+
   return (
     <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:D.bg, minHeight:'100vh', color:D.fg}}>
       <div style={{padding:'32px 28px 40px'}}>
@@ -422,75 +425,84 @@ export default function TravelportUsersPage() {
       </div>
 
       {/* Add/Edit Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Travelport User' : 'Add Travelport User'}>
-        <div className="space-y-4" style={{color:"#1e293b"}}>
+      {modalOpen && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+        <div style={{width:'100%', maxWidth:'640px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${D.accent}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${D.accentSoft}`}}>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'18px'}}>
+            <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editing ? 'Edit Travelport User' : 'Add Travelport User'}</h2>
+            <button onClick={() => setModalOpen(false)} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
+          </div>
 
           {/* 1. Create & Link a New User — top */}
-          <div className="border border-dashed border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Or create &amp; link a new user</p>
-            <p className="text-xs text-slate-400">If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
-              <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+          <div style={{border:`1px dashed ${D.borderLight}`, borderRadius:'8px', padding:'14px', marginBottom:'14px', background:'rgba(0,0,0,0.15)'}}>
+            <p style={{fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px'}}>Or create &amp; link a new user</p>
+            <p style={{fontSize:'12px', color:D.fgDim, marginBottom:'10px'}}>If the user does not exist yet — fill in their details and they will be added to the Users table automatically. If the email already exists, the existing user will be linked instead.</p>
+            <div style={{marginBottom:'10px'}}>
+              <label style={lblDark}>Email Address</label>
+              <input type="email" value={form.newEmail ?? ''} onChange={e => setForm(f => ({ ...f, newEmail: e.target.value }))} placeholder="user@company.com" style={inpDark()} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
-                <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                <label style={lblDark}>First Name</label>
+                <input type="text" value={form.newFirstName ?? ''} onChange={e => setForm(f => ({ ...f, newFirstName: e.target.value }))} placeholder="First name" style={inpDark()} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-                <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
+                <label style={lblDark}>Last Name</label>
+                <input type="text" value={form.newLastName ?? ''} onChange={e => setForm(f => ({ ...f, newLastName: e.target.value }))} placeholder="Last name" style={inpDark()} />
               </div>
             </div>
           </div>
 
           {/* 2. Sign-On ID + CID */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Sign-On ID</label>
-              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. JS01" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">CID</label>
-              <input type="text" value={form.cid} onChange={e => setForm(f => ({ ...f, cid: e.target.value.toUpperCase() }))} placeholder="e.g. CID123" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+            <div><label style={lblDark}>Sign-On ID</label>
+              <input type="text" value={form.sign_on_id} onChange={e => setForm(f => ({ ...f, sign_on_id: e.target.value.toUpperCase() }))} placeholder="e.g. JS01" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} /></div>
+            <div><label style={lblDark}>CID</label>
+              <input type="text" value={form.cid} onChange={e => setForm(f => ({ ...f, cid: e.target.value.toUpperCase() }))} placeholder="e.g. CID123" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} /></div>
           </div>
 
           {/* 3. GTID + PCC */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">GTID</label>
-              <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
-              <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+            <div><label style={lblDark}>GTID</label>
+              <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} /></div>
+            <div><label style={lblDark}>PCC</label>
+              <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} style={{...inpDark({cursor:'pointer'}), fontFamily:'monospace', textTransform:'uppercase'}}>
                 <option value="">- Select PCC -</option>
                 {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
               </select></div>
           </div>
 
           {/* 4. Status */}
-          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+          <div style={{marginBottom:'14px'}}><label style={lblDark}>Status</label>
+            <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="suspended">Suspended</option>
             </select></div>
 
           {/* 5. Linked User */}
-          <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Linked User</label>
-            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
+          <div style={{marginBottom:'14px'}}><label style={lblDark}>Linked User</label>
+            <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="">- None -</option>
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
             </select></div>
 
           {/* 6. OTA toggle */}
-          <div><label className="block text-sm font-medium text-slate-700 mb-2">OTA</label>
-            <div className="flex gap-4">{[true, false].map(v => <label key={String(v)} className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} className="accent-blue-500" /><span className="text-sm text-slate-700">{v ? 'Yes' : 'No'}</span></label>)}</div>
+          <div style={{marginBottom:'18px'}}><label style={lblDark}>OTA</label>
+            <div style={{display:'flex', gap:'20px'}}>{[true, false].map(v => <label key={String(v)} style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer'}}><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} style={{accentColor:D.accent}} /><span style={{fontSize:'14px', color:D.fg}}>{v ? 'Yes' : 'No'}</span></label>)}</div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} style={{flex:1,padding:"9px",fontSize:"13px",border:`1px solid ${T.border}`,borderRadius:T.radius,background:T.card,color:T.textMid,cursor:"pointer"}}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"9px",fontSize:"13px",fontWeight:700,border:"none",borderRadius:T.radius,background:T.primary,color:"white",cursor:"pointer"}}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}</button>
+          {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
+          <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+            <button onClick={() => setModalOpen(false)} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'8px', color:D.fgMuted, cursor:'pointer'}}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{padding:'9px 20px', fontSize:'14px', fontWeight:600, background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', color:'#fff', cursor:'pointer', opacity:saving?0.6:1}}>
+              {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add User'}
+            </button>
           </div>
         </div>
-      </Modal>
+        </div>
+      )}
 
       {/* Delete Modal */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Travelport User" size="sm">
