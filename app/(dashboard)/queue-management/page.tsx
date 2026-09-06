@@ -74,6 +74,11 @@ export default function QueueManagementPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   useEffect(() => { fetchAll() }, [])
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setPanelOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   async function fetchAll() {
     setLoading(true)
@@ -394,9 +399,11 @@ export default function QueueManagementPage() {
           </div>
         )}
 
-        {/* Dark Edit Panel — inline, not a floating modal, for maximum readability */}
+        {/* Add/Edit Modal — popup overlay */}
         {panelOpen && (
-          <div style={{marginTop:'20px', background:D.card, border:`1px solid ${D.accent}`, borderRadius:'10px', padding:'22px', boxShadow:`0 0 0 3px ${D.accentSoft}`}}>
+          <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
+            onClick={e => { if (e.target === e.currentTarget) setPanelOpen(false) }}>
+          <div style={{width:'100%', maxWidth:'720px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${D.accent}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${D.accentSoft}`}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'18px'}}>
               <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editing ? 'Edit Queue' : 'Add Queue'}</h2>
               <button onClick={() => setPanelOpen(false)} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
@@ -454,6 +461,7 @@ export default function QueueManagementPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+          </div>
           </div>
         )}
       </div>
