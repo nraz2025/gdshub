@@ -20,6 +20,7 @@ interface Permission {
   module: string
   can_access: boolean
   can_edit: boolean
+  can_delete: boolean
 }
 
 // Main page dark theme (matches TopNav's System group = coral)
@@ -42,15 +43,19 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; soft: string; 
 
 const ALL_MODULES = [
   { key: 'dashboard',         label: 'Dashboard'         },
-  { key: 'gds_info',          label: 'GDS Access Record' },
-  { key: 'gds_functionality', label: 'GDS Features'      },
   { key: 'organisation',      label: 'Organisation'      },
   { key: 'gds',               label: 'GDS'               },
+  { key: 'gds_functionality', label: 'GDS Features'      },
+  { key: 'gds_info',          label: 'GDS Access Record' },
+  { key: 'queue_management',  label: 'Queue Management'  },
+  { key: 'client',            label: 'PCC Group'         },
+  { key: 'billing_cycles',    label: 'Billing Cycles'    },
+  { key: 'users',             label: 'Users'             },
   { key: 'sabre_users',       label: 'Sabre Users'       },
   { key: 'amadeus_users',     label: 'Amadeus Users'     },
   { key: 'travelport_users',  label: 'Travelport Users'  },
-  { key: 'client',            label: 'PCC Group'         },
-  { key: 'users',             label: 'Users'             },
+  { key: 'resigned_users',    label: 'Offboarded Users'  },
+  { key: 'reporting',         label: 'Report'            },
   { key: 'admin_panel',       label: 'Admin Panel'       },
 ]
 
@@ -99,13 +104,13 @@ export default function AdminPage() {
     fetchAll()
   }
 
-  async function togglePermission(role: string, module: string, field: 'can_access' | 'can_edit', value: boolean) {
+  async function togglePermission(role: string, module: string, field: 'can_access' | 'can_edit' | 'can_delete', value: boolean) {
     const key = `${role}-${module}-${field}`
     setSaving(key)
 
     const updates: Partial<Permission> = { [field]: value }
-    if (field === 'can_access' && !value) updates.can_edit = false
-    if (field === 'can_edit' && value) updates.can_access = true
+    if (field === 'can_access' && !value) { updates.can_edit = false; updates.can_delete = false }
+    if ((field === 'can_edit' || field === 'can_delete') && value) updates.can_access = true
 
     await supabase.from('role_permissions')
       .upsert({ role, module, ...updates }, { onConflict: 'role,module' })
@@ -113,6 +118,23 @@ export default function AdminPage() {
     setPermissions(prev => prev.map(p =>
       p.role === role && p.module === module ? { ...p, ...updates } : p
     ))
+    setSaving(null)
+  }
+
+  async function setAllPermissions(role: string, module: string, value: boolean) {
+    const key = `${role}-${module}-all`
+    setSaving(key)
+    const updates = { can_access: value, can_edit: value, can_delete: value }
+
+    await supabase.from('role_permissions')
+      .upsert({ role, module, ...updates }, { onConflict: 'role,module' })
+
+    setPermissions(prev => {
+      const exists = prev.some(p => p.role === role && p.module === module)
+      return exists
+        ? prev.map(p => p.role === role && p.module === module ? { ...p, ...updates } : p)
+        : [...prev, { id: -1, role, module, ...updates }]
+    })
     setSaving(null)
   }
 
@@ -128,9 +150,9 @@ export default function AdminPage() {
     return matchSearch && matchRole
   })
 
-  const ToggleCell = ({ role, module, field }: { role: string; module: string; field: 'can_access' | 'can_edit' }) => {
+  const ToggleCell = ({ role, module, field }: { role: string; module: string; field: 'can_access' | 'can_edit' | 'can_delete' }) => {
     const perm = getPerm(role, module)
-    const val = field === 'can_access' ? (perm?.can_access ?? false) : (perm?.can_edit ?? false)
+    const val = field === 'can_access' ? (perm?.can_access ?? false) : field === 'can_edit' ? (perm?.can_edit ?? false) : (perm?.can_delete ?? false)
     const key = `${role}-${module}-${field}`
     const isSaving = saving === key
     const isAdminLocked = role === 'admin'
@@ -150,6 +172,32 @@ export default function AdminPage() {
         }}
       >
         {isSaving ? '…' : val ? '✓' : '✕'}
+      </button>
+    )
+  }
+
+  const AllCell = ({ role, module }: { role: string; module: string }) => {
+    const perm = getPerm(role, module)
+    const allOn = !!perm?.can_access && !!perm?.can_edit && !!perm?.can_delete
+    const key = `${role}-${module}-all`
+    const isSaving = saving === key
+    const isAdminLocked = role === 'admin'
+
+    return (
+      <button
+        onClick={() => !isAdminLocked && setAllPermissions(role, module, !allOn)}
+        disabled={isSaving || isAdminLocked}
+        title={isAdminLocked ? 'Admin always has full access' : allOn ? 'Click to revoke all permissions' : 'Click to grant View + Edit + Delete'}
+        style={{
+          width:'32px', height:'32px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center',
+          fontSize:'15px', fontWeight:700, margin:'0 auto', border:`1px solid ${allOn ? D.blue : 'transparent'}`,
+          cursor: isAdminLocked ? 'not-allowed' : 'pointer',
+          opacity: isSaving ? 0.5 : 1,
+          background: allOn ? D.blueSoft : 'rgba(139,148,158,0.10)',
+          color: allOn ? D.blue : D.fgDim,
+        }}
+      >
+        {isSaving ? '…' : allOn ? '✓' : '—'}
       </button>
     )
   }
@@ -269,16 +317,18 @@ export default function AdminPage() {
                 <thead>
                   <tr style={{background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
                     <th style={{textAlign:'left', padding:'12px 20px', fontWeight:600, color:D.fgDim, fontSize:'15px', textTransform:'uppercase', letterSpacing:'0.05em', width:'176px'}}>Module</th>
-                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.danger, fontSize:'15px'}} colSpan={2}>Admin</th>
-                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.accent, fontSize:'15px'}} colSpan={2}>Manager</th>
-                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.warning, fontSize:'15px'}} colSpan={2}>Viewer</th>
+                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.danger, fontSize:'15px'}} colSpan={4}>Admin</th>
+                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.accent, fontSize:'15px'}} colSpan={4}>Manager</th>
+                    <th style={{textAlign:'center', padding:'12px', fontWeight:600, color:D.warning, fontSize:'15px'}} colSpan={4}>Viewer</th>
                   </tr>
                   <tr style={{borderBottom:`1px solid ${D.border}`}}>
                     <th></th>
                     {['admin','manager','user'].map(role => (
                       <React.Fragment key={role}>
-                        <th style={{textAlign:'center', padding:'8px', fontSize:'15px', fontWeight:600, color:D.fgDim}}>Access</th>
-                        <th style={{textAlign:'center', padding:'8px', fontSize:'15px', fontWeight:600, color:D.fgDim}}>Edit</th>
+                        <th style={{textAlign:'center', padding:'8px', fontSize:'13px', fontWeight:600, color:D.fgDim}}>View</th>
+                        <th style={{textAlign:'center', padding:'8px', fontSize:'13px', fontWeight:600, color:D.fgDim}}>Edit</th>
+                        <th style={{textAlign:'center', padding:'8px', fontSize:'13px', fontWeight:600, color:D.fgDim}}>Delete</th>
+                        <th style={{textAlign:'center', padding:'8px', fontSize:'13px', fontWeight:600, color:D.fgDim}}>All</th>
                       </React.Fragment>
                     ))}
                   </tr>
@@ -297,6 +347,12 @@ export default function AdminPage() {
                           <td style={{padding:'12px', textAlign:'center'}}>
                             <ToggleCell role={role} module={mod.key} field="can_edit" />
                           </td>
+                          <td style={{padding:'12px', textAlign:'center'}}>
+                            <ToggleCell role={role} module={mod.key} field="can_delete" />
+                          </td>
+                          <td style={{padding:'12px', textAlign:'center'}}>
+                            <AllCell role={role} module={mod.key} />
+                          </td>
                         </React.Fragment>
                       ))}
                     </tr>
@@ -308,7 +364,7 @@ export default function AdminPage() {
           <div style={{padding:'12px 20px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', display:'flex', flexWrap:'wrap', alignItems:'center', gap:'24px', fontSize:'16px', color:D.fgDim}}>
             <span style={{display:'flex', alignItems:'center', gap:'8px'}}><span style={{width:'22px', height:'22px', background:D.successSoft, color:D.success, borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'16px'}}>✓</span> Enabled</span>
             <span style={{display:'flex', alignItems:'center', gap:'8px'}}><span style={{width:'22px', height:'22px', background:'rgba(139,148,158,0.10)', color:D.fgDim, borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'16px'}}>✕</span> Disabled</span>
-            <span>Access = can view the module · Edit = can add/edit/delete records</span>
+            <span>View = can see the module · Edit = can add/edit records · Delete = can remove records · All = quick toggle for all three</span>
           </div>
         </div>
       )}
