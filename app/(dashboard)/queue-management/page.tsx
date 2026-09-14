@@ -47,11 +47,6 @@ const TYPE_DARK: Record<string, { color: string; soft: string }> = {
   Functional: { color: D.blue, soft: D.blueSoft },
   'Client / Corporate': { color: D.warning, soft: D.warningSoft },
 }
-const STATUS_DARK: Record<string, { color: string; soft: string }> = {
-  Active: { color: D.success, soft: D.successSoft },
-  Vacant: { color: D.warning, soft: D.warningSoft },
-  Inactive: { color: D.fgDim, soft: 'rgba(139,148,158,0.10)' },
-}
 
 export default function QueueManagementPage() {
   const supabase = createClient()
@@ -223,7 +218,6 @@ export default function QueueManagementPage() {
 
   const activePccCount = new Set(records.map(r => r.pcc)).size
   const systemCount = records.filter(r => r.queue_type === 'System').length
-  const vacantCount = records.filter(r => r.status === 'Vacant').length
 
   const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lblDark = { fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' as const }
@@ -270,7 +264,6 @@ export default function QueueManagementPage() {
             { label: 'Total Queues', value: records.length, color: D.accent, soft: D.accentSoft, sub: `Across ${gdsList.length} GDSes` },
             { label: 'Distinct PCCs', value: activePccCount, color: D.blue, soft: D.blueSoft, sub: 'PCC / OID codes covered' },
             { label: 'System Queues', value: systemCount, color: D.warning, soft: D.warningSoft, sub: 'Pre-assigned by GDS' },
-            { label: 'Vacant', value: vacantCount, color: D.purple, soft: D.purpleSoft, sub: 'Available for allocation' },
           ].map(s => (
             <div key={s.label} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px'}}>
               <div style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'22px', fontWeight:700, color:s.color}}>{s.value}</div>
@@ -279,6 +272,24 @@ export default function QueueManagementPage() {
             </div>
           ))}
         </div>
+
+        {/* Type tabs */}
+        <div style={{display:'flex', gap:'6px', marginBottom:'14px', flexWrap:'wrap'}}>
+          {(['all', ...QUEUE_TYPES] as const).map(t => {
+            const active = filterType === t
+            const tStyle = t === 'all' ? { color: D.fg, soft: D.accentSoft, border: D.accent } : TYPE_DARK[t] ? { color: TYPE_DARK[t].color, soft: TYPE_DARK[t].soft, border: TYPE_DARK[t].color } : { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)', border: D.borderLight }
+            return (
+              <button key={t} onClick={() => setFilterType(t)}
+                style={{padding:'8px 16px', fontSize:'14px', fontWeight:600, borderRadius:'8px', cursor:'pointer',
+                  background: active ? tStyle.soft : D.card,
+                  color: active ? tStyle.color : D.fgMuted,
+                  border: `1.5px solid ${active ? tStyle.border : D.border}`}}>
+                {t === 'all' ? 'All Types' : t === 'System' ? 'System Defined Queue' : t}
+              </button>
+            )
+          })}
+        </div>
+        <p style={{fontSize:'13px', color:D.fgDim, marginBottom:'18px'}}>{filtered.length} queue{filtered.length !== 1 ? 's' : ''} shown</p>
 
         {/* Filters */}
         <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
@@ -291,11 +302,6 @@ export default function QueueManagementPage() {
             style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'140px'}}>
             <option value="all">All PCC / OID</option>
             {pccOptions.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={filterType} onChange={e => setFilterType(e.target.value)}
-            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'140px'}}>
-            <option value="all">All Types</option>
-            {QUEUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <div style={{position:'relative', flex:'1 1 240px'}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -316,7 +322,7 @@ export default function QueueManagementPage() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Grouped-by-PCC cards */}
         {loading ? (
           <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div>
         ) : filtered.length === 0 ? (
@@ -324,55 +330,45 @@ export default function QueueManagementPage() {
             {search || filterGds !== 'all' || filterPcc !== 'all' || filterType !== 'all' ? 'No queues match your filters.' : 'No queues configured yet.'}
           </div>
         ) : (
-          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
-            <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1150px'}}>
-              <thead>
-                <tr>
-                  {isAdmin && (
-                    <th style={{padding:'12px 16px', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', width:'40px'}}>
-                      <input type="checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll} style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent}} />
-                    </th>
-                  )}
-                  {['GDS', 'PCC / OID', 'Queue #', 'Queue Name', 'Category', 'Purpose', 'Type', 'Status', 'Actions'].map((h, i) => (
-                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === 8 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', whiteSpace:'nowrap'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row, i) => {
-                  const gdsName = row.gds?.name ?? ''
-                  const gdsStyle = GDS_DARK[gdsName] ?? { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' }
-                  const typeStyle = row.queue_type ? TYPE_DARK[row.queue_type] ?? { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' } : null
-                  const statusStyle = row.status ? STATUS_DARK[row.status] ?? { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' } : null
-                  return (
-                    <tr key={row.id} style={{borderBottom: i < filtered.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s', background: selectedIds.has(row.id) ? D.accentSoft : 'transparent'}}
-                      onMouseEnter={e => { if (!selectedIds.has(row.id)) e.currentTarget.style.background = 'rgba(57,210,192,0.05)' }}
-                      onMouseLeave={e => { if (!selectedIds.has(row.id)) e.currentTarget.style.background = 'transparent' }}>
-                      {isAdmin && (
-                        <td style={{padding:'12px 16px'}}>
-                          <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleSelect(row.id)} style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent}} />
-                        </td>
-                      )}
-                      <td style={{padding:'12px 16px'}}>
-                        <span style={{padding:'3px 10px', borderRadius:'6px', background:gdsStyle.soft, color:gdsStyle.color, fontSize:'12px', fontWeight:700}}>{gdsName}</span>
-                      </td>
-                      <td style={{padding:'12px 16px'}}>
-                        <div style={{fontFamily:'monospace', fontWeight:600, color:D.fg, fontSize:'14px'}}>{row.pcc}</div>
-                        {row.pcc_label && <div style={{fontSize:'12px', color:D.fgDim}}>{row.pcc_label}</div>}
-                      </td>
-                      <td style={{padding:'12px 16px', fontFamily:'monospace', fontWeight:700, color:D.accent, fontSize:'14px'}}>{row.queue_number}{row.sub_category && <span style={{marginLeft:'6px', fontSize:'11px', color:D.warning}}>{row.sub_category}</span>}</td>
-                      <td style={{padding:'12px 16px', fontWeight:600, color:D.fg, fontSize:'14px'}}>{row.queue_name}</td>
-                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted}}>{row.category ?? <span style={{color:D.fgDim}}>—</span>}</td>
-                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted, maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{row.purpose ?? <span style={{color:D.fgDim}}>—</span>}</td>
-                      <td style={{padding:'12px 16px'}}>
-                        {typeStyle ? <span style={{fontSize:'12px', fontWeight:600, padding:'2px 9px', borderRadius:'20px', background:typeStyle.soft, color:typeStyle.color}}>{row.queue_type}</span> : <span style={{color:D.fgDim}}>—</span>}
-                      </td>
-                      <td style={{padding:'12px 16px'}}>
-                        {statusStyle ? <span style={{fontSize:'12px', fontWeight:600, padding:'2px 9px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color}}>{row.status}</span> : <span style={{color:D.fgDim}}>—</span>}
-                      </td>
-                      <td style={{padding:'12px 16px'}}>
+          (() => {
+            const groups = new Map<string, QueueRow[]>()
+            filtered.forEach(r => {
+              const key = `${r.gds_id}::${r.pcc}`
+              if (!groups.has(key)) groups.set(key, [])
+              groups.get(key)!.push(r)
+            })
+            return Array.from(groups.entries()).map(([key, rows]) => {
+              const first = rows[0]
+              const gdsName = first.gds?.name ?? ''
+              const gdsStyle = GDS_DARK[gdsName] ?? { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' }
+              return (
+                <div key={key} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden', marginBottom:'16px'}}>
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 18px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                      <span style={{fontFamily:'monospace', fontWeight:700, fontSize:'15px', color:D.fg}}>{first.pcc}</span>
+                      {first.pcc_label && <span style={{fontSize:'13px', color:D.fgDim}}>{first.pcc_label}</span>}
+                      <span style={{fontSize:'11px', color:D.fgDim}}>·</span>
+                      <span style={{padding:'2px 9px', borderRadius:'6px', background:gdsStyle.soft, color:gdsStyle.color, fontSize:'11px', fontWeight:700}}>{gdsName}</span>
+                    </div>
+                    <span style={{fontSize:'13px', color:D.fgDim}}>{rows.length} queue{rows.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {rows.map((row, i) => {
+                    const typeStyle = row.queue_type ? TYPE_DARK[row.queue_type] ?? { color: D.fgMuted, soft: 'rgba(139,148,158,0.10)' } : null
+                    return (
+                      <div key={row.id} style={{display:'flex', alignItems:'center', gap:'16px', padding:'12px 18px', borderBottom: i < rows.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s', background: selectedIds.has(row.id) ? D.accentSoft : 'transparent'}}
+                        onMouseEnter={e => { if (!selectedIds.has(row.id)) e.currentTarget.style.background = 'rgba(57,210,192,0.05)' }}
+                        onMouseLeave={e => { if (!selectedIds.has(row.id)) e.currentTarget.style.background = 'transparent' }}>
                         {isAdmin && (
-                          <div style={{display:'flex', gap:'6px', justifyContent:'flex-end'}}>
+                          <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleSelect(row.id)} style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent, flexShrink:0}} />
+                        )}
+                        <span style={{fontFamily:'monospace', fontWeight:700, color:D.accent, fontSize:'14px', width:'44px', flexShrink:0}}>{row.queue_number}{row.sub_category && <span style={{marginLeft:'4px', fontSize:'10px', color:D.warning}}>{row.sub_category}</span>}</span>
+                        <span style={{fontWeight:600, color:D.fg, fontSize:'14px', width:'180px', flexShrink:0}}>{row.queue_name}</span>
+                        <div style={{flex:1, minWidth:0, display:'flex', alignItems:'center', gap:'10px'}}>
+                          {typeStyle && <span style={{fontSize:'12px', fontWeight:600, padding:'2px 9px', borderRadius:'20px', background:typeStyle.soft, color:typeStyle.color, whiteSpace:'nowrap'}}>{row.queue_type}</span>}
+                          {row.purpose && <span style={{fontSize:'13px', color:D.fgMuted, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{row.purpose}</span>}
+                        </div>
+                        {isAdmin && (
+                          <div style={{display:'flex', gap:'6px', flexShrink:0}}>
                             <button onClick={() => openEdit(row)}
                               style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
                               onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
@@ -387,16 +383,13 @@ export default function QueueManagementPage() {
                             </button>
                           </div>
                         )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div style={{padding:'12px 16px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', fontSize:'13px', color:D.fgDim}}>
-              {filtered.length} of {records.length} queue{records.length !== 1 ? 's' : ''}
-            </div>
-          </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })
+          })()
         )}
 
         {/* Add/Edit Modal — popup overlay */}
