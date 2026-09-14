@@ -21,7 +21,7 @@ interface QueueRow {
   status: string | null
 }
 
-const EMPTY = { pcc: '', queue_number: '', queue_name: '', category: '', purpose: '', queue_type: '' }
+const EMPTY = { pcc: '', queue_number: '', queue_name: '', sub_category: '', category: '', purpose: '', queue_type: '' }
 const QUEUE_TYPES = ['System', 'User', 'Functional', 'Client / Corporate']
 
 const D = {
@@ -39,7 +39,8 @@ export default function AmadeusQueueManagementPage() {
   const [loading, setLoading] = useState(true)
   const [selectedPccs, setSelectedPccs] = useState<Set<string>>(new Set())
   const [panelOpen, setPanelOpen] = useState(false)
-  const [editing, setEditing] = useState<{pcc: string; queue_number: string} | null>(null)
+  // editing tracks the exact record id when editing an existing entry, or null when adding a brand new one
+  const [editing, setEditing] = useState<{ id: number | null; pcc: string; queue_number: string } | null>(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -62,7 +63,7 @@ export default function AmadeusQueueManagementPage() {
     const thisGdsId = g?.id ?? null
     setGdsId(thisGdsId)
     if (thisGdsId) {
-      const { data: q } = await supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number')
+      const { data: q } = await supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number').order('sub_category')
       setRecords((q as unknown as QueueRow[]) ?? [])
       setSelectedPccs(prev => prev.size > 0 ? prev : new Set(Array.from(new Set((q ?? []).map((r: QueueRow) => r.pcc)))))
     }
@@ -79,16 +80,23 @@ export default function AmadeusQueueManagementPage() {
     return a.localeCompare(b)
   })
 
-  function cellFor(pcc: string, qnum: string) {
-    return records.find(r => r.pcc === pcc && r.queue_number === qnum)
+  // Returns ALL records for a pcc+queue_number pair — a cell can legitimately
+  // hold multiple entries when they're split by sub_category (C1/C2/C3 etc.)
+  function cellsFor(pcc: string, qnum: string) {
+    return records.filter(r => r.pcc === pcc && r.queue_number === qnum)
   }
 
-  function openCell(pcc: string, qnum: string) {
-    const existing = cellFor(pcc, qnum)
-    setEditing({ pcc, queue_number: qnum })
-    setForm(existing
-      ? { pcc, queue_number: qnum, queue_name: existing.queue_name, category: existing.category ?? '', purpose: existing.purpose ?? '', queue_type: existing.queue_type ?? '' }
-      : { pcc, queue_number: qnum, queue_name: '', category: '', purpose: '', queue_type: '' })
+  // Click an existing line within a cell to edit that exact record
+  function openEditRecord(row: QueueRow) {
+    setEditing({ id: row.id, pcc: row.pcc, queue_number: row.queue_number })
+    setForm({ pcc: row.pcc, queue_number: row.queue_number, queue_name: row.queue_name, sub_category: row.sub_category ?? '', category: row.category ?? '', purpose: row.purpose ?? '', queue_type: row.queue_type ?? '' })
+    setError(''); setPanelOpen(true)
+  }
+
+  // Click empty space in a cell (or an empty cell entirely) to add a new record there
+  function openAddToCell(pcc: string, qnum: string) {
+    setEditing({ id: null, pcc, queue_number: qnum })
+    setForm({ ...EMPTY, pcc, queue_number: qnum })
     setError(''); setPanelOpen(true)
   }
 
@@ -104,25 +112,23 @@ export default function AmadeusQueueManagementPage() {
     if (!form.queue_number.trim()) { setError('Queue number is required.'); return }
     if (!form.queue_name.trim()) { setError('Queue name is required.'); return }
     setSaving(true); setError('')
-    const existing = cellFor(form.pcc.trim().toUpperCase(), form.queue_number.trim())
     const payload = {
       gds_id: gdsId, pcc: form.pcc.trim().toUpperCase(), queue_number: form.queue_number.trim(),
-      queue_name: form.queue_name.trim(), category: form.category.trim() || null,
+      queue_name: form.queue_name.trim(), sub_category: form.sub_category.trim() || null,
+      category: form.category.trim() || null,
       purpose: form.purpose.trim() || null, queue_type: form.queue_type || null,
     }
-    const { error: e } = existing
-      ? await supabase.from('gds_queue').update(payload).eq('id', existing.id)
+    const { error: e } = editing?.id
+      ? await supabase.from('gds_queue').update(payload).eq('id', editing.id)
       : await supabase.from('gds_queue').insert(payload)
     if (e) { setError(e.message); setSaving(false); return }
     setSaving(false); setPanelOpen(false); fetchAll()
   }
 
   async function handleDeleteCell() {
-    if (!editing) return
-    const existing = cellFor(editing.pcc, editing.queue_number)
-    if (!existing) return
-    if (!confirm(`Delete queue ${editing.queue_number} for PCC ${editing.pcc}?`)) return
-    await supabase.from('gds_queue').delete().eq('id', existing.id)
+    if (!editing?.id) return
+    if (!confirm(`Delete queue ${editing.queue_number}${form.sub_category ? ` (${form.sub_category})` : ''} for PCC ${editing.pcc}?`)) return
+    await supabase.from('gds_queue').delete().eq('id', editing.id)
     setPanelOpen(false); fetchAll()
   }
 
@@ -172,6 +178,11 @@ export default function AmadeusQueueManagementPage() {
             )
           })}
         </div>
+        {visiblePccs.length > 4 && (
+          <p style={{fontSize:'12px', color:D.fgDim, marginTop:'-10px', marginBottom:'14px'}}>
+            {visiblePccs.length} PCCs shown — scroll the table horizontally to see columns past your screen width.
+          </p>
+        )}
 
         {/* Pivot table */}
         {loading ? (
@@ -200,15 +211,40 @@ export default function AmadeusQueueManagementPage() {
               <tbody>
                 {allQueueNumbers.map((qnum, i) => (
                   <tr key={qnum} style={{borderBottom: i < allQueueNumbers.length - 1 ? `1px solid ${D.border}` : 'none'}}>
-                    <td style={{padding:'10px 16px', fontFamily:'monospace', fontWeight:700, color:D.fg, fontSize:'14px', position:'sticky', left:0, background:D.card}}>{qnum}</td>
+                    <td style={{padding:'10px 16px', fontFamily:'monospace', fontWeight:700, color:D.fg, fontSize:'14px', position:'sticky', left:0, background:D.card, verticalAlign:'top'}}>{qnum}</td>
                     {visiblePccs.map(pcc => {
-                      const cell = cellFor(pcc, qnum)
+                      const cells = cellsFor(pcc, qnum)
                       return (
-                        <td key={pcc} onClick={() => isAdmin && openCell(pcc, qnum)}
-                          style={{padding:'10px 16px', fontSize:'13px', color: cell ? D.fg : D.fgDim, cursor: isAdmin ? 'pointer' : 'default', transition:'background 0.15s'}}
-                          onMouseEnter={e => { if (isAdmin) e.currentTarget.style.background = ACCENT_SOFT }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                          {cell ? cell.queue_name : '—'}
+                        <td key={pcc}
+                          style={{padding:'10px 16px', fontSize:'13px', color: D.fg, cursor: 'default', verticalAlign:'top'}}>
+                          {cells.length === 0 ? (
+                            <span onClick={() => isAdmin && openAddToCell(pcc, qnum)}
+                              style={{color:D.fgDim, cursor: isAdmin ? 'pointer' : 'default', display:'block'}}
+                              onMouseEnter={e => { if (isAdmin) e.currentTarget.style.color = ACCENT }}
+                              onMouseLeave={e => { e.currentTarget.style.color = D.fgDim }}>
+                              —
+                            </span>
+                          ) : (
+                            <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                              {cells.map(cell => (
+                                <div key={cell.id} onClick={() => isAdmin && openEditRecord(cell)}
+                                  style={{cursor: isAdmin ? 'pointer' : 'default', borderRadius:'4px', padding:'2px 4px', margin:'-2px -4px'}}
+                                  onMouseEnter={e => { if (isAdmin) e.currentTarget.style.background = ACCENT_SOFT }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                                  {cell.sub_category && <span style={{fontWeight:700, color:ACCENT, marginRight:'6px', fontSize:'12px'}}>{cell.sub_category}:</span>}
+                                  {cell.queue_name}
+                                </div>
+                              ))}
+                              {isAdmin && (
+                                <div onClick={() => openAddToCell(pcc, qnum)}
+                                  style={{fontSize:'11px', color:D.fgDim, cursor:'pointer', marginTop:'2px'}}
+                                  onMouseEnter={e => { e.currentTarget.style.color = ACCENT }}
+                                  onMouseLeave={e => { e.currentTarget.style.color = D.fgDim }}>
+                                  + add
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
                       )
                     })}
@@ -216,7 +252,7 @@ export default function AmadeusQueueManagementPage() {
                 ))}
               </tbody>
             </table>
-            {isAdmin && <div style={{padding:'10px 16px', borderTop:`1px solid ${D.border}`, fontSize:'12px', color:D.fgDim}}>Click any cell to add or edit that PCC&apos;s queue.</div>}
+            {isAdmin && <div style={{padding:'10px 16px', borderTop:`1px solid ${D.border}`, fontSize:'12px', color:D.fgDim}}>Click any entry to edit it, or &quot;+ add&quot; to add another sub-category to the same cell.</div>}
           </div>
         )}
 
@@ -226,23 +262,30 @@ export default function AmadeusQueueManagementPage() {
             onClick={e => { if (e.target === e.currentTarget) setPanelOpen(false) }}>
           <div style={{width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${ACCENT}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${ACCENT_SOFT}`}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'18px'}}>
-              <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editing && cellFor(editing.pcc, editing.queue_number) ? 'Edit Queue' : 'Add Queue'}</h2>
+              <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editing?.id ? 'Edit Queue' : 'Add Queue'}</h2>
               <button onClick={() => setPanelOpen(false)} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
             </div>
 
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
               <div>
                 <label style={lblDark}>PCC <span style={{color:D.danger}}>*</span></label>
-                <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} placeholder="e.g. XW7J" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} />
+                <input type="text" value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} placeholder="e.g. KULMY217Z" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} />
               </div>
               <div>
                 <label style={lblDark}>Queue Number <span style={{color:D.danger}}>*</span></label>
                 <input type="text" value={form.queue_number} onChange={e => setForm(f => ({ ...f, queue_number: e.target.value }))} placeholder="e.g. 0" style={{...inpDark(), fontFamily:'monospace'}} />
               </div>
             </div>
-            <div style={{marginBottom:'14px'}}>
-              <label style={lblDark}>Queue Name <span style={{color:D.danger}}>*</span></label>
-              <input type="text" value={form.queue_name} onChange={e => setForm(f => ({ ...f, queue_name: e.target.value }))} placeholder="e.g. URGENT" style={inpDark()} />
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+              <div>
+                <label style={lblDark}>Queue Name <span style={{color:D.danger}}>*</span></label>
+                <input type="text" value={form.queue_name} onChange={e => setForm(f => ({ ...f, queue_name: e.target.value }))} placeholder="e.g. GENERAL" style={inpDark()} />
+              </div>
+              <div>
+                <label style={lblDark}>Sub-Category</label>
+                <input type="text" value={form.sub_category} onChange={e => setForm(f => ({ ...f, sub_category: e.target.value }))} placeholder="e.g. C1 (optional)" style={{...inpDark(), fontFamily:'monospace'}} />
+                <p style={{fontSize:'11px', color:D.fgDim, marginTop:'4px'}}>Leave blank unless this PCC + Queue Number has multiple splits (C1/C2/C3...).</p>
+              </div>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
               <div>
@@ -264,7 +307,7 @@ export default function AmadeusQueueManagementPage() {
 
             {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
             <div style={{display:'flex', gap:'10px', justifyContent:'space-between'}}>
-              {editing && cellFor(editing.pcc, editing.queue_number) ? (
+              {editing?.id ? (
                 <button onClick={handleDeleteCell} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:D.dangerSoft, border:`1px solid ${D.danger}`, borderRadius:'8px', color:D.danger, cursor:'pointer'}}>Delete</button>
               ) : <span />}
               <div style={{display:'flex', gap:'10px'}}>
