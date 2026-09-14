@@ -22,6 +22,7 @@ const ICONS = {
   report: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
   admin: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
   queue: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
+  webservice: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
   chevron: <polyline points="6 9 12 15 18 9" />,
 }
 function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?: string }) {
@@ -42,6 +43,7 @@ const GROUPS: NavGroup[] = [
       { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
       { label: 'Queue Management', href: '/queue-management', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#3fb950" /> },
+      { label: 'Web Service List', href: '/web-service', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#f78166" /> },
     ],
   },
   {
