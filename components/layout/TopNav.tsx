@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
-interface NavLeaf { label: string; href: string; module: string; icon: React.ReactNode }
+interface NavLeaf { label: string; href: string; module: string; icon: React.ReactNode; subItems?: NavLeaf[] }
 interface NavGroup { key: string; label: string; color: string; soft: string; glow: string; border: string; desc: string; items: NavLeaf[] }
 
 const ICONS = {
@@ -43,15 +43,14 @@ const GROUPS: NavGroup[] = [
       { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
       { label: 'Web Service List', href: '/web-service', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#f78166" /> },
-    ],
-  },
-  {
-    key: 'queue', label: 'Queue Management', color: '#3fb950', soft: 'rgba(63,185,80,0.10)', glow: 'rgba(63,185,80,0.06)', border: 'rgba(63,185,80,0.20)',
-    desc: 'GDS queue assignments by PCC / OID',
-    items: [
-      { label: 'Sabre', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#f78166" /> },
-      { label: 'Amadeus', href: '/queue-management/amadeus', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#a371f7" /> },
-      { label: 'Travelport', href: '/queue-management/travelport', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#58a6ff" /> },
+      {
+        label: 'Queue Management', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#3fb950" />,
+        subItems: [
+          { label: 'Sabre', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#f78166" /> },
+          { label: 'Amadeus', href: '/queue-management/amadeus', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#a371f7" /> },
+          { label: 'Travelport', href: '/queue-management/travelport', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#58a6ff" /> },
+        ],
+      },
     ],
   },
   {
@@ -91,6 +90,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
   const router = useRouter()
   const supabase = createClient()
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [openSubItem, setOpenSubItem] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const navRef = useRef<HTMLDivElement>(null)
 
@@ -178,7 +178,41 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                         <div style={{ position: 'absolute', top: '100%', left: 0, paddingTop: '6px', minWidth: '230px', zIndex: 50 }}>
                         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: '10px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', padding: '6px' }}>
                           {g.items.map(item => {
-                            const active = pathname === item.href
+                            const active = item.subItems ? item.subItems.some(s => pathname === s.href) : pathname === item.href
+                            if (item.subItems) {
+                              return (
+                                <div key={item.label} style={{ position: 'relative' }}
+                                  onMouseEnter={() => setOpenSubItem(item.label)}
+                                  onMouseLeave={() => setOpenSubItem(null)}>
+                                  <Link href={item.href} onClick={() => setOpenGroup(null)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', fontSize: '14px', fontWeight: active ? 600 : 500, textTransform: 'uppercase', letterSpacing: '0.03em',
+                                      color: active ? g.color : T.fg, background: active ? g.soft : 'transparent', border: `1.5px solid ${active ? g.border : 'transparent'}`, borderRadius: '7px', textDecoration: 'none', transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s', boxShadow: active ? `0 0 0 3px ${g.soft}` : 'none' }}
+                                    onMouseOver={e => { if (!active) { e.currentTarget.style.borderColor = g.border; e.currentTarget.style.background = g.soft; e.currentTarget.style.boxShadow = `0 0 0 3px ${g.soft}` } }}
+                                    onMouseOut={e => { if (!active) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none' } }}>
+                                    {item.icon} {item.label}
+                                    <span style={{ marginLeft: 'auto', display: 'flex', transform: 'rotate(-90deg)' }}><Ic path={ICONS.chevron} w={12} /></span>
+                                  </Link>
+                                  {openSubItem === item.label && (
+                                    <div style={{ position: 'absolute', top: 0, left: 'calc(100% + 6px)', minWidth: '200px', zIndex: 60 }}>
+                                      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: '10px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', padding: '6px' }}>
+                                        {item.subItems.map(sub => {
+                                          const subActive = pathname === sub.href
+                                          return (
+                                            <Link key={sub.href} href={sub.href} onClick={() => { setOpenGroup(null); setOpenSubItem(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', fontSize: '14px', fontWeight: subActive ? 600 : 500, textTransform: 'uppercase', letterSpacing: '0.03em',
+                                                color: subActive ? g.color : T.fg, background: subActive ? g.soft : 'transparent', border: `1.5px solid ${subActive ? g.border : 'transparent'}`, borderRadius: '7px', textDecoration: 'none' }}
+                                              onMouseOver={e => { if (!subActive) { e.currentTarget.style.borderColor = g.border; e.currentTarget.style.background = g.soft } }}
+                                              onMouseOut={e => { if (!subActive) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent' } }}>
+                                              {sub.icon} {sub.label}
+                                            </Link>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            }
                             return (
                               <Link key={item.href} href={item.href} onClick={() => setOpenGroup(null)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', fontSize: '14px', fontWeight: active ? 600 : 500, textTransform: 'uppercase', letterSpacing: '0.03em',
@@ -228,6 +262,25 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
               <div key={g.key} style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: T.fgDim, opacity: 0.6, padding: '4px 8px' }}>{g.label}</div>
                 {g.items.map(item => {
+                  if (item.subItems) {
+                    return (
+                      <div key={item.label} style={{ marginBottom: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', fontSize: '13px', fontWeight: 500, color: T.fgDim }}>
+                          {item.icon} {item.label}
+                        </div>
+                        {item.subItems.map(sub => {
+                          const subActive = pathname === sub.href
+                          return (
+                            <Link key={sub.href} href={sub.href} onClick={() => setMobileOpen(false)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px 9px 28px', fontSize: '13px', fontWeight: subActive ? 600 : 500,
+                                color: subActive ? g.color : T.fgDim, background: subActive ? g.soft : 'transparent', border: `1.5px solid ${subActive ? g.border : 'transparent'}`, borderRadius: '8px', textDecoration: 'none', marginBottom: '2px' }}>
+                              {sub.icon} {sub.label}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )
+                  }
                   const active = pathname === item.href
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
