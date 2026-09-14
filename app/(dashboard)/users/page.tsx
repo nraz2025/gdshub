@@ -88,6 +88,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [filterOta, setFilterOta] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -217,12 +218,11 @@ export default function UsersPage() {
 
   const filtered = users.filter(u => {
     const term = search.toLowerCase()
-    const otaText = u.ota_client ? 'yes' : 'no'
     const matchSearch = `${u.first_name} ${u.last_name}`.toLowerCase().includes(term)
       || u.email_address.toLowerCase().includes(term)
-      || otaText.includes(term)
     const matchStatus = filterStatus === 'all' || (u.status ?? 'Active') === filterStatus
-    return matchSearch && matchStatus
+    const matchOta = filterOta === 'all' || (filterOta === 'yes' ? u.ota_client : !u.ota_client)
+    return matchSearch && matchStatus && matchOta
   })
 
   const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize)
@@ -300,7 +300,7 @@ export default function UsersPage() {
         <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
           <div style={{position:'relative', flex:1, minWidth:'240px'}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search by name, email or OTA status..." value={search}
+            <input type="text" placeholder="Search by name or email..." value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
               style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
               onFocus={e => { e.target.style.borderColor=D.accent; e.target.style.boxShadow=`0 0 0 3px ${D.accentSoft}` }}
@@ -313,8 +313,14 @@ export default function UsersPage() {
             <option value="Inactive">Inactive</option>
             <option value="Suspended">Suspended</option>
           </select>
-          {(search || filterStatus !== 'all') && (
-            <button onClick={() => { setSearch(''); setFilterStatus('all'); setCurrentPage(1) }}
+          <select value={filterOta} onChange={e => { setFilterOta(e.target.value); setCurrentPage(1) }}
+            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none'}}>
+            <option value="all">All OTA</option>
+            <option value="yes">OTA: Yes</option>
+            <option value="no">OTA: No</option>
+          </select>
+          {(search || filterStatus !== 'all' || filterOta !== 'all') && (
+            <button onClick={() => { setSearch(''); setFilterStatus('all'); setFilterOta('all'); setCurrentPage(1) }}
               style={{padding:'8px 14px', background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'13px', color:D.accent, cursor:'pointer', fontWeight:600}}>
               Clear
             </button>
