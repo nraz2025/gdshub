@@ -65,7 +65,7 @@ const EPR_CATEGORIES: { label: string; value: EprCategory; min: number; max: num
   { label: 'Vendor', value: 'Vendor', min: 9950, max: 9999, color: '#F59E0B' },
 ]
 
-const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active', category: '' as EprCategory | '',
+const EMPTY = { login: '', sign_on_id: '', initial: '', duty_code: '', oid: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active', category: '' as EprCategory | '', notes: '',
 }
 
 interface ImportRow {
@@ -166,7 +166,7 @@ export default function AmadeusUsersPage() {
   }
   function openEdit(row: AmadeusUser) {
     setEditing(row)
-    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active', category: (row as AmadeusUser & { category?: EprCategory }).category ?? '' })
+    setForm({ login: row.login, sign_on_id: row.sign_on_id ?? '', initial: row.initial ?? '', duty_code: row.duty_code ?? '', oid: row.oid ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active', category: (row as AmadeusUser & { category?: EprCategory }).category ?? '', notes: (row as AmadeusUser & { notes?: string }).notes ?? '' })
     setError(''); setSaving(false); setNextEpr(null); setNextSignOnNum(null); setModalOpen(true)
   }
   function openDelete(row: AmadeusUser) { setEditing(row); setDeleteOpen(true) }
@@ -198,7 +198,7 @@ export default function AmadeusUsersPage() {
       if (synced) { resolvedUserId = synced }
     }
 
-    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active', category: (form as {category?: string}).category || null }
+    const payload = { login: form.login.trim(), sign_on_id: form.sign_on_id.trim().toUpperCase() || null, initial: form.initial.trim().toUpperCase() || null, duty_code: form.duty_code.trim().toUpperCase() || null, oid: form.oid.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active', category: (form as {category?: string}).category || null, notes: form.notes.trim() || null }
     const { error: err } = editing
       ? await supabase.from('amadeus_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('amadeus_user').insert({ ...payload, ...audit })
@@ -452,9 +452,9 @@ export default function AmadeusUsersPage() {
 
         {loading ? <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div> : (
           <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
-            <div style={{display:'grid', gridTemplateColumns:'minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,150px)', minWidth:'1140px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
-              {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Status','Actions'].map((h,i) => (
-                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===8 ? 'right' : 'left'}}>{h}</div>
+            <div style={{display:'grid', gridTemplateColumns:'minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,1.5fr) minmax(150px,150px)', minWidth:'1290px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+              {['OID','Login','Sign-On','Linked User','Initial','Duty','OTA','Notes','Status','Actions'].map((h,i) => (
+                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===9 ? 'right' : 'left'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>No Amadeus users found.</div> :
@@ -466,7 +466,7 @@ export default function AmadeusUsersPage() {
                 : { soft: D.warningSoft, color: D.warning }
               const pccAssigned = getPccAssigned(row.oid)
               return (
-                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,150px)', minWidth:'1140px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(140px,1.4fr) minmax(130px,1.3fr) minmax(120px,1.2fr) minmax(200px,2fr) minmax(95px,1fr) minmax(95px,1fr) minmax(95px,1fr) minmax(115px,1.15fr) minmax(150px,1.5fr) minmax(150px,150px)', minWidth:'1290px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background = D.accentSoft)} onMouseLeave={e=>(e.currentTarget.style.background = 'transparent')}>
                   <div style={{padding:'12px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:'2px'}}>
                     <span style={{fontFamily:'monospace', fontSize:'13px', color:D.fgMuted, textTransform:'uppercase', letterSpacing:'0.03em'}}>{row.oid??'—'}</span>
@@ -485,6 +485,9 @@ export default function AmadeusUsersPage() {
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:600, color:D.fgMuted}}>{row.duty_code??'—'}</span></div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{fontSize:'12px', fontWeight:600, padding:'4px 10px', borderRadius:'20px', background: row.ota ? D.cyanSoft : 'rgba(139,148,158,0.10)', color: row.ota ? D.cyan : D.fgMuted}}>{row.ota ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'13px', color:D.fgMuted, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={(row as {notes?: string}).notes ?? ''}>{(row as {notes?: string}).notes || <span style={{color:D.fgDim}}>—</span>}</span>
                   </div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color, textTransform:'capitalize'}}>
@@ -647,7 +650,13 @@ export default function AmadeusUsersPage() {
             </select>
           </div>
 
-          {/* 8. OTA toggle */}
+          {/* 8. Notes */}
+          <div style={{marginBottom:'14px'}}>
+            <label style={lblDark}>Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Any additional notes..." style={{...inpDark(), resize:'vertical' as const}} />
+          </div>
+
+          {/* 9. OTA toggle */}
           <div style={{marginBottom:'18px'}}>
             <label style={lblDark}>OTA</label>
             <div style={{display:'flex', gap:'20px'}}>

@@ -42,8 +42,16 @@ const GROUPS: NavGroup[] = [
       { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
       { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
-      { label: 'Queue Management', href: '/queue-management', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#3fb950" /> },
       { label: 'Web Service List', href: '/web-service', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#f78166" /> },
+    ],
+  },
+  {
+    key: 'queue', label: 'Queue Management', color: '#3fb950', soft: 'rgba(63,185,80,0.10)', glow: 'rgba(63,185,80,0.06)', border: 'rgba(63,185,80,0.20)',
+    desc: 'GDS queue assignments by PCC / OID',
+    items: [
+      { label: 'Sabre', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#f78166" /> },
+      { label: 'Amadeus', href: '/queue-management/amadeus', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#a371f7" /> },
+      { label: 'Travelport', href: '/queue-management/travelport', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#58a6ff" /> },
     ],
   },
   {

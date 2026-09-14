@@ -68,7 +68,7 @@ const EPR_CATEGORIES: { label: string; value: EprCategory; min: number; max: num
 const EMPTY = {
   epr: '', initial: '', status: 'Active' as SabreStatus,
   pcc: '', user_id: '', ota_client_id: '' as number | '',
-  cta: '', pta: '', minicom: '',
+  cta: '', pta: '', minicom: '', notes: '',
   newEmail: '', newFirstName: '', newLastName: '',
   category: '' as EprCategory | '',
   ota: false,
@@ -170,6 +170,7 @@ export default function SabreUsersPage() {
       cta: row.cta ?? '',
       pta: row.pta ?? '',
       minicom: row.minicom ?? '',
+      notes: (row as SabreUser & { notes?: string }).notes ?? '',
       newEmail: '', newFirstName: '', newLastName: '',
       category: (row as SabreUser & { category?: EprCategory }).category ?? '',
       ota: (row as SabreUser & { ota?: boolean }).ota ?? false,
@@ -217,6 +218,7 @@ export default function SabreUsersPage() {
       cta:           form.cta.trim() || null,
       pta:           form.pta.trim() || null,
       minicom:       form.minicom.trim() || null,
+      notes:         form.notes.trim() || null,
       category:      form.category || null,
       ota:           form.ota,
     }
@@ -581,9 +583,9 @@ export default function SabreUsersPage() {
 
         {loading ? <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div> : (
           <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
-            <div style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1175px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
-              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Status','Actions'].map((h,i) => (
-                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===9 ? 'right' : 'left'}}>{h}</div>
+            <div style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(150px,1.5fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1325px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+              {['PCC','EPR','Linked User','Initial','CTA','PTA','Minicom','OTA','Notes','Status','Actions'].map((h,i) => (
+                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===10 ? 'right' : 'left'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>No Sabre users found.</div> :
@@ -598,7 +600,7 @@ export default function SabreUsersPage() {
               const dup = isDuplicateInitial(ini)
               const ota = (row as {ota?:boolean}).ota
               return (
-                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1175px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(100px,1fr) minmax(200px,2.5fr) minmax(85px,0.85fr) minmax(100px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(80px,0.8fr) minmax(150px,1.5fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1325px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background = D.accentSoft)} onMouseLeave={e=>(e.currentTarget.style.background = 'transparent')}>
                   <div style={{padding:'12px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:'2px'}}>
                     <span style={{fontFamily:'monospace', fontSize:'14px', fontWeight:600, color:D.fg, letterSpacing:'0.03em'}}>{row.pcc??'—'}</span>
@@ -619,6 +621,9 @@ export default function SabreUsersPage() {
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.minicom??'—'}</span></div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{fontSize:'12px', fontWeight:600, padding:'4px 10px', borderRadius:'20px', background: ota ? D.cyanSoft : 'rgba(139,148,158,0.10)', color: ota ? D.cyan : D.fgMuted}}>{ota ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'13px', color:D.fgMuted, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={(row as {notes?: string}).notes ?? ''}>{(row as {notes?: string}).notes || <span style={{color:D.fgDim}}>—</span>}</span>
                   </div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color}}>
@@ -812,7 +817,13 @@ export default function SabreUsersPage() {
             <input type="text" value={form.minicom} onChange={e => setForm(f => ({ ...f, minicom: e.target.value }))} placeholder="e.g. MC-456" style={{...inpDark(), fontFamily:'monospace'}} />
           </div>
 
-          {/* 7. OTA toggle */}
+          {/* 7. Notes */}
+          <div style={{marginBottom:'14px'}}>
+            <label style={lblDark}>Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Any additional notes..." style={{...inpDark(), resize:'vertical' as const}} />
+          </div>
+
+          {/* 8. OTA toggle */}
           <div style={{marginBottom:'18px'}}>
             <label style={lblDark}>OTA</label>
             <div style={{display:'flex', gap:'20px'}}>

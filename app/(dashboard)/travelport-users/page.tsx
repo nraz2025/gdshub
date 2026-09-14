@@ -48,7 +48,7 @@ const D = {
   cyan: '#39d2c0', cyanSoft: 'rgba(57,210,192,0.10)',
 }
 
-const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active',
+const EMPTY = { sign_on_id: '', cid: '', gtid: '', pcc: '', user_id: '', ota: false, ota_client_id: '' as number | '', newEmail: '', newFirstName: '', newLastName: '', status: 'active', notes: '',
 }
 
 interface ImportRow {
@@ -108,7 +108,7 @@ export default function TravelportUsersPage() {
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setSaving(false); setModalOpen(true) }
   function openEdit(row: TravelportUser) {
     setEditing(row)
-    setForm({ sign_on_id: row.sign_on_id ?? '', cid: row.cid ?? '', gtid: row.gtid ?? '', pcc: row.pcc ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active' })
+    setForm({ sign_on_id: row.sign_on_id ?? '', cid: row.cid ?? '', gtid: row.gtid ?? '', pcc: row.pcc ?? '', user_id: row.user_id ?? '', ota: row.ota, ota_client_id: row.ota_client_id ?? '', newEmail: '', newFirstName: '', newLastName: '', status: (row as {status?: string}).status ?? 'active', notes: (row as TravelportUser & { notes?: string }).notes ?? '' })
     setError(''); setSaving(false); setModalOpen(true)
   }
   function openDelete(row: TravelportUser) { setEditing(row); setDeleteOpen(true) }
@@ -140,7 +140,7 @@ export default function TravelportUsersPage() {
       if (synced) { resolvedUserId = synced }
     }
 
-    const payload = { sign_on_id: form.sign_on_id.trim().toUpperCase() || null, cid: form.cid.trim().toUpperCase() || null, gtid: form.gtid.trim().toUpperCase() || null, pcc: form.pcc.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active' }
+    const payload = { sign_on_id: form.sign_on_id.trim().toUpperCase() || null, cid: form.cid.trim().toUpperCase() || null, gtid: form.gtid.trim().toUpperCase() || null, pcc: form.pcc.trim().toUpperCase() || null, user_id: resolvedUserId, ota: form.ota, ota_client_id: form.ota_client_id || null, status: (form as {status?: string}).status ?? 'active', notes: form.notes.trim() || null }
     const { error: err } = editing
       ? await supabase.from('travelport_user').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('travelport_user').insert({ ...payload, ...audit })
@@ -368,9 +368,9 @@ export default function TravelportUsersPage() {
 
         {loading ? <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div> : (
           <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
-            <div style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'980px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
-              {['PCC','Sign-On','Linked User','CID','GTID','OTA','Status','Actions'].map((h,i) => (
-                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===7 ? 'right' : 'left'}}>{h}</div>
+            <div style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(150px,1.5fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1130px', background:'rgba(0,0,0,0.1)', borderBottom:`1px solid ${D.border}`}}>
+              {['PCC','Sign-On','Linked User','CID','GTID','OTA','Notes','Status','Actions'].map((h,i) => (
+                <div key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.06em', textAlign: i===8 ? 'right' : 'left'}}>{h}</div>
               ))}
             </div>
             {filtered.length===0 ? <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>No Travelport users found.</div> :
@@ -382,7 +382,7 @@ export default function TravelportUsersPage() {
                 : { soft: D.warningSoft, color: D.warning }
               const pccAssigned = getPccAssigned(row.pcc)
               return (
-                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'980px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                <div key={row.id} style={{display:'grid', gridTemplateColumns:'minmax(130px,1.3fr) minmax(110px,1.1fr) minmax(200px,2fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(80px,0.8fr) minmax(150px,1.5fr) minmax(110px,1.1fr) minmax(170px,170px)', minWidth:'1130px', borderBottom: i<filtered.length-1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
                   onMouseEnter={e=>(e.currentTarget.style.background = D.accentSoft)} onMouseLeave={e=>(e.currentTarget.style.background = 'transparent')}>
                   <div style={{padding:'12px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:'2px'}}>
                     <span style={{fontFamily:'monospace', fontSize:'14px', color:D.fgMuted, textTransform:'uppercase', letterSpacing:'0.03em'}}>{row.pcc??'—'}</span>
@@ -394,6 +394,9 @@ export default function TravelportUsersPage() {
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'14px', color:D.fgMuted, textTransform:'uppercase', letterSpacing:'0.03em'}}>{row.gtid??'—'}</span></div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{fontSize:'12px', fontWeight:600, padding:'4px 10px', borderRadius:'20px', background: row.ota ? D.cyanSoft : 'rgba(139,148,158,0.10)', color: row.ota ? D.cyan : D.fgMuted}}>{row.ota ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
+                    <span style={{fontSize:'13px', color:D.fgMuted, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={(row as {notes?: string}).notes ?? ''}>{(row as {notes?: string}).notes || <span style={{color:D.fgDim}}>—</span>}</span>
                   </div>
                   <div style={{padding:'12px 16px', display:'flex', alignItems:'center'}}>
                     <span style={{display:'inline-flex', alignItems:'center', gap:'6px', fontSize:'13px', fontWeight:600, padding:'5px 12px', borderRadius:'20px', background:statusStyle.soft, color:statusStyle.color, textTransform:'capitalize'}}>
@@ -488,7 +491,11 @@ export default function TravelportUsersPage() {
               {usersList.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email_address})</option>)}
             </select></div>
 
-          {/* 6. OTA toggle */}
+          {/* 6. Notes */}
+          <div style={{marginBottom:'14px'}}><label style={lblDark}>Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Any additional notes..." style={{...inpDark(), resize:'vertical' as const}} /></div>
+
+          {/* 7. OTA toggle */}
           <div style={{marginBottom:'18px'}}><label style={lblDark}>OTA</label>
             <div style={{display:'flex', gap:'20px'}}>{[true, false].map(v => <label key={String(v)} style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer'}}><input type="radio" checked={form.ota === v} onChange={() => setForm(f => ({ ...f, ota: v }))} style={{accentColor:D.accent}} /><span style={{fontSize:'14px', color:D.fg}}>{v ? 'Yes' : 'No'}</span></label>)}</div>
           </div>
