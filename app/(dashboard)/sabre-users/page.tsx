@@ -285,6 +285,7 @@ export default function SabreUsersPage() {
         'PCC':         r.pcc ?? '',
         'OTA Client':  ota?.company_name ?? '',
         'Linked User': u ? `${u.first_name} ${u.last_name}` : '',
+        'Email Address': u?.email_address ?? '',
         'CTA':         r.cta ?? '',
         'PTA':         r.pta ?? '',
         'Minicom':     r.minicom ?? '',
@@ -292,7 +293,7 @@ export default function SabreUsersPage() {
       }
     })
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }]
+    ws['!cols'] = [{ wch: 5 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Sabre Users')
     XLSX.writeFile(wb, `GDSHub_Sabre_Users_${new Date().toISOString().slice(0, 10)}.xlsx`)

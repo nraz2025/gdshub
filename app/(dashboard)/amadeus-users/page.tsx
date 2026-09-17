@@ -245,10 +245,10 @@ export default function AmadeusUsersPage() {
   function handleExport() {
     const data = filtered.map((r, i) => {
       const u = r.users as User
-      return { 'No.': i + 1, 'Login': r.login, 'Sign-On ID': r.sign_on_id ?? '', 'Initial': r.initial ?? '', 'Duty Code': r.duty_code ?? '', 'OID': r.oid ?? '', 'OTA': r.ota ? 'Yes' : 'No', 'Linked User': u ? `${u.first_name} ${u.last_name}` : '', 'Created': new Date(r.created_at).toLocaleDateString('en-MY') }
+      return { 'No.': i + 1, 'Login': r.login, 'Sign-On ID': r.sign_on_id ?? '', 'Initial': r.initial ?? '', 'Duty Code': r.duty_code ?? '', 'OID': r.oid ?? '', 'OTA': r.ota ? 'Yes' : 'No', 'Linked User': u ? `${u.first_name} ${u.last_name}` : '', 'Email Address': u?.email_address ?? '', 'Created': new Date(r.created_at).toLocaleDateString('en-MY') }
     })
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 25 }, { wch: 15 }]
+    ws['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 25 }, { wch: 28 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Amadeus Users')
     XLSX.writeFile(wb, `GDSHub_Amadeus_Users_${new Date().toISOString().slice(0, 10)}.xlsx`)

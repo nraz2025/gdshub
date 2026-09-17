@@ -194,10 +194,10 @@ export default function TravelportUsersPage() {
   function handleExport() {
     const data = filtered.map((r, i) => {
       const u = r.users as User
-      return { 'No.': i + 1, 'Sign-On ID': r.sign_on_id ?? '', 'CID': r.cid ?? '', 'GTID': r.gtid ?? '', 'PCC': r.pcc ?? '', 'OTA': r.ota ? 'Yes' : 'No', 'Linked User': u ? `${u.first_name} ${u.last_name}` : '', 'Created': new Date(r.created_at).toLocaleDateString('en-MY') }
+      return { 'No.': i + 1, 'Sign-On ID': r.sign_on_id ?? '', 'CID': r.cid ?? '', 'GTID': r.gtid ?? '', 'PCC': r.pcc ?? '', 'OTA': r.ota ? 'Yes' : 'No', 'Linked User': u ? `${u.first_name} ${u.last_name}` : '', 'Email Address': u?.email_address ?? '', 'Created': new Date(r.created_at).toLocaleDateString('en-MY') }
     })
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 25 }, { wch: 15 }]
+    ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 25 }, { wch: 28 }, { wch: 15 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Travelport Users')
     XLSX.writeFile(wb, `GDSHub_Travelport_Users_${new Date().toISOString().slice(0, 10)}.xlsx`)
