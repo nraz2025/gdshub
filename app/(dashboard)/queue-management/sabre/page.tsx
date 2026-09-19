@@ -92,7 +92,7 @@ export default function SabreQueueManagementPage() {
     setGdsId(thisGdsId)
     if (thisGdsId) {
       const [{ data: q }, { data: l }, { data: o }] = await Promise.all([
-        supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number'),
+        supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number').range(0, 19999),
         supabase.from('gds_queue_labels').select('queue_number, label').eq('gds_id', thisGdsId),
         supabase.from('gds_pcc_order').select('pcc, sort_order').eq('gds_id', thisGdsId),
       ])

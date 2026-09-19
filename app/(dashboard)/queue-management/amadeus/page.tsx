@@ -93,7 +93,7 @@ export default function AmadeusQueueManagementPage() {
     setGdsId(thisGdsId)
     if (thisGdsId) {
       const [{ data: q }, { data: l }] = await Promise.all([
-        supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number').order('sub_category'),
+        supabase.from('gds_queue').select('*').eq('gds_id', thisGdsId).order('pcc').order('queue_number').order('sub_category').range(0, 19999),
         supabase.from('gds_queue_labels').select('queue_number, label, categories').eq('gds_id', thisGdsId),
       ])
       setRecords((q as unknown as QueueRow[]) ?? [])
