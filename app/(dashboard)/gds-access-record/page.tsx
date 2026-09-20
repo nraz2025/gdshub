@@ -129,7 +129,7 @@ export default function GDSAccessRecordPage() {
   // PCC Name login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
-  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null;status:string}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null;status:string}[]}>({ sabre:[], amadeus:[], travelport:[] })
+  const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null;status:string;users?:{email_address:string|null}|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null;status:string}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
   // GDS Feature detail popup
@@ -262,7 +262,7 @@ export default function GDSAccessRecordPage() {
         ? supabase.from('sabre_user').select('id,epr,pcc,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('epr')
         : Promise.resolve({ data: [] }),
       gdsName === 'Amadeus' || !gdsName
-        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid,status').eq('ota_client_id', pcc.ota_client_id).order('login')
+        ? supabase.from('amadeus_user').select('id,login,sign_on_id,oid,status,users:user_id(email_address)').eq('ota_client_id', pcc.ota_client_id).order('login')
         : Promise.resolve({ data: [] }),
       gdsName === 'Travelport' || !gdsName
         ? supabase.from('travelport_user').select('id,sign_on_id,cid,pcc,status').eq('ota_client_id', pcc.ota_client_id).order('sign_on_id')
@@ -742,6 +742,13 @@ export default function GDSAccessRecordPage() {
             <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>PCC assignments and configuration details across organisations</p>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+            {isAdmin && selectedIds.size > 0 && (
+              <button onClick={openBulk}
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.purpleSoft, border:`1px solid ${D.purple}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.purple, cursor:'pointer'}}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Bulk Edit ({selectedIds.size})
+              </button>
+            )}
             {isAdmin && (
               <button onClick={handleExport} disabled={filtered.length === 0}
                 style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:filtered.length===0?0.4:1}}
@@ -749,13 +756,6 @@ export default function GDSAccessRecordPage() {
                 onMouseOut={e => { e.currentTarget.style.background=D.card; e.currentTarget.style.color=D.fgMuted }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export xlsx
-              </button>
-            )}
-            {isAdmin && selectedIds.size > 0 && (
-              <button onClick={openBulk}
-                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.purpleSoft, border:`1px solid ${D.purple}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.purple, cursor:'pointer'}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Bulk Edit ({selectedIds.size})
               </button>
             )}
             {isAdmin && (
@@ -834,9 +834,29 @@ export default function GDSAccessRecordPage() {
           </div>
         </div>
 
-        {/* Top record bar */}
+        {/* Select all + records count bar (single row) */}
         {!loading && filtered.length > 0 && (
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', flexWrap:'wrap', gap:'12px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+              {isAdmin && (
+                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'14px', color:D.fgMuted}}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected }}
+                    onChange={toggleSelectAll}
+                    style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent}}
+                  />
+                  Select all
+                </label>
+              )}
+              {isAdmin && selectedIds.size > 0 && (
+                <button onClick={() => setSelectedIds(new Set())}
+                  style={{fontSize:'13px', color:D.fgDim, background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0}}>
+                  Clear ({selectedIds.size} selected)
+                </button>
+              )}
+            </div>
             <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
               <span style={{fontSize:'14px', color:D.fgMuted}}>
                 {pageSize === 'all'
@@ -854,33 +874,6 @@ export default function GDSAccessRecordPage() {
             </div>
           </div>
         )}
-
-        {/* Select all + records count bar */}
-        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px'}}>
-          {isAdmin && !loading && filtered.length > 0 && (
-            <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'14px', color:D.fgMuted}}>
-              <input
-                type="checkbox"
-                checked={allSelected}
-                ref={el => { if (el) el.indeterminate = someSelected }}
-                onChange={toggleSelectAll}
-                style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent}}
-              />
-              Select all
-            </label>
-          )}
-          {isAdmin && selectedIds.size > 0 && (
-            <button onClick={() => setSelectedIds(new Set())}
-              style={{fontSize:'13px', color:D.fgDim, background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0}}>
-              Clear ({selectedIds.size} selected)
-            </button>
-          )}
-          {!loading && (
-            <span style={{fontSize:'13px', color:D.fgDim, marginLeft:'auto'}}>
-              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
 
         {/* Table */}
         {loading ? (
@@ -1363,14 +1356,14 @@ export default function GDSAccessRecordPage() {
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>{['Login','Sign-On ID','OID','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
+                          <tr>{['Login','Email','Sign-On ID','Status'].map(h=><th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {loginPopupData.amadeus.map((r,i)=>(
                             <tr key={r.id} className={i<loginPopupData.amadeus.length-1?'border-b border-slate-50':''}>
                               <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{r.login}</span></td>
+                              <td className="px-4 py-2.5 text-slate-600 text-xs">{r.users?.email_address??''}</td>
                               <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.sign_on_id??''}</td>
-                              <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{r.oid??''}</td>
                               <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${r.status==='Active'?'bg-blue-50 text-blue-600 border-blue-200':'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.status}</span></td>
                             </tr>
                           ))}
