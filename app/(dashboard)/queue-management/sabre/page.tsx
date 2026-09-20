@@ -23,6 +23,7 @@ interface QueueRow {
 
 const EMPTY = { pcc: '', queue_number: '', queue_name: '', category: '', purpose: '', queue_type: '' }
 const QUEUE_TYPES = ['System', 'User', 'Functional', 'Client / Corporate']
+const BLANK_PCC = '__blank__'
 
 // Queue numbers 0-49 are system queues for Sabre.
 const SYSTEM_QUEUE_NUMBERS = new Set<string>(Array.from({ length: 50 }, (_, i) => String(i)))
@@ -203,18 +204,29 @@ export default function SabreQueueManagementPage() {
 
   async function handleDuplicatePcc() {
     if (!gdsId) return
-    if (!dupSourcePcc) { setDupError('Choose which PCC to copy from.'); return }
     const newPcc = dupNewPcc.trim().toUpperCase()
     if (!newPcc) { setDupError('Enter the new PCC / OID.'); return }
     if (allPccs.includes(newPcc)) { setDupError('That PCC already exists.'); return }
     setDupSaving(true); setDupError('')
-    const sourceRows = records.filter(r => r.pcc === dupSourcePcc)
-    if (sourceRows.length === 0) { setDupSaving(false); setDupError('That PCC has no queues to copy.'); return }
-    const newRows = sourceRows.map(r => ({
-      gds_id: gdsId, pcc: newPcc, pcc_label: dupNewLabel.trim() || null,
-      queue_number: r.queue_number, queue_name: r.queue_name,
-      category: r.category, purpose: r.purpose, queue_type: r.queue_type,
-    }))
+    let newRows: Record<string, unknown>[]
+    if (dupSourcePcc === BLANK_PCC) {
+      // Blank PCC — don't copy anything. Insert one empty row per existing queue
+      // number so the new column shows up in the table, ready to fill in cell by cell.
+      if (allQueueNumbers.length === 0) { setDupSaving(false); setDupError('No queue numbers exist yet to attach this PCC to.'); return }
+      newRows = allQueueNumbers.map(qnum => ({
+        gds_id: gdsId, pcc: newPcc, pcc_label: dupNewLabel.trim() || null,
+        queue_number: qnum, queue_name: '', category: null, purpose: null, queue_type: null,
+      }))
+    } else {
+      if (!dupSourcePcc) { setDupSaving(false); setDupError('Choose which PCC to copy from, or pick "Blank PCC".'); return }
+      const sourceRows = records.filter(r => r.pcc === dupSourcePcc)
+      if (sourceRows.length === 0) { setDupSaving(false); setDupError('That PCC has no queues to copy.'); return }
+      newRows = sourceRows.map(r => ({
+        gds_id: gdsId, pcc: newPcc, pcc_label: dupNewLabel.trim() || null,
+        queue_number: r.queue_number, queue_name: r.queue_name,
+        category: r.category, purpose: r.purpose, queue_type: r.queue_type,
+      }))
+    }
     const { error: e } = await supabase.from('gds_queue').insert(newRows)
     setDupSaving(false)
     if (e) { setDupError(e.message); return }
@@ -256,10 +268,13 @@ export default function SabreQueueManagementPage() {
     const idx = allPccs.indexOf(pcc)
     const swapIdx = direction === 'left' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= allPccs.length) return
-    // Base new sort_order values on current column positions so a first-time
-    // reorder (before any explicit order exists) still produces a clean sequence.
-    const base = allPccs.map((p, i) => pccOrder[p] ?? i)
-    const newOrders = [...base]
+    // Always rebuild a clean, sequential 0..n-1 order from the CURRENT on-screen
+    // column positions before swapping. Reusing old stored sort_order values here
+    // caused a bug: a newly-added PCC (with no stored order yet) would fall back to
+    // its array index, which can be smaller than another PCC's real stored value if
+    // that value drifted non-sequential from earlier reorders — so the swap would
+    // "save" successfully but never actually move anything on screen.
+    const newOrders = allPccs.map((_, i) => i)
     const tmp = newOrders[idx]; newOrders[idx] = newOrders[swapIdx]; newOrders[swapIdx] = tmp
     const rows = allPccs.map((p, i) => ({ gds_id: gdsId, pcc: p, sort_order: newOrders[i] }))
     const { error: e } = await supabase.from('gds_pcc_order').upsert(rows, { onConflict: 'gds_id,pcc' })
@@ -309,6 +324,13 @@ export default function SabreQueueManagementPage() {
             </div>
           )}
         </div>
+
+        {error && (
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', padding:'10px 14px', marginBottom:'14px', background:'rgba(248,81,73,0.1)', border:`1px solid ${D.danger}`, borderRadius:'8px'}}>
+            <span style={{fontSize:'13px', color:D.danger}}>{error}</span>
+            <button onClick={() => setError('')} style={{background:'none', border:'none', color:D.danger, cursor:'pointer', fontSize:'14px'}}>✕</button>
+          </div>
+        )}
 
         {/* PCC selector */}
         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'18px', flexWrap:'wrap'}}>
@@ -517,6 +539,7 @@ export default function SabreQueueManagementPage() {
               <label style={lblDark}>Copy From <span style={{color:D.danger}}>*</span></label>
               <select value={dupSourcePcc} onChange={e => setDupSourcePcc(e.target.value)} style={inpDark({cursor:'pointer', fontFamily:'monospace'})}>
                 <option value="">Select an existing PCC...</option>
+                <option value={BLANK_PCC}>— Blank PCC —</option>
                 {allPccs.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>

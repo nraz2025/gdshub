@@ -14,10 +14,9 @@ const T = {
 
 // Same grouping as TopNav's dropdown groups, so the Dashboard mirrors the nav structure
 const GROUPS: { title: string; color: string; soft: string; keys: string[] }[] = [
-  { title: 'Organisation', color: '#d29922', soft: 'rgba(210,153,34,0.10)', keys: ['organisation'] },
-  { title: 'GDS',          color: '#39d2c0', soft: 'rgba(57,210,192,0.10)', keys: ['gds', 'gds_functionality', 'gds_info', 'web_service', 'queue_management'] },
-  { title: 'Users',        color: '#a371f7', soft: 'rgba(163,113,247,0.10)', keys: ['users', 'sabre_users', 'amadeus_users', 'travelport_users', 'resigned_users'] },
-  { title: 'System',       color: '#f78166', soft: 'rgba(247,129,102,0.10)', keys: ['billing_cycles', 'client', 'reporting', 'admin_panel'] },
+  { title: 'GDS',          color: '#39d2c0', soft: 'rgba(57,210,192,0.10)', keys: ['gds_info', 'web_service', 'queue_management'] },
+  { title: 'Users',        color: '#a371f7', soft: 'rgba(163,113,247,0.10)', keys: ['sabre_users', 'amadeus_users', 'travelport_users', 'resigned_users'] },
+  { title: 'System',       color: '#f78166', soft: 'rgba(247,129,102,0.10)', keys: ['organisation', 'users', 'gds', 'gds_functionality', 'billing_cycles', 'client', 'reporting', 'admin_panel'] },
 ]
 
 export default function DashboardModuleGrid({ modules }: ModuleGridProps) {

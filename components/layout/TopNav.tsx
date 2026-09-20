@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 interface NavLeaf { label: string; href: string; module: string; icon: React.ReactNode; subItems?: NavLeaf[] }
-interface NavGroup { key: string; label: string; color: string; soft: string; glow: string; border: string; desc: string; items: NavLeaf[] }
+interface NavGroup { key: string; label: string; color: string; soft: string; glow: string; border: string; desc: string; items: NavLeaf[]; icon?: React.ReactNode }
 
 const ICONS = {
   building: <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
@@ -23,6 +23,7 @@ const ICONS = {
   admin: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
   queue: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
   webservice: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+  contract: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></>,
   chevron: <polyline points="6 9 12 15 18 9" />,
 }
 function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?: string }) {
@@ -31,33 +32,34 @@ function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?
 
 const GROUPS: NavGroup[] = [
   {
-    key: 'organisation', label: 'Organisation', color: '#d29922', soft: 'rgba(210,153,34,0.10)', glow: 'rgba(210,153,34,0.06)', border: 'rgba(210,153,34,0.20)',
-    desc: 'Manage travel organisations and configs',
-    items: [{ label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} color="#d29922" /> }],
+    key: 'gds_access_record', label: 'GDS Access Record', color: '#39d2c0', soft: 'rgba(57,210,192,0.10)', glow: 'rgba(57,210,192,0.06)', border: 'rgba(57,210,192,0.20)',
+    desc: 'GDS access records',
+    items: [{ label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> }],
   },
   {
-    key: 'gds', label: 'GDS', color: '#39d2c0', soft: 'rgba(57,210,192,0.10)', glow: 'rgba(57,210,192,0.06)', border: 'rgba(57,210,192,0.20)',
-    desc: 'Global Distribution Systems & features',
+    key: 'web_service', label: 'Web Service', color: '#f78166', soft: 'rgba(247,129,102,0.10)', glow: 'rgba(247,129,102,0.06)', border: 'rgba(247,129,102,0.20)',
+    desc: 'Web service credentials across GDS platforms',
+    icon: <Ic path={ICONS.webservice} color="#f78166" />,
     items: [
-      { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
-      { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
-      { label: 'GDS Access Record', href: '/gds-access-record', module: 'gds_info', icon: <Ic path={ICONS.info} color="#39d2c0" /> },
-      { label: 'Web Service List', href: '/web-service', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#f78166" /> },
-      {
-        label: 'Queue Management', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#3fb950" />,
-        subItems: [
-          { label: 'Sabre', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#f78166" /> },
-          { label: 'Amadeus', href: '/queue-management/amadeus', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#a371f7" /> },
-          { label: 'Travelport', href: '/queue-management/travelport', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#58a6ff" /> },
-        ],
-      },
+      { label: 'Sabre', href: '/web-service/sabre', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#f78166" /> },
+      { label: 'Amadeus', href: '/web-service/amadeus', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#a371f7" /> },
+      { label: 'Travelport', href: '/web-service/travelport', module: 'web_service', icon: <Ic path={ICONS.webservice} color="#58a6ff" /> },
     ],
   },
   {
-    key: 'users', label: 'Users', color: '#a371f7', soft: 'rgba(163,113,247,0.10)', glow: 'rgba(163,113,247,0.06)', border: 'rgba(163,113,247,0.20)',
+    key: 'queue_management', label: 'Queue Management', color: '#3fb950', soft: 'rgba(63,185,80,0.10)', glow: 'rgba(63,185,80,0.06)', border: 'rgba(63,185,80,0.20)',
+    desc: 'Queue setups across GDS platforms',
+    icon: <Ic path={ICONS.queue} color="#3fb950" />,
+    items: [
+      { label: 'Sabre', href: '/queue-management/sabre', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#f78166" /> },
+      { label: 'Amadeus', href: '/queue-management/amadeus', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#a371f7" /> },
+      { label: 'Travelport', href: '/queue-management/travelport', module: 'queue_management', icon: <Ic path={ICONS.queue} color="#58a6ff" /> },
+    ],
+  },
+  {
+    key: 'users', label: 'GDS User', color: '#a371f7', soft: 'rgba(163,113,247,0.10)', glow: 'rgba(163,113,247,0.06)', border: 'rgba(163,113,247,0.20)',
     desc: 'User accounts across platforms',
     items: [
-      { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} color="#a371f7" /> },
       { label: 'Sabre', href: '/sabre-users', module: 'sabre_users', icon: <Ic path={ICONS.shield} color="#f78166" /> },
       { label: 'Amadeus', href: '/amadeus-users', module: 'amadeus_users', icon: <Ic path={ICONS.shield} color="#39d2c0" /> },
       { label: 'Travelport', href: '/travelport-users', module: 'travelport_users', icon: <Ic path={ICONS.shield} color="#58a6ff" /> },
@@ -65,12 +67,25 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    key: 'reporting', label: 'Report', color: '#a371f7', soft: 'rgba(163,113,247,0.10)', glow: 'rgba(163,113,247,0.06)', border: 'rgba(163,113,247,0.20)',
+    desc: 'Reporting',
+    items: [{ label: 'Report', href: '/report', module: 'reporting', icon: <Ic path={ICONS.report} color="#a371f7" /> }],
+  },
+  {
+    key: 'contract', label: 'Contract', color: '#d29922', soft: 'rgba(210,153,34,0.10)', glow: 'rgba(210,153,34,0.06)', border: 'rgba(210,153,34,0.20)',
+    desc: 'Contracts',
+    items: [{ label: 'Contract', href: '/contract', module: 'contract', icon: <Ic path={ICONS.contract} color="#d29922" /> }],
+  },
+  {
     key: 'system', label: 'System', color: '#f78166', soft: 'rgba(247,129,102,0.10)', glow: 'rgba(247,129,102,0.06)', border: 'rgba(247,129,102,0.20)',
     desc: 'Reports & administration',
     items: [
+      { label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} color="#d29922" /> },
+      { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} color="#a371f7" /> },
+      { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
+      { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
       { label: 'Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} color="#3fb950" /> },
       { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
-      { label: 'Report', href: '/report', module: 'reporting', icon: <Ic path={ICONS.report} color="#a371f7" /> },
       { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} color="#db61a2" /> },
     ],
   },
@@ -138,7 +153,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
 
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, width: '100%', zIndex: 100, background: T.bgElevated, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px', background: activeColor, opacity: 0.35, transition: 'background 0.4s' }} />
-        <div style={{ padding: '0 24px', display: 'flex', alignItems: 'center', height: '84px' }}>
+        <div style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 0', minHeight: '84px' }}>
 
           {/* Brand */}
           <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '11px', marginRight: '32px', flexShrink: 0, textDecoration: 'none' }}>
@@ -149,16 +164,16 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
           </Link>
 
           {/* Nav links — desktop */}
-          <div className="hidden lg:flex" style={{ alignItems: 'center', gap: '2px', flex: 1, minWidth: 0, padding: '6px 0' }}>
+          <div className="hidden lg:flex" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '6px 2px', flex: 1, minWidth: 0, padding: '6px 0' }}>
             {visibleGroups.map((g, gi) => {
               const isActiveGroup = activeGroup?.key === g.key
-              const isSingle = g.items.length === 1
+              const isSingle = g.items.length === 1 && !g.items[0].subItems
               return (
                 <div key={g.key} style={{ display: 'flex', alignItems: 'center' }}>
                   {gi > 0 && <div style={{ width: '1px', height: '20px', background: T.border, margin: '0 6px', flexShrink: 0 }} />}
                   {isSingle ? (
                     <Link href={g.items[0].href}
-                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 18px', fontSize: '18px', fontWeight: 600,
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 13px', fontSize: '14px', fontWeight: 600,
                         color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', textDecoration: 'none', whiteSpace: 'nowrap',
                         background: isActiveGroup ? g.soft : 'transparent', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}` }}>
                       {g.items[0].icon} {g.label}
@@ -168,11 +183,11 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
                       onMouseEnter={() => setOpenGroup(g.key)}
                       onMouseLeave={() => setOpenGroup(null)}>
                       <button type="button" onClick={() => setOpenGroup(o => o === g.key ? null : g.key)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 18px', fontSize: '18px', fontWeight: 600,
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 13px', fontSize: '14px', fontWeight: 600,
                           color: isActiveGroup ? g.color : T.fg, borderRadius: '7px', border: `1px solid ${isActiveGroup ? g.border : T.borderLight}`,
                           background: isActiveGroup ? g.soft : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        {g.items[0].icon} {g.label}
-                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={15} /></span>
+                        {g.icon ?? g.items[0].icon} {g.label}
+                        <span style={{ transform: openGroup === g.key ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'flex' }}><Ic path={ICONS.chevron} w={13} /></span>
                       </button>
                       {openGroup === g.key && (
                         <div style={{ position: 'absolute', top: '100%', left: 0, paddingTop: '6px', minWidth: '230px', zIndex: 50 }}>

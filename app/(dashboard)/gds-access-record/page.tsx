@@ -94,52 +94,12 @@ const PCC_FUNC_COLORS: Record<string, string> = {
 
 const EMPTY: Partial<PCCList> = {
   gds_id: undefined, pcc: '', status: 'Active',
-  org_id: null, ota_client_id: null, functionality_id: null, pcc_functionality: null, client_group_id: null, remarks: null,
+  org_id: null, ota_client_id: null, functionality_id: null, pcc_functionality: null, remarks: null,
 }
 
 interface ImportRow {
   gds_name: string; pcc: string; status: PCCStatus
   _row: number; _errors: string[]; _gds_id?: number
-}
-
-// Custom autocomplete — replaces native <datalist> popups, which browsers render
-// using OS-level UI that CSS cannot style at all, in any browser.
-function AutocompleteInput({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
-
-  const filtered = value ? options.filter(o => o.toLowerCase().includes(value.toLowerCase())) : options
-
-  return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-      <input type="text" value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => setOpen(true)}
-        placeholder={placeholder}
-        style={{ width: '100%', padding: '9px 14px 9px 34px', fontSize: '14px', border: `1.5px solid ${open ? D.accent : D.borderLight}`, borderRadius: '8px', background: D.bg, color: D.fg, outline: 'none', boxSizing: 'border-box', boxShadow: open ? `0 0 0 3px ${D.accentSoft}` : 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }} />
-      {open && filtered.length > 0 && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', background: D.card, border: `1.5px solid ${D.fg}`, borderRadius: '8px', boxShadow: '0 12px 28px rgba(0,0,0,0.4)', zIndex: 60, padding: '4px' }}>
-          {filtered.slice(0, 50).map(o => (
-            <div key={o} onClick={() => { onChange(o); setOpen(false) }}
-              style={{ padding: '8px 10px', fontSize: '14px', color: D.fg, cursor: 'pointer', borderRadius: '6px' }}
-              onMouseOver={e => (e.currentTarget.style.background = D.accentSoft)}
-              onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
-              {o}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function GDSAccessRecordPage() {
@@ -148,8 +108,6 @@ export default function GDSAccessRecordPage() {
 
   const [records, setRecords] = useState<PCCList[]>([])
   const [gdsList, setGdsList] = useState<GDS[]>([])
-  const [clientGroups, setClientGroups] = useState<{id:number;name:string}[]>([])
-  const [filterGroup, setFilterGroup] = useState('')
   const [orgList, setOrgList] = useState<Organisation[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [funcList, setFuncList] = useState<GDSFunctionality[]>([])
@@ -157,11 +115,7 @@ export default function GDSAccessRecordPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterGDS, setFilterGDS] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [filterOrg, setFilterOrg] = useState('')
-  const [filterPCC, setFilterPCC] = useState('')
-  const [filterOTA, setFilterOTA] = useState('')
   const [filterPccFunc, setFilterPccFunc] = useState('')
 
   // Add/Edit modal
@@ -172,7 +126,7 @@ export default function GDSAccessRecordPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // PCC Assigned login popup
+  // PCC Name login popup
   const [loginPopupOpen, setLoginPopupOpen] = useState(false)
   const [loginPopupPCC, setLoginPopupPCC] = useState<PCCList | null>(null)
   const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null;status:string}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null;status:string}[]}>({ sabre:[], amadeus:[], travelport:[] })
@@ -216,17 +170,15 @@ export default function GDSAccessRecordPage() {
       const role = profile?.role ?? 'user'
       setIsAdmin(role === 'admin' || role === 'manager')
     }
-    const [{ data: pccData }, { data: gdsData }, { data: groupData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
+    const [{ data: pccData }, { data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
       supabase.from('pcc_list').select(`
         *, gds:gds_id(id, name),
         organisation:org_id(id, organisation, iata),
         ota_client:ota_client_id(id, company_name),
-        client_group:client_group_id(id, name),
         gds_functionality:functionality_id(id, name, gds_id),
         pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
       `).order('pcc'),
       supabase.from('gds').select('*').order('name'),
-      supabase.from('client_group').select('id,name').order('name'),
       supabase.from('organisation').select('*').order('organisation'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
@@ -243,7 +195,6 @@ export default function GDSAccessRecordPage() {
     })
     setRecords(sorted)
     setGdsList(gdsData ?? [])
-    setClientGroups(groupData ?? [])
     setOrgList(orgData ?? [])
     setOtaClients(otaData ?? [])
     setFuncList(funcData ?? [])
@@ -257,7 +208,7 @@ export default function GDSAccessRecordPage() {
   function openAdd() {
     setEditing(null)
     setForm({ ...EMPTY, gds_id: gdsList[0]?.id })
-    setError(''); setModalOpen(true)
+    setError(''); setRenamingOta(false); setAddingOta(false); setModalOpen(true)
   }
 
   function openEdit(row: PCCList) {
@@ -265,10 +216,10 @@ export default function GDSAccessRecordPage() {
     setForm({
       gds_id: row.gds_id, pcc: row.pcc, status: row.status ?? 'Active',
       org_id: row.org_id ?? null, ota_client_id: row.ota_client_id ?? null,
-      functionality_id: row.functionality_id ?? null, pcc_functionality: row.pcc_functionality ?? null, client_group_id: (row as PCCList & {client_group_id?:number|null}).client_group_id ?? null, remarks: row.remarks ?? null,
+      functionality_id: row.functionality_id ?? null, pcc_functionality: row.pcc_functionality ?? null, remarks: row.remarks ?? null,
       pcc_functionality: row.pcc_functionality ?? null,
     })
-    setError(''); setModalOpen(true)
+    setError(''); setRenamingOta(false); setAddingOta(false); setModalOpen(true)
   }
 
   function openDelete(row: PCCList) { setEditing(row); setDeleteOpen(true) }
@@ -282,7 +233,7 @@ export default function GDSAccessRecordPage() {
     const payload = {
       gds_id: form.gds_id, pcc: pccUpper, status: form.status ?? 'Active',
       org_id: form.org_id ?? null, ota_client_id: form.ota_client_id ?? null,
-      functionality_id: form.functionality_id ?? null, pcc_functionality: form.pcc_functionality ?? null, client_group_id: (form as Partial<PCCList> & {client_group_id?:number|null}).client_group_id ?? null, remarks: form.remarks ?? null,
+      functionality_id: form.functionality_id ?? null, pcc_functionality: form.pcc_functionality ?? null, remarks: form.remarks ?? null,
       pcc_functionality: (form as Partial<PCCList>).pcc_functionality ?? null,
     }
     const { error: err } = editing
@@ -353,7 +304,6 @@ export default function GDSAccessRecordPage() {
       const org       = r.organisation as Organisation
       const ota       = r.ota_client as OTAClient
       const func      = r.gds_functionality as GDSFunctionality
-      const cg        = (r as PCCList & {client_group?: {name?:string}}).client_group
       const pccFeats  = (r as PCCList & {pcc_features?: {gds_features?: {label?:string;cost?:number;currency?:string;billing_cycle?:string}}[]}).pcc_features ?? []
       const featNames = pccFeats.map(pf => pf.gds_features?.label ?? '').filter(Boolean).join(', ')
       const featCosts = pccFeats.map(pf => {
@@ -369,7 +319,6 @@ export default function GDSAccessRecordPage() {
         'Organisation':         org?.organisation ?? '',
         'IATA':                 org?.iata ?? '',
         'OTA Client':           ota?.company_name ?? '',
-        'Client Group':         cg?.name ?? '',
         'GDS Functionality':    func?.name ?? '',
         'PCC Functionality':    (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
         'Enabled Features':     featNames,
@@ -391,7 +340,6 @@ export default function GDSAccessRecordPage() {
       { wch: 30 },  // Organisation
       { wch: 12 },  // IATA
       { wch: 25 },  // OTA Client
-      { wch: 20 },  // Client Group
       { wch: 25 },  // GDS Functionality
       { wch: 20 },  // PCC Functionality
       { wch: 40 },  // Enabled Features
@@ -462,18 +410,20 @@ export default function GDSAccessRecordPage() {
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null); setDetectedHeaders([]) }
 
-  //  FILTER 
+  //  FILTER
   const filtered = records.filter(r => {
-    const pccGroup = r.client_group as {id:number;name:string} | null
-    if (filterGroup && !pccGroup?.name?.toLowerCase().includes(filterGroup.toLowerCase())) return false
-    const matchSearch = r.pcc.toLowerCase().includes(search.toLowerCase())
-    const matchGDS    = filterGDS    === 'all' || String(r.gds_id)        === filterGDS
-    const matchStatus = filterStatus === 'all' || (r.status ?? 'Active')  === filterStatus
-    const matchOrg    = !filterOrg    || (r.organisation as {organisation:string}|null)?.organisation?.toLowerCase().includes(filterOrg.toLowerCase())
-    const matchPCC    = !filterPCC    || r.pcc.toLowerCase().includes(filterPCC.toLowerCase())
-    const matchOTA    = !filterOTA    || (r.ota_client as {company_name:string}|null)?.company_name?.toLowerCase().includes(filterOTA.toLowerCase())
+    const term = search.trim().toLowerCase()
+    const orgName = (r.organisation as {organisation:string}|null)?.organisation ?? ''
+    const otaName = (r.ota_client as {company_name:string}|null)?.company_name ?? ''
+    const gdsName = (r.gds as {name:string}|null)?.name ?? ''
+    const matchSearch = !term
+      || r.pcc.toLowerCase().includes(term)
+      || orgName.toLowerCase().includes(term)
+      || otaName.toLowerCase().includes(term)
+      || gdsName.toLowerCase().includes(term)
+    const matchStatus  = filterStatus  === 'all' || (r.status ?? 'Active') === filterStatus
     const matchPccFunc = !filterPccFunc || r.pcc_functionality === filterPccFunc
-    return matchSearch && matchGDS && matchStatus && matchOrg && matchPCC && matchOTA && matchPccFunc
+    return matchSearch && matchStatus && matchPccFunc
   })
 
   const filteredFuncs = funcList.filter(f => !form.gds_id || f.gds_id === form.gds_id)
@@ -539,9 +489,12 @@ export default function GDSAccessRecordPage() {
   const [addingFunctionality, setAddingFunctionality] = useState(false)
   const [newFunctionalityName, setNewFunctionalityName] = useState('')
   const [savingFunctionality, setSavingFunctionality] = useState(false)
-  const [addingOtaClient, setAddingOtaClient] = useState(false)
-  const [newOtaClientName, setNewOtaClientName] = useState('')
-  const [savingOtaClient, setSavingOtaClient] = useState(false)
+  const [renamingOta, setRenamingOta] = useState(false)
+  const [otaRenameValue, setOtaRenameValue] = useState('')
+  const [savingOtaRename, setSavingOtaRename] = useState(false)
+  const [addingOta, setAddingOta] = useState(false)
+  const [newOtaName, setNewOtaName] = useState('')
+  const [savingNewOta, setSavingNewOta] = useState(false)
 
   // Look up the proper unit-of-measure label from the billing_cycles table.
   // Falls back to a prettified version of the raw code for legacy values that were
@@ -582,14 +535,14 @@ export default function GDSAccessRecordPage() {
     return data.name
   }
 
-  async function addOtaClientOption(name: string): Promise<number | null> {
+  async function addOtaClient(name: string): Promise<number | null> {
     const trimmed = name.trim()
     if (!trimmed) return null
-    setSavingOtaClient(true)
+    setSavingNewOta(true)
     const { data, error: e } = await supabase.from('ota_client')
       .insert({ company_name: trimmed })
       .select('id, company_name').single()
-    setSavingOtaClient(false)
+    setSavingNewOta(false)
     if (e) {
       // Unique violation just means it already exists — use the existing one instead of failing.
       const existing = otaClients.find(o => o.company_name.toLowerCase() === trimmed.toLowerCase())
@@ -597,8 +550,21 @@ export default function GDSAccessRecordPage() {
       alert(`Could not add OTA client: ${e.message}`)
       return null
     }
-    setOtaClients(prev => [...prev, data as OTAClient].sort((a, b) => a.company_name.localeCompare(b.company_name)))
+    setOtaClients(prev => [...prev, data].sort((a, b) => a.company_name.localeCompare(b.company_name)))
     return data.id
+  }
+
+  async function handleRenameOta() {
+    if (!form.ota_client_id) return
+    const trimmed = otaRenameValue.trim()
+    if (!trimmed) return
+    setSavingOtaRename(true)
+    const { error: e } = await supabase.from('ota_client').update({ company_name: trimmed }).eq('id', form.ota_client_id)
+    setSavingOtaRename(false)
+    if (e) { alert(`Could not rename OTA client: ${e.message}`); return }
+    setOtaClients(prev => prev.map(o => o.id === form.ota_client_id ? { ...o, company_name: trimmed } : o))
+    setRenamingOta(false)
+    fetchAll()
   }
 
   // Features for popup  only those matching the PCC's GDS
@@ -684,24 +650,14 @@ export default function GDSAccessRecordPage() {
       key: 'pcc', label: 'PCC', width: '120px',
       render: (row: PCCList) => <span style={{fontFamily:'monospace',fontWeight:600,color:D.fg,fontSize:'15px',letterSpacing:'0.05em'}}>{row.pcc}</span>
     },
-    // 5. PCC Functionality
+    // 4. PCC Name  badge + view logins link
     {
-      key: 'pcc_functionality', label: 'PCC Functionality', width: '140px',
-      render: (row: PCCList) => {
-        const val = row.pcc_functionality
-        return val
-          ? <span style={{fontSize:'14px',fontWeight:600,color:PCC_FUNC_DARK[val]??D.fgMuted,textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
-          : <span style={{color:D.fgDim}}>—</span>
-      }
-    },
-    // 4. PCC Assigned  badge + view logins link
-    {
-      key: 'ota_client_id', label: 'PCC Assigned', width: '220px',
+      key: 'ota_client_id', label: 'PCC Name', width: '170px',
       render: (row: PCCList) => {
         const ota = row.ota_client as OTAClient
         return ota ? (
           <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
-            <span style={{fontSize:'15px',fontWeight:600,color:D.fg,whiteSpace:'nowrap'}}>{ota.company_name}</span>
+            <span style={{fontSize:'15px',fontWeight:600,color:D.fg,wordBreak:'break-word'}}>{ota.company_name}</span>
             <button onClick={() => openLoginPopup(row)}
               style={{fontSize:'13px',color:D.accent,background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0,whiteSpace:'nowrap',fontWeight:600,textAlign:'left'}}
               onMouseOver={e => e.currentTarget.style.textDecoration='underline'}
@@ -712,19 +668,19 @@ export default function GDSAccessRecordPage() {
         ) : <span style={{color:D.fgDim}}>—</span>
       }
     },
-    // 4b. Client Group
+    // 5. Functionality
     {
-      key: 'client_group', label: 'Client Group', width: '120px',
+      key: 'pcc_functionality', label: 'Functionality', width: '180px',
       render: (row: PCCList) => {
-        const g = row.client_group as {id:number;name:string} | null
-        return g
-          ? <span style={{fontSize:'14px',fontWeight:600,color:D.purple}}>{g.name}</span>
+        const val = row.pcc_functionality
+        return val
+          ? <span style={{fontSize:'14px',fontWeight:600,color:PCC_FUNC_DARK[val]??D.fgMuted,textTransform:'uppercase',letterSpacing:'0.03em'}}>{val}</span>
           : <span style={{color:D.fgDim}}>—</span>
       }
     },
-    // 6. GDS Feature  clickable badge that opens popup
+    // 6. Features  clickable badge that opens popup
     {
-      key: 'functionality_id', label: 'GDS Feature', width: '120px',
+      key: 'functionality_id', label: 'Features', width: '150px',
       render: (row: PCCList) => {
         const func = row.gds_functionality as GDSFunctionality
         const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
@@ -744,7 +700,22 @@ export default function GDSAccessRecordPage() {
         )
       }
     },
-    // 7. Status
+    // 7. Remarks
+    {
+      key: 'remarks', label: 'Remarks', width: '430px',
+      render: (row: PCCList) => {
+        if (!row.remarks) return <span style={{color:D.fgDim,fontSize:'12px'}}>—</span>
+        const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
+        return (
+          <ul style={{listStyleType:'disc',listStylePosition:'outside',paddingLeft:'16px',display:'flex',flexDirection:'column',gap:'4px'}}>
+            {points.map((p, i) => (
+              <li key={i} style={{fontSize:'14px',color:D.fgMuted,lineHeight:1.5,wordBreak:'break-word',overflowWrap:'break-word'}}>{p}</li>
+            ))}
+          </ul>
+        )
+      }
+    },
+    // 8. Status
     {
       key: 'status', label: 'Status', width: '100px',
       render: (row: PCCList) => {
@@ -755,28 +726,6 @@ export default function GDSAccessRecordPage() {
             <span style={{width:'7px',height:'7px',borderRadius:'50%',background:c.dot,flexShrink:0,display:'inline-block',boxShadow: s==='Active' ? `0 0 6px ${c.dot}` : 'none'}}/>
             {s}
           </span>
-        )
-      }
-    },
-    // 8. Remarks
-    {
-      key: 'remarks', label: 'Remarks', width: '260px',
-      render: (row: PCCList) => {
-        if (!row.remarks) return <span style={{color:D.fgDim,fontSize:'12px'}}>—</span>
-        const points = row.remarks.split('\n').map(l => l.trim()).filter(Boolean)
-        return (
-          <ul style={{listStyleType:'disc',listStylePosition:'outside',paddingLeft:'16px',display:'flex',flexDirection:'column',gap:'2px'}}>
-            {points.map((p, i) => {
-              const chunks = chunkText(p, 50)
-              return (
-                <li key={i} style={{fontSize:'14px',color:D.fgMuted,wordBreak:'break-word'}}>
-                  {chunks.map((line, j) => (
-                    <span key={j}>{line}{j < chunks.length - 1 && <br />}</span>
-                  ))}
-                </li>
-              )
-            })}
-          </ul>
         )
       }
     },
@@ -831,30 +780,19 @@ export default function GDSAccessRecordPage() {
 
         {/* Filters */}
         <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'16px', marginBottom:'18px'}}>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr 1fr 1fr auto', alignItems:'flex-end', gap:'12px', width:'100%'}}>
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr auto', alignItems:'flex-end', gap:'12px', width:'100%'}}>
 
-            {/* Organisation */}
+            {/* Unified search — Organisation, PCC, PCC Name, GDS */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Organisation</label>
-              <AutocompleteInput value={filterOrg} onChange={v => { setFilterOrg(v); resetPage() }} placeholder="Search org..." options={orgList.map(o => o.organisation)} />
-            </div>
-
-            {/* PCC */}
-            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>PCC</label>
-              <AutocompleteInput value={filterPCC} onChange={v => { setFilterPCC(v); resetPage() }} placeholder="Code..." options={[...new Set(records.map(r => r.pcc))].sort()} />
-            </div>
-
-            {/* PCC Assigned */}
-            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>PCC Assigned</label>
-              <AutocompleteInput value={filterOTA} onChange={v => { setFilterOTA(v); resetPage() }} placeholder="Assigned..." options={otaClients.map(o => o.company_name)} />
-            </div>
-
-            {/* Client Group */}
-            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Client Group</label>
-              <AutocompleteInput value={filterGroup} onChange={v => { setFilterGroup(v); resetPage() }} placeholder="Group..." options={clientGroups.map(g => g.name)} />
+              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Search</label>
+              <div style={{position:'relative'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage() }}
+                  placeholder="Search by organisation, PCC, PCC name, or GDS..."
+                  style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
+                  onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
+                  onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }} />
+              </div>
             </div>
 
             {/* PCC Functionality */}
@@ -866,18 +804,6 @@ export default function GDSAccessRecordPage() {
                 onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
                 <option value="">All</option>
                 {pccFunctionalityOptions.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
-              </select>
-            </div>
-
-            {/* GDS */}
-            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>GDS</label>
-              <select value={filterGDS} onChange={e => { setFilterGDS(e.target.value); resetPage() }}
-                style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
-                onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
-                onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
-                <option value="all">All GDS</option>
-                {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
               </select>
             </div>
 
@@ -896,7 +822,7 @@ export default function GDSAccessRecordPage() {
             {/* Reset button */}
             <div style={{display:'flex', alignItems:'flex-end'}}>
               <button
-                onClick={() => { setFilterOrg(''); setFilterPCC(''); setFilterOTA(''); setFilterGDS('all'); setFilterStatus('all'); setFilterGroup(''); setFilterPccFunc(''); resetPage() }}
+                onClick={() => { setSearch(''); setFilterStatus('all'); setFilterPccFunc(''); resetPage() }}
                 title="Reset filters"
                 style={{display:'flex', alignItems:'center', justifyContent:'center', width:'38px', height:'38px', background:D.bg, color:D.fgMuted, border:`1px solid ${D.border}`, borderRadius:'8px', cursor:'pointer', flexShrink:0}}
                 onMouseOver={e => { e.currentTarget.style.color=D.accent; e.currentTarget.style.borderColor=D.accent }}
@@ -960,16 +886,15 @@ export default function GDSAccessRecordPage() {
         {loading ? (
           <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'15px'}}>Loading</div>
         ) : (
-          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'hidden'}}>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1400px'}}>
+          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1470px', tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     {columns.map(col => (
-                      <th key={col.key} style={{padding:'12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', whiteSpace:'nowrap', width: col.width}}>{col.label}</th>
+                      <th key={col.key} style={{padding: ['pcc_functionality','functionality_id','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:D.card, width: col.width, position:'sticky', top:0, zIndex:2}}>{col.label}</th>
                     ))}
                     {isAdmin && (
-                      <th style={{padding:'12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'right', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)'}}>Actions</th>
+                      <th style={{padding:'12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'right', borderBottom:`1px solid ${D.border}`, background:D.card, position:'sticky', top:0, zIndex:2}}>Actions</th>
                     )}
                   </tr>
                 </thead>
@@ -982,7 +907,7 @@ export default function GDSAccessRecordPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         {columns.map(col => (
-                          <td key={col.key} style={{padding:'12px 16px', verticalAlign:'middle'}}>{col.render(row as PCCList)}</td>
+                          <td key={col.key} style={{padding: ['pcc_functionality','functionality_id','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', verticalAlign:'middle'}}>{col.render(row as PCCList)}</td>
                         ))}
                         {isAdmin && (
                           <td style={{padding:'12px 16px', textAlign:'right'}}>
@@ -1007,7 +932,6 @@ export default function GDSAccessRecordPage() {
                   )}
                 </tbody>
               </table>
-            </div>
           </div>
         )}
 
@@ -1116,13 +1040,6 @@ export default function GDSAccessRecordPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Client Group</label>
-            <select value={(form as Partial<PCCList> & {client_group_id?:number|null}).client_group_id ?? ''} onChange={e => setForm(f => ({ ...f, client_group_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
-              <option value=""> None </option>
-              {clientGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </div>
-          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Organisation</label>
             <select value={form.org_id ?? ''} onChange={e => setForm(f => ({ ...f, org_id: e.target.value ? Number(e.target.value) : null }))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">
               <option value=""> None </option>
@@ -1130,47 +1047,95 @@ export default function GDSAccessRecordPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">OTA Client</label>
-            {!addingOtaClient ? (
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-slate-700">OTA Client</label>
+              {!renamingOta && !addingOta && (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setNewOtaName(''); setAddingOta(true) }}
+                    className="text-xs font-medium text-blue-500 hover:underline"
+                  >
+                    + Add
+                  </button>
+                  {form.ota_client_id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = otaClients.find(o => o.id === form.ota_client_id)
+                        setOtaRenameValue(cur?.company_name ?? '')
+                        setRenamingOta(true)
+                      }}
+                      className="text-xs font-medium text-blue-500 hover:underline"
+                    >
+                      Rename
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            {addingOta ? (
+              <div className="flex gap-2">
+                <input
+                  type="text" autoFocus value={newOtaName}
+                  onChange={e => setNewOtaName(e.target.value)}
+                  placeholder="e.g. Via.com"
+                  className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter') {
+                      const id = await addOtaClient(newOtaName)
+                      if (id) { setForm(f => ({ ...f, ota_client_id: id })); setAddingOta(false) }
+                    }
+                    if (e.key === 'Escape') setAddingOta(false)
+                  }}
+                />
+                <button
+                  type="button" disabled={savingNewOta || !newOtaName.trim()}
+                  onClick={async () => {
+                    const id = await addOtaClient(newOtaName)
+                    if (id) { setForm(f => ({ ...f, ota_client_id: id })); setAddingOta(false) }
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {savingNewOta ? 'Saving' : 'Add'}
+                </button>
+                <button
+                  type="button" onClick={() => setAddingOta(false)}
+                  className="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : !renamingOta ? (
               <select
                 value={form.ota_client_id ?? ''}
-                onChange={e => {
-                  if (e.target.value === '__add_new__') { setNewOtaClientName(''); setAddingOtaClient(true); return }
-                  setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))
-                }}
+                onChange={e => setForm(f => ({ ...f, ota_client_id: e.target.value ? Number(e.target.value) : null }))}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
               >
                 <option value=""> None </option>
                 {otaClients.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
-                <option value="__add_new__">+ Add New OTA Client…</option>
               </select>
             ) : (
               <div className="flex gap-2">
                 <input
-                  type="text" autoFocus value={newOtaClientName}
-                  onChange={e => setNewOtaClientName(e.target.value)}
-                  placeholder="e.g. Acme Travel"
+                  type="text" autoFocus value={otaRenameValue}
+                  onChange={e => setOtaRenameValue(e.target.value)}
+                  placeholder="OTA client name"
                   className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
                   onKeyDown={async e => {
-                    if (e.key === 'Enter') {
-                      const saved = await addOtaClientOption(newOtaClientName)
-                      if (saved) { setForm(f => ({ ...f, ota_client_id: saved })); setAddingOtaClient(false) }
-                    }
-                    if (e.key === 'Escape') setAddingOtaClient(false)
+                    if (e.key === 'Enter') await handleRenameOta()
+                    if (e.key === 'Escape') setRenamingOta(false)
                   }}
                 />
                 <button
-                  type="button" disabled={savingOtaClient || !newOtaClientName.trim()}
-                  onClick={async () => {
-                    const saved = await addOtaClientOption(newOtaClientName)
-                    if (saved) { setForm(f => ({ ...f, ota_client_id: saved })); setAddingOtaClient(false) }
-                  }}
+                  type="button" disabled={savingOtaRename || !otaRenameValue.trim()}
+                  onClick={handleRenameOta}
                   className="px-3 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
                 >
-                  {savingOtaClient ? 'Saving' : 'Add'}
+                  {savingOtaRename ? 'Saving' : 'Save'}
                 </button>
                 <button
-                  type="button" onClick={() => setAddingOtaClient(false)}
+                  type="button" onClick={() => setRenamingOta(false)}
                   className="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
                 >
                   Cancel
@@ -1348,7 +1313,7 @@ export default function GDSAccessRecordPage() {
         )}
       </Modal>
 
-      {/*  PCC Assigned Login Popup  */}
+      {/*  PCC Name Login Popup  */}
       <Modal
         open={loginPopupOpen}
         onClose={() => { setLoginPopupOpen(false); setLoginPopupPCC(null) }}
