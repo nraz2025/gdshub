@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 
 interface WebServiceRow {
@@ -14,13 +15,26 @@ interface WebServiceRow {
   created_at: string
 }
 
+interface ImportRow {
+  pcc: string
+  company_name: string
+  agent_id: string
+  password: string
+  notes: string
+  source: string
+  valid: boolean
+  error?: string
+}
+
 const EMPTY = { pcc: '', company_name: '', agent_id: '', password: '', notes: '', source: '' }
 
-// Dark theme (matches TopNav's GDS group = teal)
+const GDS_NAME = 'Travelport'
+
+// Dark theme (accent matches Travelport's color elsewhere in the app)
 const D = {
   bg: '#0e1117', card: '#1c2129', border: '#2d333b', borderLight: '#373e47',
   fg: '#e6edf3', fgMuted: '#8b949e', fgDim: '#6e7681',
-  accent: '#39d2c0', accentSoft: 'rgba(57,210,192,0.10)',
+  accent: '#58a6ff', accentSoft: 'rgba(88,166,255,0.10)',
   purple: '#a371f7', purpleSoft: 'rgba(163,113,247,0.10)',
   danger: '#f85149', dangerSoft: 'rgba(248,81,73,0.10)',
   success: '#3fb950', successSoft: 'rgba(63,185,80,0.10)',
@@ -67,10 +81,11 @@ function AutocompleteInput({ value, onChange, options, placeholder }: { value: s
   )
 }
 
-export default function WebServicePage() {
+export default function WebServiceTravelportPage() {
   const supabase = createClient()
   const [records, setRecords] = useState<WebServiceRow[]>([])
   const [pccOptions, setPccOptions] = useState<string[]>([])
+  const [gdsId, setGdsId] = useState<number | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -82,6 +97,13 @@ export default function WebServicePage() {
 
   const [search, setSearch] = useState('')
   const [filterPcc, setFilterPcc] = useState('all')
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importRows, setImportRows] = useState<ImportRow[]>([])
+  const [importFileName, setImportFileName] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -98,9 +120,16 @@ export default function WebServicePage() {
       const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(p?.role === 'admin')
     }
+    const { data: gds } = await supabase.from('gds').select('id').eq('name', GDS_NAME).maybeSingle()
+    const thisGdsId = gds?.id ?? null
+    setGdsId(thisGdsId)
     const [{ data: ws }, { data: pcc }] = await Promise.all([
-      supabase.from('web_service').select('*').order('pcc').order('company_name'),
-      supabase.from('pcc_list').select('pcc'),
+      thisGdsId
+        ? supabase.from('web_service').select('*').eq('gds_id', thisGdsId).order('pcc').order('company_name')
+        : Promise.resolve({ data: [] as WebServiceRow[] }),
+      thisGdsId
+        ? supabase.from('pcc_list').select('pcc').eq('gds_id', thisGdsId)
+        : Promise.resolve({ data: [] as { pcc: string }[] }),
     ])
     setRecords(ws ?? [])
     setPccOptions(Array.from(new Set((pcc ?? []).map(p => p.pcc))).sort())
@@ -118,8 +147,10 @@ export default function WebServicePage() {
     if (!form.pcc.trim()) { setError('PCC / OID is required.'); return }
     if (!form.agent_id.trim()) { setError('Agent ID / Web Service number is required.'); return }
     if (!form.password.trim()) { setError('Password is required.'); return }
+    if (!gdsId) { setError(`Could not find the ${GDS_NAME} GDS record.`); return }
     setSaving(true); setError('')
     const payload = {
+      gds_id: gdsId,
       pcc: form.pcc.trim().toUpperCase(), company_name: form.company_name.trim() || null,
       agent_id: form.agent_id.trim(), password: form.password.trim(),
       notes: form.notes.trim() || null, source: form.source.trim() || null,
@@ -145,14 +176,81 @@ export default function WebServicePage() {
     })
   }
 
+  function handleExport() {
+    const data = filtered.map(r => ({
+      'PCC / OID': r.pcc,
+      'Company': r.company_name ?? '',
+      'Agent ID / WS': r.agent_id,
+      'Password': r.password,
+      'Notes': r.notes ?? '',
+      'Source': r.source ?? '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `${GDS_NAME} Web Service`)
+    XLSX.writeFile(wb, `GDSHub_${GDS_NAME}_Web_Service_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  function handleDownloadTemplate() {
+    const ws = XLSX.utils.json_to_sheet([
+      { 'PCC / OID': 'B7Y8', 'Company': 'Forecepts New System', 'Agent ID / WS': '935028', 'Password': 'WS258022', 'Notes': '', 'Source': 'Automation Hub' },
+    ])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `${GDS_NAME} Web Service`)
+    XLSX.writeFile(wb, `GDSHub_${GDS_NAME}_Web_Service_Template.xlsx`)
+  }
+
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportFileName(file.name); setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const wb = XLSX.read(evt.target?.result, { type: 'binary' })
+      const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
+      const parsed: ImportRow[] = raw.map(r => {
+        const pcc = String(r['PCC / OID'] ?? r['pcc'] ?? '').trim().toUpperCase()
+        const agent_id = String(r['Agent ID / WS'] ?? r['agent_id'] ?? '').trim()
+        const password = String(r['Password'] ?? r['password'] ?? '').trim()
+        const company_name = String(r['Company'] ?? r['company_name'] ?? '').trim()
+        const notes = String(r['Notes'] ?? r['notes'] ?? '').trim()
+        const source = String(r['Source'] ?? r['source'] ?? '').trim()
+        let error: string | undefined
+        if (!pcc) error = 'Missing PCC / OID'
+        else if (!agent_id) error = 'Missing Agent ID / WS'
+        else if (!password) error = 'Missing Password'
+        return { pcc, company_name, agent_id, password, notes, source, valid: !error, error }
+      })
+      setImportRows(parsed); setImportOpen(true)
+    }
+    reader.readAsBinaryString(file)
+    e.target.value = ''
+  }
+
+  async function handleImportConfirm() {
+    if (!gdsId) { return }
+    setImporting(true)
+    const validRows = importRows.filter(r => r.valid)
+    let success = 0, failed = 0
+    for (const r of validRows) {
+      const { error: e } = await supabase.from('web_service').insert({
+        gds_id: gdsId, pcc: r.pcc, company_name: r.company_name || null,
+        agent_id: r.agent_id, password: r.password, notes: r.notes || null, source: r.source || null,
+      })
+      if (e) failed++; else success++
+    }
+    setImporting(false); setImportResult({ success, failed })
+    fetchAll()
+  }
+
+  function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null) }
+
   const filtered = records.filter(r => {
     const matchPcc = filterPcc === 'all' || r.pcc === filterPcc
     const term = search.toLowerCase()
     const matchSearch = !term || r.pcc.toLowerCase().includes(term) || r.agent_id.toLowerCase().includes(term) || (r.company_name ?? '').toLowerCase().includes(term)
     return matchPcc && matchSearch
   })
-
-  const distinctPccs = new Set(records.map(r => r.pcc)).size
 
   const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lblDark = { fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' as const }
@@ -164,30 +262,33 @@ export default function WebServicePage() {
         {/* Header */}
         <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'22px'}}>
           <div>
-            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>Web Service List</h1>
-            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Web service credentials by PCC / OID</p>
+            <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>{GDS_NAME} Web Service List</h1>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Web service credentials by PCC / OID — {GDS_NAME}</p>
           </div>
-          {isAdmin && (
-            <button onClick={openAdd}
-              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Web Service
+          <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+            <button onClick={handleExport} disabled={filtered.length === 0}
+              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor: filtered.length === 0 ? 'default' : 'pointer', opacity: filtered.length === 0 ? 0.5 : 1}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
             </button>
-          )}
+            {isAdmin && (
+              <>
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} style={{display:'none'}} />
+                <button onClick={() => fileInputRef.current?.click()}
+                  style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Import
+                </button>
+                <button onClick={openAdd}
+                  style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add Web Service
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Stats */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:'16px', marginBottom:'22px'}}>
-          {[
-            { label: 'Total Web Services', value: records.length, color: D.accent, soft: D.accentSoft },
-            { label: 'Distinct PCCs', value: distinctPccs, color: D.purple, soft: D.purpleSoft },
-          ].map(s => (
-            <div key={s.label} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px'}}>
-              <div style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'22px', fontWeight:700, color:s.color}}>{s.value}</div>
-              <div style={{fontSize:'12px', color:D.fgMuted, marginTop:'3px'}}>{s.label}</div>
-            </div>
-          ))}
-        </div>
 
         {/* Filters */}
         <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
@@ -211,12 +312,12 @@ export default function WebServicePage() {
             {search || filterPcc !== 'all' ? 'No web services match your filters.' : 'No web services configured yet.'}
           </div>
         ) : (
-          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflowX:'auto'}}>
+          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
             <table style={{width:'100%', borderCollapse:'collapse', minWidth:'900px'}}>
               <thead>
                 <tr>
                   {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Actions'].map((h, i) => (
-                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === 5 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', whiteSpace:'nowrap'}}>{h}</th>
+                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === 5 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -289,7 +390,7 @@ export default function WebServicePage() {
             <div style={{marginBottom:'14px'}}>
               <label style={lblDark}>PCC / OID <span style={{color:D.danger}}>*</span></label>
               <AutocompleteInput value={form.pcc} onChange={v => setForm(f => ({ ...f, pcc: v }))} options={pccOptions} placeholder="e.g. B7Y8" />
-              <p style={{fontSize:'11px', color:D.fgDim, marginTop:'4px'}}>Sourced from GDS Access Record — type to search existing PCCs</p>
+              <p style={{fontSize:'11px', color:D.fgDim, marginTop:'4px'}}>Sourced from {GDS_NAME}'s GDS Access Record — type to search existing PCCs</p>
             </div>
 
             <div style={{marginBottom:'14px'}}>
@@ -334,6 +435,68 @@ export default function WebServicePage() {
               </button>
             </div>
           </div>
+          </div>
+        )}
+
+        {/* Import Modal */}
+        {importOpen && (
+          <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
+            onClick={e => { if (e.target === e.currentTarget) closeImport() }}>
+            <div style={{width:'100%', maxWidth:'720px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${D.accent}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${D.accentSoft}`}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
+                <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>Import {GDS_NAME} Web Service</h2>
+                <button onClick={closeImport} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
+              </div>
+              <p style={{fontSize:'12px', color:D.fgDim, marginBottom:'16px'}}>
+                {importFileName} — columns expected: PCC / OID, Company, Agent ID / WS, Password, Notes, Source.{' '}
+                <button type="button" onClick={handleDownloadTemplate} style={{background:'none', border:'none', color:D.accent, fontSize:'12px', fontWeight:600, cursor:'pointer', padding:0, textDecoration:'underline'}}>Download template</button>
+              </p>
+
+              {importResult ? (
+                <div style={{padding:'16px', background: importResult.failed > 0 ? D.dangerSoft : D.successSoft, border:`1px solid ${importResult.failed > 0 ? D.danger : D.success}`, borderRadius:'10px', marginBottom:'16px'}}>
+                  <p style={{fontSize:'14px', fontWeight:600, color:D.fg, margin:0}}>Imported {importResult.success} record{importResult.success !== 1 ? 's' : ''}.</p>
+                  {importResult.failed > 0 && <p style={{fontSize:'13px', color:D.danger, marginTop:'6px'}}>{importResult.failed} record{importResult.failed !== 1 ? 's' : ''} failed to save.</p>}
+                </div>
+              ) : (
+                <div style={{border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'340px', marginBottom:'16px'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px'}}>
+                    <thead>
+                      <tr>
+                        {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Status'].map(h => (
+                          <th key={h} style={{padding:'8px 12px', fontSize:'11px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:D.bg, position:'sticky', top:0}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importRows.map((r, i) => (
+                        <tr key={i} style={{borderBottom:`1px solid ${D.border}`, background: r.valid ? 'transparent' : D.dangerSoft}}>
+                          <td style={{padding:'8px 12px', fontFamily:'monospace', color:D.fg}}>{r.pcc || '—'}</td>
+                          <td style={{padding:'8px 12px', color:D.fgMuted}}>{r.company_name || '—'}</td>
+                          <td style={{padding:'8px 12px', fontFamily:'monospace', color:D.fgMuted}}>{r.agent_id || '—'}</td>
+                          <td style={{padding:'8px 12px', fontFamily:'monospace', color:D.fgMuted}}>{r.password || '—'}</td>
+                          <td style={{padding:'8px 12px', color:D.fgMuted}}>{r.notes || '—'}</td>
+                          <td style={{padding:'8px 12px'}}>
+                            {r.valid ? <span style={{color:D.success, fontWeight:600}}>OK</span> : <span style={{color:D.danger, fontWeight:600}}>{r.error}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                <button onClick={closeImport} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'8px', color:D.fgMuted, cursor:'pointer'}}>
+                  {importResult ? 'Close' : 'Cancel'}
+                </button>
+                {!importResult && (
+                  <button onClick={handleImportConfirm} disabled={importing || importRows.filter(r => r.valid).length === 0}
+                    style={{padding:'9px 20px', fontSize:'14px', fontWeight:600, background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', color:'#fff', cursor:'pointer', opacity: importing || importRows.filter(r => r.valid).length === 0 ? 0.6 : 1}}>
+                    {importing ? 'Importing...' : `Import ${importRows.filter(r => r.valid).length} Record${importRows.filter(r => r.valid).length !== 1 ? 's' : ''}`}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
