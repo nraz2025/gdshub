@@ -86,7 +86,12 @@ export default function SabreUsersPage() {
   const [resignedUsers, setResignedUsers] = useState<{id:string;full_name:string|null;initial:string|null;email:string|null;sabre_epr:string|null;sabre_pcc:string|null;pcc:string|null;ota_client:string|null;cta:string|null;pta:string|null;minicom:string|null;date_created_in_gds:string|null;date_resigned:string|null}[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
+<<<<<<< Updated upstream
   const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
+=======
+  const [pccList, setPccList] = useState<{pcc:string; ota_client_id?: number | null; ota_client?: {company_name?:string} | null}[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
+>>>>>>> Stashed changes
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('Active')
@@ -122,14 +127,14 @@ export default function SabreUsersPage() {
       supabase.from('ota_client').select('id, company_name').order('company_name'),
       supabase.from('resigned_user').select('*').eq('source_gds', 'Sabre').order('date_resigned', { ascending: false }),
       sabreGds?.id
-        ? supabase.from('pcc_list').select('pcc, ota_client:ota_client_id(company_name)').eq('gds_id', sabreGds.id).order('pcc')
+        ? supabase.from('pcc_list').select('pcc, ota_client_id, ota_client:ota_client_id(company_name)').eq('gds_id', sabreGds.id).order('pcc')
         : Promise.resolve({ data: [] as {pcc:string; ota_client?: {company_name?:string} | null}[] }),
     ])
     setRecords(sabreData ?? [])
     setUsersList(usersData ?? [])
     setOtaClients(otaData ?? [])
     setResignedUsers(resignedData ?? [])
-    setPccList((pccData as unknown as {pcc:string; ota_client?: {company_name?:string} | null}[]) ?? [])
+    setPccList((pccData as unknown as {pcc:string; ota_client_id?: number | null; ota_client?: {company_name?:string} | null}[]) ?? [])
     setLoading(false)
   }
 
@@ -774,11 +779,29 @@ export default function SabreUsersPage() {
               </select>
             </div>
             <div>
+<<<<<<< Updated upstream
               <label style={lblDark}>PCC</label>
               <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} style={{...inpDark({cursor:'pointer'}), fontFamily:'monospace', textTransform:'uppercase'}}>
+=======
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
+              <select value={form.pcc} onChange={e => {
+                  const newPcc = e.target.value
+                  const match = pccList.find(p => p.pcc === newPcc)
+                  setForm(f => ({ ...f, pcc: newPcc, ota_client_id: match?.ota_client_id ?? '' }))
+                }} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
+>>>>>>> Stashed changes
                 <option value="">- Select PCC -</option>
                 {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
               </select>
+              {form.pcc && (
+                (() => {
+                  const match = pccList.find(p => p.pcc === form.pcc)
+                  const clientName = (match?.ota_client as {company_name?: string} | null | undefined)?.company_name
+                  return clientName
+                    ? <p className="text-xs text-emerald-600 mt-1 font-medium">✓ Links to OTA Client: {clientName}</p>
+                    : <p className="text-xs text-amber-600 mt-1">⚠ This PCC has no OTA Client linked in GDS Access Record — this user won&apos;t appear under &quot;View IDs&quot; until that&apos;s set on the PCC record.</p>
+                })()
+              )}
             </div>
           </div>
 
