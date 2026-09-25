@@ -4,14 +4,23 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 
+interface Attachment {
+  id: number
+  file_name: string
+  file_path: string
+  file_size: number | null
+}
+
 interface WebServiceRow {
   id: number
   pcc: string
   company_name: string | null
   agent_id: string
   password: string
+  password_email_link: string | null
   notes: string | null
   source: string | null
+  web_service_attachments?: Attachment[]
   created_at: string
 }
 
@@ -20,13 +29,14 @@ interface ImportRow {
   company_name: string
   agent_id: string
   password: string
+  password_email_link: string
   notes: string
   source: string
   valid: boolean
   error?: string
 }
 
-const EMPTY = { pcc: '', company_name: '', agent_id: '', password: '', notes: '', source: '' }
+const EMPTY = { pcc: '', company_name: '', agent_id: '', password: '', password_email_link: '', notes: '', source: '' }
 
 const GDS_NAME = 'Travelport'
 
@@ -45,6 +55,12 @@ function generateWsPassword() {
   const digits = Math.floor(100000 + Math.random() * 900000)
   return `WS${digits}`
 }
+
+// Attachment upload settings — shared bucket used by all 3 GDS Web Service pages
+const ATTACH_BUCKET = 'web-service-attachments'
+const ATTACH_ACCEPT = '.eml,.msg,.png,.jpg,.jpeg,.pdf,.xlsx,.csv,.doc,.docx'
+const ATTACH_ALLOWED_EXT = ['eml', 'msg', 'png', 'jpg', 'jpeg', 'pdf', 'xlsx', 'csv', 'doc', 'docx']
+const ATTACH_MAX_SIZE = 20 * 1024 * 1024
 
 // Custom autocomplete — native <datalist> popups can't be styled, so this is a real component
 function AutocompleteInput({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }) {
@@ -95,6 +111,12 @@ export default function WebServiceTravelportPage() {
   const [error, setError] = useState('')
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set())
 
+  // Attachment (Add/Edit modal) — supports multiple files per record
+  const attachInputRef = useRef<HTMLInputElement>(null)
+  const [newAttachFiles, setNewAttachFiles] = useState<File[]>([])
+  const [attachError, setAttachError] = useState('')
+  const [removeAttachmentIds, setRemoveAttachmentIds] = useState<Set<number>>(new Set())
+
   const [search, setSearch] = useState('')
   const [filterPcc, setFilterPcc] = useState('all')
 
@@ -125,7 +147,7 @@ export default function WebServiceTravelportPage() {
     setGdsId(thisGdsId)
     const [{ data: ws }, { data: pcc }] = await Promise.all([
       thisGdsId
-        ? supabase.from('web_service').select('*').eq('gds_id', thisGdsId).order('pcc').order('company_name')
+        ? supabase.from('web_service').select('*, web_service_attachments(id, file_name, file_path, file_size)').eq('gds_id', thisGdsId).order('pcc').order('company_name')
         : Promise.resolve({ data: [] as WebServiceRow[] }),
       thisGdsId
         ? supabase.from('pcc_list').select('pcc').eq('gds_id', thisGdsId)
@@ -136,35 +158,98 @@ export default function WebServiceTravelportPage() {
     setLoading(false)
   }
 
-  function openAdd() { setEditing(null); setForm({ ...EMPTY, password: generateWsPassword() }); setError(''); setModalOpen(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); resetAttachmentState(); setModalOpen(true) }
   function openEdit(row: WebServiceRow) {
     setEditing(row)
-    setForm({ pcc: row.pcc, company_name: row.company_name ?? '', agent_id: row.agent_id, password: row.password, notes: row.notes ?? '', source: row.source ?? '' })
-    setError(''); setModalOpen(true)
+    setForm({
+      pcc: row.pcc, company_name: row.company_name ?? '', agent_id: row.agent_id,
+      password: row.password, password_email_link: row.password_email_link ?? '',
+      notes: row.notes ?? '', source: row.source ?? '',
+    })
+    setError(''); resetAttachmentState(); setModalOpen(true)
+  }
+
+  function resetAttachmentState() { setNewAttachFiles([]); setAttachError(''); setRemoveAttachmentIds(new Set()) }
+
+  function handlePickAttachments(files: FileList) {
+    setAttachError('')
+    const picked: File[] = []
+    for (const f of Array.from(files)) {
+      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!ATTACH_ALLOWED_EXT.includes(ext)) { setAttachError('Only .eml, .msg, .png, .jpg, .pdf, .xlsx, .csv, .doc/.docx files are allowed.'); continue }
+      if (f.size > ATTACH_MAX_SIZE) { setAttachError('Each file must be under 20MB.'); continue }
+      picked.push(f)
+    }
+    if (picked.length) setNewAttachFiles(prev => [...prev, ...picked])
+  }
+
+  function removeNewAttachment(index: number) {
+    setNewAttachFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function toggleRemoveExistingAttachment(id: number) {
+    setRemoveAttachmentIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   async function handleSave() {
     if (!form.pcc.trim()) { setError('PCC / OID is required.'); return }
-    if (!form.agent_id.trim()) { setError('Agent ID / Web Service number is required.'); return }
-    if (!form.password.trim()) { setError('Password is required.'); return }
+    if (!form.agent_id.trim()) { setError('Username is required.'); return }
     if (!gdsId) { setError(`Could not find the ${GDS_NAME} GDS record.`); return }
     setSaving(true); setError('')
+
     const payload = {
       gds_id: gdsId,
       pcc: form.pcc.trim().toUpperCase(), company_name: form.company_name.trim() || null,
       agent_id: form.agent_id.trim(), password: form.password.trim(),
+      password_email_link: form.password_email_link.trim() || null,
       notes: form.notes.trim() || null, source: form.source.trim() || null,
     }
-    const { error: e } = editing
-      ? await supabase.from('web_service').update(payload).eq('id', editing.id)
-      : await supabase.from('web_service').insert(payload)
-    if (e) { setError(e.message); setSaving(false); return }
-    setSaving(false); setModalOpen(false); fetchAll()
+    let webServiceId = editing?.id ?? null
+    if (editing) {
+      const { error: e } = await supabase.from('web_service').update(payload).eq('id', editing.id)
+      if (e) { setError(e.message); setSaving(false); return }
+    } else {
+      const { data: inserted, error: e } = await supabase.from('web_service').insert(payload).select('id').single()
+      if (e) { setError(e.message); setSaving(false); return }
+      webServiceId = inserted?.id ?? null
+    }
+
+    // Attachments: remove any the person marked for removal, then upload any newly-picked files.
+    if (removeAttachmentIds.size > 0 && editing?.web_service_attachments) {
+      const toRemove = editing.web_service_attachments.filter(a => removeAttachmentIds.has(a.id))
+      if (toRemove.length) {
+        await supabase.storage.from(ATTACH_BUCKET).remove(toRemove.map(a => a.file_path))
+        await supabase.from('web_service_attachments').delete().in('id', toRemove.map(a => a.id))
+      }
+    }
+    if (newAttachFiles.length > 0 && webServiceId) {
+      const safePcc = form.pcc.trim().toUpperCase().replace(/[^a-zA-Z0-9-_]/g, '_')
+      for (const f of newAttachFiles) {
+        const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${GDS_NAME.toLowerCase()}/${safePcc}/${Date.now()}_${safeName}`
+        const { error: uploadErr } = await supabase.storage.from(ATTACH_BUCKET).upload(path, f)
+        if (uploadErr) { setError(`Attachment upload failed: ${uploadErr.message}`); setSaving(false); fetchAll(); return }
+        await supabase.from('web_service_attachments').insert({ web_service_id: webServiceId, file_name: f.name, file_path: path, file_size: f.size })
+      }
+    }
+
+    setSaving(false); setModalOpen(false); resetAttachmentState(); fetchAll()
+  }
+
+  async function handleAttachmentDownload(att: Attachment) {
+    const { data } = await supabase.storage.from(ATTACH_BUCKET).createSignedUrl(att.file_path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
   async function handleDelete(row: WebServiceRow) {
-    if (!confirm(`Delete web service for PCC ${row.pcc} (Agent ID ${row.agent_id})? This cannot be undone.`)) return
+    if (!confirm(`Delete web service for PCC ${row.pcc} (Username ${row.agent_id})? This cannot be undone.`)) return
     await supabase.from('web_service').delete().eq('id', row.id)
+    const paths = (row.web_service_attachments ?? []).map(a => a.file_path)
+    if (paths.length) await supabase.storage.from(ATTACH_BUCKET).remove(paths)
     fetchAll()
   }
 
@@ -179,9 +264,10 @@ export default function WebServiceTravelportPage() {
   function handleExport() {
     const data = filtered.map(r => ({
       'PCC / OID': r.pcc,
-      'Company': r.company_name ?? '',
-      'Agent ID / WS': r.agent_id,
+      'Branch Code': r.company_name ?? '',
+      'Username': r.agent_id,
       'Password': r.password,
+      'URL': r.password_email_link ?? '',
       'Notes': r.notes ?? '',
       'Source': r.source ?? '',
     }))
@@ -193,7 +279,7 @@ export default function WebServiceTravelportPage() {
 
   function handleDownloadTemplate() {
     const ws = XLSX.utils.json_to_sheet([
-      { 'PCC / OID': 'B7Y8', 'Company': 'Forecepts New System', 'Agent ID / WS': '935028', 'Password': 'WS258022', 'Notes': '', 'Source': 'Automation Hub' },
+      { 'PCC / OID': 'B7Y8', 'Branch Code': 'Forecepts New System', 'Username': '935028', 'Password': 'WS258022', 'URL': '', 'Notes': '', 'Source': 'Automation Hub' },
     ])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, `${GDS_NAME} Web Service`)
@@ -210,16 +296,17 @@ export default function WebServiceTravelportPage() {
       const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
       const parsed: ImportRow[] = raw.map(r => {
         const pcc = String(r['PCC / OID'] ?? r['pcc'] ?? '').trim().toUpperCase()
-        const agent_id = String(r['Agent ID / WS'] ?? r['agent_id'] ?? '').trim()
+        const agent_id = String(r['Username'] ?? r['Agent ID / WS'] ?? r['agent_id'] ?? '').trim()
         const password = String(r['Password'] ?? r['password'] ?? '').trim()
-        const company_name = String(r['Company'] ?? r['company_name'] ?? '').trim()
+        const password_email_link = String(r['URL'] ?? r['password_email_link'] ?? '').trim()
+        const company_name = String(r['Branch Code'] ?? r['Company'] ?? r['company_name'] ?? '').trim()
         const notes = String(r['Notes'] ?? r['notes'] ?? '').trim()
         const source = String(r['Source'] ?? r['source'] ?? '').trim()
         let error: string | undefined
         if (!pcc) error = 'Missing PCC / OID'
-        else if (!agent_id) error = 'Missing Agent ID / WS'
+        else if (!agent_id) error = 'Missing Username'
         else if (!password) error = 'Missing Password'
-        return { pcc, company_name, agent_id, password, notes, source, valid: !error, error }
+        return { pcc, company_name, agent_id, password, password_email_link, notes, source, valid: !error, error }
       })
       setImportRows(parsed); setImportOpen(true)
     }
@@ -235,7 +322,8 @@ export default function WebServiceTravelportPage() {
     for (const r of validRows) {
       const { error: e } = await supabase.from('web_service').insert({
         gds_id: gdsId, pcc: r.pcc, company_name: r.company_name || null,
-        agent_id: r.agent_id, password: r.password, notes: r.notes || null, source: r.source || null,
+        agent_id: r.agent_id, password: r.password, password_email_link: r.password_email_link || null,
+        notes: r.notes || null, source: r.source || null,
       })
       if (e) failed++; else success++
     }
@@ -294,7 +382,7 @@ export default function WebServiceTravelportPage() {
         <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
           <div style={{position:'relative', flex:'1 1 240px'}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search PCC, Agent ID, or company..." value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder="Search PCC, Username, or Branch Code..." value={search} onChange={e => setSearch(e.target.value)}
               style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box'}} />
           </div>
           <select value={filterPcc} onChange={e => setFilterPcc(e.target.value)}
@@ -316,8 +404,8 @@ export default function WebServiceTravelportPage() {
             <table style={{width:'100%', borderCollapse:'collapse', minWidth:'900px'}}>
               <thead>
                 <tr>
-                  {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Actions'].map((h, i) => (
-                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === 5 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
+                  {['PCC / OID', 'Branch Code', 'Username', 'Password', 'URL', 'Notes', 'Attachment', 'Actions'].map((h, i, arr) => (
+                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === arr.length - 1 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -347,7 +435,31 @@ export default function WebServiceTravelportPage() {
                           </button>
                         </div>
                       </td>
-                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted}}>{row.notes ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                      <td style={{padding:'12px 16px'}}>
+                        {row.password_email_link ? (
+                          <a href={row.password_email_link} target="_blank" rel="noopener noreferrer" title={row.password_email_link}
+                            style={{display:'inline-flex', alignItems:'center', gap:'6px', color:D.accent, textDecoration:'none', fontSize:'13px', fontWeight:600}}
+                            onMouseOver={e => (e.currentTarget.style.textDecoration = 'underline')}
+                            onMouseOut={e => (e.currentTarget.style.textDecoration = 'none')}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            Open
+                          </a>
+                        ) : <span style={{color:D.fgDim}}>—</span>}
+                      </td>
+                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted, whiteSpace:'pre-wrap', maxWidth:'220px'}}>{row.notes ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                      <td style={{padding:'12px 16px'}}>
+                        {row.web_service_attachments && row.web_service_attachments.length > 0 ? (
+                          <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                            {row.web_service_attachments.map(att => (
+                              <button key={att.id} onClick={() => handleAttachmentDownload(att)} title={att.file_name}
+                                style={{display:'flex', alignItems:'center', gap:'6px', background:'none', border:'none', color:D.accent, cursor:'pointer', padding:0, fontSize:'13px', fontWeight:600, maxWidth:'160px'}}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : <span style={{color:D.fgDim}}>—</span>}
+                      </td>
                       <td style={{padding:'12px 16px'}}>
                         {isAdmin && (
                           <div style={{display:'flex', gap:'6px', justifyContent:'flex-end'}}>
@@ -394,37 +506,89 @@ export default function WebServiceTravelportPage() {
             </div>
 
             <div style={{marginBottom:'14px'}}>
-              <label style={lblDark}>Company Name</label>
+              <label style={lblDark}>Branch Code</label>
               <input type="text" value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} placeholder="e.g. Forecepts New System" style={inpDark()} />
             </div>
 
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'4px'}}>
               <div>
-                <label style={lblDark}>Agent ID / Web Service <span style={{color:D.danger}}>*</span></label>
+                <label style={lblDark}>Username <span style={{color:D.danger}}>*</span></label>
                 <input type="text" value={form.agent_id} onChange={e => setForm(f => ({ ...f, agent_id: e.target.value }))} placeholder="e.g. 935028" style={{...inpDark(), fontFamily:'monospace'}} />
               </div>
               <div>
-                <label style={lblDark}>Source / System</label>
-                <input type="text" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} placeholder="e.g. Automation Hub" style={inpDark()} />
+                <label style={lblDark}>Auto-generate Password</label>
+                <div style={{display:'flex', gap:'6px'}}>
+                  <input type="text" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Click Generate" style={{...inpDark(), fontFamily:'monospace'}} />
+                  <button type="button" onClick={() => setForm(f => ({ ...f, password: generateWsPassword() }))} title="Generate"
+                    style={{display:'flex', alignItems:'center', justifyContent:'center', padding:'0 10px', background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', color:D.accent, cursor:'pointer', flexShrink:0}}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  </button>
+                </div>
               </div>
+            </div>
+            <p style={{fontSize:'11px', color:D.fgDim, marginTop:'0', marginBottom:'14px'}}>Password blank until you click Generate (WS + 6-digit format), or type your own.</p>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>URL</label>
+              <input type="url" value={form.password_email_link} onChange={e => setForm(f => ({ ...f, password_email_link: e.target.value }))} placeholder="Paste link to the email containing the password" style={inpDark()} />
             </div>
 
             <div style={{marginBottom:'14px'}}>
-              <label style={lblDark}>Password <span style={{color:D.danger}}>*</span></label>
-              <div style={{display:'flex', gap:'8px'}}>
-                <input type="text" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="e.g. WS258022" style={{...inpDark(), fontFamily:'monospace'}} />
-                <button type="button" onClick={() => setForm(f => ({ ...f, password: generateWsPassword() }))}
-                  style={{display:'flex', alignItems:'center', gap:'6px', padding:'0 14px', background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', color:D.accent, fontSize:'13px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap'}}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  Generate
+              <label style={{fontSize:'13px', fontWeight:600, color:D.accent, textTransform:'none' as const, letterSpacing:'normal', marginBottom:'6px', display:'block' as const}}>Attachments (.eml, .msg, .png, .jpg, .pdf, .xlsx, .csv)</label>
+              <input ref={attachInputRef} type="file" accept={ATTACH_ACCEPT} multiple style={{display:'none'}}
+                onChange={e => { if (e.target.files && e.target.files.length) handlePickAttachments(e.target.files); e.target.value = '' }} />
+              <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                <button type="button" onClick={() => attachInputRef.current?.click()}
+                  style={{padding:'6px 14px', fontSize:'13px', fontWeight:500, fontFamily:'inherit', border:'1px solid #a8a8a8', borderRadius:'4px', background:'linear-gradient(to bottom, #f8f8f8, #e8e8e8)', color:'#1a1a1a', cursor:'pointer', boxShadow:'0 1px 1px rgba(0,0,0,0.1)'}}
+                  onMouseOver={e => { e.currentTarget.style.background='linear-gradient(to bottom, #ffffff, #f0f0f0)' }}
+                  onMouseOut={e => { e.currentTarget.style.background='linear-gradient(to bottom, #f8f8f8, #e8e8e8)' }}>
+                  Choose Files
                 </button>
+                <span style={{fontSize:'13px', color:D.fgDim}}>
+                  {newAttachFiles.length > 0 ? `${newAttachFiles.length} file${newAttachFiles.length > 1 ? 's' : ''} selected` : 'No file chosen'}
+                </span>
               </div>
-              <p style={{fontSize:'11px', color:D.fgDim, marginTop:'4px'}}>Generates in the WS + 6-digit format. Still editable if you need a different one.</p>
+
+              {((editing?.web_service_attachments && editing.web_service_attachments.length > 0) || newAttachFiles.length > 0) && (
+                <div style={{display:'flex', flexWrap:'wrap', gap:'6px', marginTop:'10px'}}>
+                  {editing?.web_service_attachments?.map(att => {
+                    const marked = removeAttachmentIds.has(att.id)
+                    return (
+                      <span key={`existing-${att.id}`} title={att.file_name}
+                        style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'5px 6px 5px 10px', fontSize:'12px', border:`1px solid ${D.border}`, borderRadius:'999px', background:D.bg, color: marked ? D.fgDim : D.accent, textDecoration: marked ? 'line-through' : 'none', maxWidth:'220px'}}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
+                        <button type="button" onClick={() => toggleRemoveExistingAttachment(att.id)} title={marked ? 'Keep this attachment' : 'Remove this attachment'}
+                          style={{background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, fontSize:'13px', lineHeight:1, flexShrink:0}}>
+                          {marked ? '↺' : '✕'}
+                        </button>
+                      </span>
+                    )
+                  })}
+                  {newAttachFiles.map((f, i) => (
+                    <span key={`new-${i}`} title={f.name}
+                      style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'5px 6px 5px 10px', fontSize:'12px', border:`1px solid ${D.border}`, borderRadius:'999px', background:D.bg, color:D.fg, maxWidth:'220px'}}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{f.name}</span>
+                      <button type="button" onClick={() => removeNewAttachment(i)} title="Remove this file"
+                        style={{background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, fontSize:'13px', lineHeight:1, flexShrink:0}}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {attachError && <p style={{fontSize:'11px', color:D.danger, marginTop:'6px'}}>{attachError}</p>}
+              <p style={{fontSize:'11px', color:D.fgDim, marginTop:'6px'}}>Up to 20MB each. You can attach more than one file.</p>
+            </div>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>Source / System</label>
+              <input type="text" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} placeholder="e.g. Automation Hub" style={inpDark()} />
             </div>
 
             <div style={{marginBottom:'18px'}}>
               <label style={lblDark}>Notes</label>
-              <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. PCC Cert, Prod, Cert" style={inpDark()} />
+              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Type any notes here — as much as you need" rows={4}
+                style={inpDark({ resize:'vertical' as const, fontFamily:'inherit', lineHeight:1.5 })} />
             </div>
 
             {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
@@ -448,7 +612,7 @@ export default function WebServiceTravelportPage() {
                 <button onClick={closeImport} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
               </div>
               <p style={{fontSize:'12px', color:D.fgDim, marginBottom:'16px'}}>
-                {importFileName} — columns expected: PCC / OID, Company, Agent ID / WS, Password, Notes, Source.{' '}
+                {importFileName} — columns expected: PCC / OID, Branch Code, Username, Password, URL, Notes, Source.{' '}
                 <button type="button" onClick={handleDownloadTemplate} style={{background:'none', border:'none', color:D.accent, fontSize:'12px', fontWeight:600, cursor:'pointer', padding:0, textDecoration:'underline'}}>Download template</button>
               </p>
 
@@ -462,7 +626,7 @@ export default function WebServiceTravelportPage() {
                   <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px'}}>
                     <thead>
                       <tr>
-                        {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Status'].map(h => (
+                        {['PCC / OID', 'Branch Code', 'Username', 'Password', 'URL', 'Notes', 'Status'].map(h => (
                           <th key={h} style={{padding:'8px 12px', fontSize:'11px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:D.bg, position:'sticky', top:0}}>{h}</th>
                         ))}
                       </tr>
@@ -474,6 +638,7 @@ export default function WebServiceTravelportPage() {
                           <td style={{padding:'8px 12px', color:D.fgMuted}}>{r.company_name || '—'}</td>
                           <td style={{padding:'8px 12px', fontFamily:'monospace', color:D.fgMuted}}>{r.agent_id || '—'}</td>
                           <td style={{padding:'8px 12px', fontFamily:'monospace', color:D.fgMuted}}>{r.password || '—'}</td>
+                          <td style={{padding:'8px 12px', color:D.fgMuted}}>{r.password_email_link || '—'}</td>
                           <td style={{padding:'8px 12px', color:D.fgMuted}}>{r.notes || '—'}</td>
                           <td style={{padding:'8px 12px'}}>
                             {r.valid ? <span style={{color:D.success, fontWeight:600}}>OK</span> : <span style={{color:D.danger, fontWeight:600}}>{r.error}</span>}

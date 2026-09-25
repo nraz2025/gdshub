@@ -7,6 +7,7 @@ import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { TravelportUser, User, OTAClient } from '@/types'
 import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
+import { useAppContext } from '@/lib/context/AppContext'
 
 
 const T = {
@@ -30,8 +31,6 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
   inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
   Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
   resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
@@ -58,15 +57,15 @@ interface ImportRow {
 
 export default function TravelportUsersPage() {
   const supabase = createClient()
+  const { isAdmin } = useAppContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<TravelportUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('active')
   const [filterOTA, setFilterOTA] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -84,11 +83,6 @@ export default function TravelportUsersPage() {
 
   async function fetchAll() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
-    }
     const { data: tpGds } = await supabase.from('gds').select('id').eq('name', 'Travelport').maybeSingle()
     const [{ data: tpData }, { data: usersData }, { data: otaData }, { data: pccData }] = await Promise.all([
       supabase.from('travelport_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('sign_on_id'),
@@ -279,7 +273,6 @@ export default function TravelportUsersPage() {
 
   const activeCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='active').length
   const inactiveCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='inactive').length
-  const suspendedCount = records.filter(r=>((r as {status?:string}).status??'active').toLowerCase()==='suspended').length
   const otaCount = records.filter(r=>r.ota).length
 
   const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
@@ -327,7 +320,6 @@ export default function TravelportUsersPage() {
             { label: 'Total Users', value: records.length, color: D.accent, soft: D.accentSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></> },
             { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
             { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
-            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
             { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
           ].map((s, i) => (
             <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
@@ -356,7 +348,6 @@ export default function TravelportUsersPage() {
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
-            <option value="suspended">Suspended</option>
           </select>
           <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
             style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'130px'}}>
@@ -378,7 +369,6 @@ export default function TravelportUsersPage() {
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
               const sval = ((row as {status?:string}).status ?? 'active').toLowerCase()
               const statusStyle = sval === 'active' ? { soft: D.successSoft, color: D.success }
-                : sval === 'suspended' ? { soft: D.dangerSoft, color: D.danger }
                 : { soft: D.warningSoft, color: D.warning }
               const pccAssigned = getPccAssigned(row.pcc)
               return (
@@ -481,7 +471,6 @@ export default function TravelportUsersPage() {
             <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
             </select></div>
 
           {/* 5. Linked User */}

@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
+import { useAppContext } from '@/lib/context/AppContext'
 import type { User } from '@/types'
 
 const EMPTY: Partial<User> = { first_name: '', last_name: '', email_address: '', ota_client: false, status: 'Active' }
@@ -36,8 +37,6 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
   inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
   Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
   resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
@@ -82,12 +81,12 @@ function Avatar({ name, size = 36 }: { name: string; size?: number }) {
 
 export default function UsersPage() {
   const supabase = createClient()
+  const { isAdmin, userEmail: currentUserEmail } = useAppContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [users, setUsers] = useState<User[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('Active')
   const [filterOta, setFilterOta] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -105,18 +104,11 @@ export default function UsersPage() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; failed: number; failedRows: string[] } | null>(null)
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([])
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
-      setCurrentUserEmail(user.email ?? null)
-    }
     const { data } = await supabase.from('users').select('*').order('first_name')
     setUsers(data ?? [])
     setLoading(false)
@@ -232,7 +224,6 @@ export default function UsersPage() {
 
   const activeCount    = users.filter(u => (u.status ?? 'Active') === 'Active').length
   const inactiveCount  = users.filter(u => u.status === 'Inactive').length
-  const suspendedCount = users.filter(u => u.status === 'Suspended').length
   const otaCount       = users.filter(u => u.ota_client).length
 
   // ── Label style ──
@@ -281,7 +272,6 @@ export default function UsersPage() {
             { label: 'Total Users', value: users.length, color: D.accent, soft: D.accentSoft, icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></> },
             { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
             { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
-            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
             { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
           ].map((s, i) => (
             <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
@@ -311,7 +301,6 @@ export default function UsersPage() {
             <option value="all">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
-            <option value="Suspended">Suspended</option>
           </select>
           <select value={filterOta} onChange={e => { setFilterOta(e.target.value); setCurrentPage(1) }}
             style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none'}}>
@@ -319,8 +308,8 @@ export default function UsersPage() {
             <option value="yes">OTA: Yes</option>
             <option value="no">OTA: No</option>
           </select>
-          {(search || filterStatus !== 'all' || filterOta !== 'all') && (
-            <button onClick={() => { setSearch(''); setFilterStatus('all'); setFilterOta('all'); setCurrentPage(1) }}
+          {(search || filterStatus !== 'Active' || filterOta !== 'all') && (
+            <button onClick={() => { setSearch(''); setFilterStatus('Active'); setFilterOta('all'); setCurrentPage(1) }}
               style={{padding:'8px 14px', background:D.accentSoft, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'13px', color:D.accent, cursor:'pointer', fontWeight:600}}>
               Clear
             </button>
@@ -368,7 +357,6 @@ export default function UsersPage() {
               const fullName = `${u.first_name} ${u.last_name}`
               const status = u.status ?? 'Active'
               const statusStyle = status === 'Active' ? { soft: D.successSoft, color: D.success }
-                : status === 'Suspended' ? { soft: D.dangerSoft, color: D.danger }
                 : { soft: D.warningSoft, color: D.warning }
               return (
                 <div key={u.id}
@@ -487,7 +475,7 @@ export default function UsersPage() {
             <div>
               <label style={lbl}>Status</label>
               <div style={{display:'flex', gap:'16px', marginTop:'4px'}}>
-                {['Active','Inactive','Suspended'].map(s => (
+                {['Active','Inactive'].map(s => (
                   <label key={s} style={{display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'13px', color:T.textMid}}>
                     <input type="radio" name="status" checked={(form.status ?? 'Active') === s} onChange={() => setForm(f => ({ ...f, status: s }))} style={{accentColor:T.primary}} />
                     {s}

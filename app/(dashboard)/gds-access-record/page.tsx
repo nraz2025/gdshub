@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
+import { useAppContext } from '@/lib/context/AppContext'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
 
 // Modal styling stays light (shared Modal component not touched this session)
@@ -104,6 +105,7 @@ interface ImportRow {
 
 export default function GDSAccessRecordPage() {
   const supabase = createClient()
+  const { canManage: isAdmin } = useAppContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [records, setRecords] = useState<PCCList[]>([])
@@ -112,9 +114,10 @@ export default function GDSAccessRecordPage() {
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [funcList, setFuncList] = useState<GDSFunctionality[]>([])
   const [allFeatures, setAllFeatures] = useState<GDSFeature[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [totalCount, setTotalCount] = useState(0)
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPccFunc, setFilterPccFunc] = useState('')
 
@@ -146,6 +149,10 @@ export default function GDSAccessRecordPage() {
 
   // Bulk edit
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  // Full row data for every ID ever selected, kept around so the bulk-edit
+  // modal can still show/act on selections made on a page that's no longer
+  // loaded (selection now spans server-side pages, not one big in-memory list).
+  const [selectedRowMap, setSelectedRowMap] = useState<Map<number, PCCList>>(new Map())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkFeatureIds, setBulkFeatureIds] = useState<Set<number>>(new Set())
   const [bulkMode, setBulkMode] = useState<'add' | 'remove'>('add')
@@ -160,24 +167,12 @@ export default function GDSAccessRecordPage() {
   const [importResult, setImportResult] = useState<{ success: number; failed: number; failedRows: string[] } | null>(null)
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([])
 
-  useEffect(() => { fetchAll() }, [])
+  // Reference lists (GDS, Organisation, OTA Clients, Functionality, Features…)
+  // — small tables, fetched once on mount, never paginated or searched.
+  useEffect(() => { fetchReferenceData() }, [])
 
-  async function fetchAll() {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      const role = profile?.role ?? 'user'
-      setIsAdmin(role === 'admin' || role === 'manager')
-    }
-    const [{ data: pccData }, { data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
-      supabase.from('pcc_list').select(`
-        *, gds:gds_id(id, name),
-        organisation:org_id(id, organisation, iata),
-        ota_client:ota_client_id(id, company_name),
-        gds_functionality:functionality_id(id, name, gds_id),
-        pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
-      `).order('pcc'),
+  async function fetchReferenceData() {
+    const [{ data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
       supabase.from('gds').select('*').order('name'),
       supabase.from('organisation').select('*').order('organisation'),
       supabase.from('ota_client').select('id, company_name').order('company_name'),
@@ -186,14 +181,6 @@ export default function GDSAccessRecordPage() {
       supabase.from('billing_cycles').select('value, label').order('sort_order'),
       supabase.from('pcc_functionality_options').select('id, name').order('sort_order'),
     ])
-    const sorted = (pccData ?? []).slice().sort((a, b) => {
-      const orgA = (a.organisation as { organisation: string } | undefined)?.organisation ?? ''
-      const orgB = (b.organisation as { organisation: string } | undefined)?.organisation ?? ''
-      const gdsA = (a.gds as { name: string } | undefined)?.name ?? ''
-      const gdsB = (b.gds as { name: string } | undefined)?.name ?? ''
-      return orgA.localeCompare(orgB) || gdsA.localeCompare(gdsB) || a.pcc.localeCompare(b.pcc)
-    })
-    setRecords(sorted)
     setGdsList(gdsData ?? [])
     setOrgList(orgData ?? [])
     setOtaClients(otaData ?? [])
@@ -201,6 +188,58 @@ export default function GDSAccessRecordPage() {
     setAllFeatures(featData ?? [])
     setBillingCycles(cycleData ?? [])
     setPccFunctionalityOptions(pccFuncOptData ?? [])
+  }
+
+  // Debounce the search box — wait for typing to settle before hitting the
+  // database, and only reset to page 1 once the settled term actually changes.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      setCurrentPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // The actual paginated, server-filtered fetch — reruns whenever the page,
+  // page size, settled search term, or either dropdown filter changes.
+  useEffect(() => { fetchRecords() }, [currentPage, pageSize, debouncedSearch, filterStatus, filterPccFunc])
+
+  const PCC_JOIN_SELECT = `
+    *, gds:gds_id(id, name),
+    organisation:org_id(id, organisation, iata),
+    ota_client:ota_client_id(id, company_name),
+    gds_functionality:functionality_id(id, name, gds_id),
+    pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
+  `
+
+  // Looks up matching PCC ids + total count via the search_pcc_access_records()
+  // RPC (see pcc_access_record_search.sql), then fetches the full joined row
+  // data for just those ids, preserving the server's ordering.
+  async function fetchMatchingRows(limit: number, offset: number): Promise<{ rows: PCCList[]; total: number }> {
+    const { data: idRows, error: idErr } = await supabase.rpc('search_pcc_access_records', {
+      p_search: debouncedSearch.trim(),
+      p_status: filterStatus,
+      p_pcc_func: filterPccFunc,
+      p_limit: limit,
+      p_offset: offset,
+    })
+    if (idErr) { console.error('search_pcc_access_records failed:', idErr.message); return { rows: [], total: 0 } }
+    const ids = (idRows ?? []).map((r: { id: number }) => r.id)
+    const total = idRows && idRows.length > 0 ? Number((idRows[0] as { total_count: number | string }).total_count) : 0
+    if (ids.length === 0) return { rows: [], total }
+    const { data: fullRows } = await supabase.from('pcc_list').select(PCC_JOIN_SELECT).in('id', ids)
+    const byId = new Map((fullRows ?? []).map(r => [r.id, r as unknown as PCCList]))
+    const ordered = ids.map((id: number) => byId.get(id)).filter(Boolean) as PCCList[]
+    return { rows: ordered, total }
+  }
+
+  async function fetchRecords() {
+    setLoading(true)
+    const limit = pageSize === 'all' ? 100000 : pageSize
+    const offset = pageSize === 'all' ? 0 : (currentPage - 1) * pageSize
+    const { rows, total } = await fetchMatchingRows(limit, offset)
+    setRecords(rows)
+    setTotalCount(total)
     setLoading(false)
   }
 
@@ -240,14 +279,14 @@ export default function GDSAccessRecordPage() {
       ? await supabase.from('pcc_list').update({ ...payload, ...audit }).eq('id', editing.id)
       : await supabase.from('pcc_list').insert({ ...payload, ...audit })
     if (err) { setError(err.message); setSaving(false); return }
-    setSaving(false); setModalOpen(false); fetchAll()
+    setSaving(false); setModalOpen(false); fetchRecords()
   }
 
   async function handleDelete() {
     if (!editing) return
     setSaving(true)
     await supabase.from('pcc_list').delete().eq('id', editing.id)
-    setSaving(false); setDeleteOpen(false); fetchAll()
+    setSaving(false); setDeleteOpen(false); fetchRecords()
   }
 
   //  PCC ASSIGNED LOGIN POPUP 
@@ -294,12 +333,17 @@ export default function GDSAccessRecordPage() {
       setProfileFeatureIds(prev => new Set([...prev, featureId]))
     }
     setFeatureToggling(false)
-    fetchAll()
+    fetchRecords()
   }
 
-  //  EXPORT 
-  function handleExport() {
-    const data = filtered.map((r, i) => {
+  //  EXPORT  — exports every record matching the current search/filters,
+  // not just the page currently on screen, so it needs its own fetch.
+  const [exporting, setExporting] = useState(false)
+  async function handleExport() {
+    setExporting(true)
+    const { rows } = await fetchMatchingRows(100000, 0)
+    setExporting(false)
+    const data = rows.map((r, i) => {
       const gdsName   = (r.gds as GDS)?.name ?? ''
       const org       = r.organisation as Organisation
       const ota       = r.ota_client as OTAClient
@@ -405,36 +449,20 @@ export default function GDSAccessRecordPage() {
       if (error) { failed++; failedRows.push(`${row.pcc} (${row.gds_name})  ${error.message}`) } else { success++ }
     }
     setImporting(false); setImportResult({ success, failed, failedRows })
-    if (success > 0) fetchAll()
+    if (success > 0) fetchRecords()
   }
 
   function closeImport() { setImportOpen(false); setImportRows([]); setImportFileName(''); setImportResult(null); setDetectedHeaders([]) }
 
-  //  FILTER
-  const filtered = records.filter(r => {
-    const term = search.trim().toLowerCase()
-    const orgName = (r.organisation as {organisation:string}|null)?.organisation ?? ''
-    const otaName = (r.ota_client as {company_name:string}|null)?.company_name ?? ''
-    const gdsName = (r.gds as {name:string}|null)?.name ?? ''
-    const matchSearch = !term
-      || r.pcc.toLowerCase().includes(term)
-      || orgName.toLowerCase().includes(term)
-      || otaName.toLowerCase().includes(term)
-      || gdsName.toLowerCase().includes(term)
-    const matchStatus  = filterStatus  === 'all' || (r.status ?? 'Active') === filterStatus
-    const matchPccFunc = !filterPccFunc || r.pcc_functionality === filterPccFunc
-    return matchSearch && matchStatus && matchPccFunc
-  })
-
+  // Search + status + PCC-functionality filtering now happens server-side
+  // (search_pcc_access_records RPC, called from fetchRecords/fetchMatchingRows)
+  // — `records` already IS the current, filtered page.
   const filteredFuncs = funcList.filter(f => !form.gds_id || f.gds_id === form.gds_id)
 
-  // Pagination
-  const effectiveSize = pageSize === "all" ? filtered.length : pageSize
-  const totalPages = pageSize === "all" ? 1 : Math.ceil(filtered.length / effectiveSize)
-  const paginated = pageSize === "all" ? filtered : filtered.slice((currentPage - 1) * effectiveSize, currentPage * effectiveSize)
-
-  // Reset to page 1 when filters change
-  const resetPage = () => setCurrentPage(1)
+  // Pagination — driven by the server's totalCount, not an in-memory array.
+  const effectiveSize = pageSize === "all" ? (totalCount || 1) : pageSize
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(totalCount / effectiveSize))
+  const paginated = records
 
   // Bulk selection helpers
   const allFilteredIds = paginated.map(r => r.id)
@@ -446,11 +474,17 @@ export default function GDSAccessRecordPage() {
       setSelectedIds(prev => { const s = new Set(prev); allFilteredIds.forEach(id => s.delete(id)); return s })
     } else {
       setSelectedIds(prev => new Set([...prev, ...allFilteredIds]))
+      setSelectedRowMap(prev => { const m = new Map(prev); paginated.forEach(r => m.set(r.id, r)); return m })
     }
   }
 
   function toggleSelect(id: number) {
     setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+    setSelectedRowMap(prev => {
+      const row = paginated.find(r => r.id === id)
+      if (!row) return prev
+      const m = new Map(prev); m.set(id, row); return m
+    })
   }
 
   function openBulk() {
@@ -478,7 +512,7 @@ export default function GDSAccessRecordPage() {
     }
     setBulkSaving(false)
     setBulkResult(`${bulkMode === 'add' ? 'Added' : 'Removed'} ${bulkFeatureIds.size} feature${bulkFeatureIds.size !== 1 ? 's' : ''} across ${done} PCC${done !== 1 ? 's' : ''}.`)
-    fetchAll()
+    fetchRecords()
   }
 
   const validRows   = importRows.filter(r => r._errors.length === 0)
@@ -564,7 +598,7 @@ export default function GDSAccessRecordPage() {
     if (e) { alert(`Could not rename OTA client: ${e.message}`); return }
     setOtaClients(prev => prev.map(o => o.id === form.ota_client_id ? { ...o, company_name: trimmed } : o))
     setRenamingOta(false)
-    fetchAll()
+    fetchRecords()
   }
 
   // Features for popup  only those matching the PCC's GDS
@@ -750,12 +784,12 @@ export default function GDSAccessRecordPage() {
               </button>
             )}
             {isAdmin && (
-              <button onClick={handleExport} disabled={filtered.length === 0}
-                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:filtered.length===0?0.4:1}}
+              <button onClick={handleExport} disabled={totalCount === 0 || exporting}
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:(totalCount===0||exporting)?0.4:1}}
                 onMouseOver={e => { e.currentTarget.style.background=D.borderLight; e.currentTarget.style.color=D.fg }}
                 onMouseOut={e => { e.currentTarget.style.background=D.card; e.currentTarget.style.color=D.fgMuted }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export xlsx
+                {exporting ? 'Exporting…' : 'Export xlsx'}
               </button>
             )}
             {isAdmin && (
@@ -787,7 +821,7 @@ export default function GDSAccessRecordPage() {
               <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Search</label>
               <div style={{position:'relative'}}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" value={search} onChange={e => { setSearch(e.target.value); resetPage() }}
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Search by organisation, PCC, PCC name, or GDS..."
                   style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
                   onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
@@ -798,7 +832,7 @@ export default function GDSAccessRecordPage() {
             {/* PCC Functionality */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
               <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>PCC Functionality</label>
-              <select value={filterPccFunc} onChange={e => { setFilterPccFunc(e.target.value); resetPage() }}
+              <select value={filterPccFunc} onChange={e => { setFilterPccFunc(e.target.value); setCurrentPage(1) }}
                 style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
                 onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
                 onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
@@ -810,7 +844,7 @@ export default function GDSAccessRecordPage() {
             {/* Status */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
               <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Status</label>
-              <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); resetPage() }}
+              <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
                 style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
                 onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
                 onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
@@ -822,7 +856,7 @@ export default function GDSAccessRecordPage() {
             {/* Reset button */}
             <div style={{display:'flex', alignItems:'flex-end'}}>
               <button
-                onClick={() => { setSearch(''); setFilterStatus('all'); setFilterPccFunc(''); resetPage() }}
+                onClick={() => { setSearch(''); setDebouncedSearch(''); setFilterStatus('all'); setFilterPccFunc(''); setCurrentPage(1) }}
                 title="Reset filters"
                 style={{display:'flex', alignItems:'center', justifyContent:'center', width:'38px', height:'38px', background:D.bg, color:D.fgMuted, border:`1px solid ${D.border}`, borderRadius:'8px', cursor:'pointer', flexShrink:0}}
                 onMouseOver={e => { e.currentTarget.style.color=D.accent; e.currentTarget.style.borderColor=D.accent }}
@@ -835,7 +869,7 @@ export default function GDSAccessRecordPage() {
         </div>
 
         {/* Select all + records count bar (single row) */}
-        {!loading && filtered.length > 0 && (
+        {!loading && totalCount > 0 && (
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', flexWrap:'wrap', gap:'12px'}}>
             <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
               {isAdmin && (
@@ -851,7 +885,7 @@ export default function GDSAccessRecordPage() {
                 </label>
               )}
               {isAdmin && selectedIds.size > 0 && (
-                <button onClick={() => setSelectedIds(new Set())}
+                <button onClick={() => { setSelectedIds(new Set()); setSelectedRowMap(new Map()) }}
                   style={{fontSize:'13px', color:D.fgDim, background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0}}>
                   Clear ({selectedIds.size} selected)
                 </button>
@@ -860,8 +894,8 @@ export default function GDSAccessRecordPage() {
             <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
               <span style={{fontSize:'14px', color:D.fgMuted}}>
                 {pageSize === 'all'
-                  ? <><strong style={{color:D.fg}}>{filtered.length}</strong> records total</>
-                  : <><strong style={{color:D.fg}}>{((currentPage-1)*effectiveSize)+1}-{Math.min(currentPage*effectiveSize, filtered.length)}</strong> of <strong style={{color:D.fg}}>{filtered.length}</strong> records</>
+                  ? <><strong style={{color:D.fg}}>{totalCount}</strong> records total</>
+                  : <><strong style={{color:D.fg}}>{totalCount === 0 ? 0 : ((currentPage-1)*effectiveSize)+1}-{Math.min(currentPage*effectiveSize, totalCount)}</strong> of <strong style={{color:D.fg}}>{totalCount}</strong> records</>
                 }
               </span>
               <select value={String(pageSize)} onChange={e => { setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1) }}
@@ -929,7 +963,7 @@ export default function GDSAccessRecordPage() {
         )}
 
         {/* Pagination */}
-        {!loading && filtered.length > 0 && totalPages > 1 && pageSize !== 'all' && (
+        {!loading && totalCount > 0 && totalPages > 1 && pageSize !== 'all' && (
           <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', marginTop:'0', background:D.card, border:`1px solid ${D.border}`, borderTop:'none', borderRadius:'0 0 10px 10px', padding:'14px 18px', gap:'4px'}}>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
               style={{display:'flex', alignItems:'center', justifyContent:'center', minWidth:'32px', height:'32px', padding:'0 12px', borderRadius:'6px', border:'1px solid transparent', background:'transparent', color:D.fgMuted, fontSize:'13px', fontWeight:600, cursor:'pointer', opacity:currentPage===1?0.4:1}}>
@@ -1433,7 +1467,7 @@ export default function GDSAccessRecordPage() {
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
                 <p className="text-xs font-medium text-slate-500 mb-2">Applying to {selectedIds.size} PCC{selectedIds.size !== 1 ? 's' : ''}:</p>
                 <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
-                  {filtered.filter(r => selectedIds.has(r.id)).map(r => (
+                  {Array.from(selectedRowMap.values()).filter(r => selectedIds.has(r.id)).map(r => (
                     <span key={r.id} className="font-mono text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{r.pcc}</span>
                   ))}
                 </div>
@@ -1446,7 +1480,7 @@ export default function GDSAccessRecordPage() {
                 </label>
                 {(() => {
                   // Get unique GDS IDs from selected PCCs
-                  const selectedPCCs = filtered.filter(r => selectedIds.has(r.id))
+                  const selectedPCCs = Array.from(selectedRowMap.values()).filter(r => selectedIds.has(r.id))
                   const gdsIds = [...new Set(selectedPCCs.map(r => r.gds_id))]
                   const relevantFeatures = allFeatures.filter(f => gdsIds.includes(f.gds_id ?? 0))
 

@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import TopNav from '@/components/layout/TopNav'
 import MainContent from '@/components/layout/MainContent'
 import IdleLogout from '@/components/shared/IdleLogout'
-import { AppProvider } from '@/lib/context/AppContext'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -37,21 +36,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <AppProvider value={{
-      userId: user.id,
-      userEmail: user.email ?? null,
-      role,
-      isAdmin,
-      canManage: role === 'admin' || role === 'manager',
-      permMap,
-    }}>
-      <div style={{ minHeight: '100vh', background: '#0e1117' }}>
-        <TopNav user={user} isAdmin={isAdmin} role={role} permMap={permMap} />
-        <IdleLogout />
-        <MainContent>
-          {children}
-        </MainContent>
-      </div>
-    </AppProvider>
+    <div style={{ minHeight: '100vh', background: '#0e1117' }}>
+      <TopNav user={user} isAdmin={isAdmin} role={role} permMap={permMap} />
+      <IdleLogout />
+      <MainContent>
+        {children}
+      </MainContent>
+    </div>
   )
 }

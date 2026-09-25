@@ -7,6 +7,7 @@ import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { SabreUser, User, OTAClient } from '@/types'
 import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
+import { useAppContext } from '@/lib/context/AppContext'
 
 
 const T = {
@@ -30,8 +31,6 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
   inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
   Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
   resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
@@ -48,12 +47,11 @@ const D = {
   cyan: '#39d2c0', cyanSoft: 'rgba(57,210,192,0.10)',
 }
 
-type SabreStatus = 'Active' | 'Inactive' | 'Suspended'
-const STATUSES: SabreStatus[] = ['Active', 'Inactive', 'Suspended']
+type SabreStatus = 'Active' | 'Inactive'
+const STATUSES: SabreStatus[] = ['Active', 'Inactive']
 const STATUS_COLORS: Record<string, string> = {
   Active:    'bg-emerald-50 text-emerald-700 border-emerald-200',
   Inactive:  'bg-slate-100 text-slate-500 border-slate-200',
-  Suspended: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
 type EprCategory = 'PST' | 'AET' | 'OTA' | 'JHT' | 'Vendor'
@@ -82,16 +80,16 @@ interface ImportRow {
 
 export default function SabreUsersPage() {
   const supabase = createClient()
+  const { isAdmin, userEmail } = useAppContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<SabreUser[]>([])
   const [resignedUsers, setResignedUsers] = useState<{id:string;full_name:string|null;initial:string|null;email:string|null;sabre_epr:string|null;sabre_pcc:string|null;pcc:string|null;ota_client:string|null;cta:string|null;pta:string|null;minicom:string|null;date_created_in_gds:string|null;date_resigned:string|null}[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('Active')
   const [filterOTA, setFilterOTA] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -115,11 +113,6 @@ export default function SabreUsersPage() {
 
   async function fetchAll() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
-    }
     const { data: sabreGds } = await supabase.from('gds').select('id').eq('name', 'Sabre').maybeSingle()
     const [{ data: sabreData }, { data: usersData }, { data: otaData }, { data: resignedData }, { data: pccData }] = await Promise.all([
       supabase.from('sabre_user')
@@ -332,7 +325,7 @@ export default function SabreUsersPage() {
         const minicom = getF(r, 'Minicom', 'minicom')
         const errors: string[] = []
         if (!epr) errors.push('EPR is required')
-        if (status && !STATUSES.includes(status as SabreStatus)) errors.push('Status must be Active, Inactive, Suspended or Resigned')
+        if (status && !STATUSES.includes(status as SabreStatus)) errors.push('Status must be Active, Inactive or Resigned')
         return { epr, initial, status: status || 'Active', pcc, cta, pta, minicom, _row: i + 2, _errors: errors }
       })
       setImportRows(parsed); setImportOpen(true)
@@ -402,7 +395,6 @@ export default function SabreUsersPage() {
     if (!confirm('Delete this available license record? This permanently removes it from the database and it will no longer be offered for reassignment. This action will be logged.')) return
     setDeletingLicenseId(id)
     const row = resignedUsers.find(r => r.id === id)
-    const { data: { user } } = await supabase.auth.getUser()
     if (row) {
       const { error: logErr } = await supabase.from('license_deletion_log').insert({
         source_gds:          'Sabre',
@@ -413,7 +405,7 @@ export default function SabreUsersPage() {
         resigned_user_id:    row.id,
         resigned_full_name:  row.full_name ?? null,
         resigned_email:      row.email ?? null,
-        deleted_by:          user?.email ?? null,
+        deleted_by:          userEmail,
       })
       if (logErr) { setError(`Could not log deletion history: ${logErr.message}`); setDeletingLicenseId(null); return }
     }
@@ -497,7 +489,6 @@ export default function SabreUsersPage() {
 
   const activeCount = records.filter(r=>r.status==='Active').length
   const inactiveCount = records.filter(r=>r.status==='Inactive').length
-  const suspendedCount = records.filter(r=>r.status==='Suspended').length
   const otaCount = records.filter(r=>r.ota).length
 
   const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
@@ -545,7 +536,6 @@ export default function SabreUsersPage() {
             { label: 'Total Users', value: records.length, color: D.accent, soft: D.accentSoft, icon: <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></> },
             { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
             { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
-            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
             { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
           ].map((s, i) => (
             <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
@@ -595,7 +585,6 @@ export default function SabreUsersPage() {
               const pccAssigned = getPccAssigned(row.pcc)
               const status = row.status ?? 'Active'
               const statusStyle = status === 'Active' ? { soft: D.successSoft, color: D.success }
-                : status === 'Suspended' ? { soft: D.dangerSoft, color: D.danger }
                 : { soft: D.warningSoft, color: D.warning }
               const ini = (row as {initial?:string}).initial
               const dup = isDuplicateInitial(ini)
@@ -879,7 +868,7 @@ export default function SabreUsersPage() {
                 <button onClick={handleDownloadTemplate} className="text-xs text-blue-500 hover:text-blue-700 underline">Download template</button>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500">
-                Required: <span className="font-mono font-medium text-slate-700">EPR</span>  Optional: <span className="font-mono font-medium text-slate-700">Initial</span>, <span className="font-mono font-medium text-slate-700">Status</span> (Active/Inactive/Suspended), <span className="font-mono font-medium text-slate-700">PCC</span>, <span className="font-mono font-medium text-slate-700">CTA</span>, <span className="font-mono font-medium text-slate-700">PTA</span>, <span className="font-mono font-medium text-slate-700">Minicom</span>
+                Required: <span className="font-mono font-medium text-slate-700">EPR</span>  Optional: <span className="font-mono font-medium text-slate-700">Initial</span>, <span className="font-mono font-medium text-slate-700">Status</span> (Active/Inactive), <span className="font-mono font-medium text-slate-700">PCC</span>, <span className="font-mono font-medium text-slate-700">CTA</span>, <span className="font-mono font-medium text-slate-700">PTA</span>, <span className="font-mono font-medium text-slate-700">Minicom</span>
                 <br/>Note: OTA Client and Linked User must be assigned manually after import.
               </div>
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">

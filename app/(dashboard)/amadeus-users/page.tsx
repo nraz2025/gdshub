@@ -7,6 +7,7 @@ import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { AmadeusUser, User, OTAClient } from '@/types'
 import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
+import { useAppContext } from '@/lib/context/AppContext'
 
 
 const T = {
@@ -30,8 +31,6 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
   Active:    {bg:'#ECFDF5', color:'#065F46', border:'#6EE7B7'},
   inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
   Inactive:  {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
-  suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
-  Suspended: {bg:'#FFFBEB', color:'#92400E', border:'#FCD34D'},
   resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Resigned:  {bg:'#FEF2F2', color:'#991B1B', border:'#FCA5A5'},
   Vacant:    {bg:'#F1F5F9', color:'#475569', border:'#CBD5E1'},
@@ -41,7 +40,6 @@ const STATUS_STYLE: Record<string, {bg:string;color:string;border:string}> = {
 const SS: Record<string,{bg:string;color:string;border:string}> = {
   active:  {bg:'#f0fdf4',color:'#166534',border:'#bbf7d0'},
   inactive:{bg:'#f1f5f9',color:'#64748b',border:'#e2e8f0'},
-  suspended:{bg:'#fffbeb',color:'#92400e',border:'#fde68a'},
   resigned:{bg:'#fef2f2',color:'#dc2626',border:'#fecaca'},
 }
 
@@ -77,15 +75,15 @@ interface ImportRow {
 
 export default function AmadeusUsersPage() {
   const supabase = createClient()
+  const { isAdmin } = useAppContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<AmadeusUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('active')
   const [filterOTA, setFilterOTA] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -106,11 +104,6 @@ export default function AmadeusUsersPage() {
 
   async function fetchAll() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
-    }
     const { data: amGds } = await supabase.from('gds').select('id').eq('name', 'Amadeus').maybeSingle()
     const [{ data: amData }, { data: usersData }, { data: otaData }, { data: pccData }] = await Promise.all([
       supabase.from('amadeus_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('login'),
@@ -318,7 +311,6 @@ export default function AmadeusUsersPage() {
 
   const activeCount    = records.filter(r => ((r as {status?:string}).status ?? 'active') === 'active').length
   const inactiveCount  = records.filter(r => (r as {status?:string}).status === 'inactive').length
-  const suspendedCount = records.filter(r => (r as {status?:string}).status === 'suspended').length
   const otaCount       = records.filter(r => r.ota).length
 
   const filtered = records.filter(r => {
@@ -344,7 +336,7 @@ export default function AmadeusUsersPage() {
     { key: 'ota_client_id', label: 'OTA Client', render: (row: AmadeusUser) => { const ota = row.ota_client as OTAClient; return ota ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">{ota.company_name}</span> : <span className="text-slate-300 text-xs">-</span> } },
     { key: 'status', label: 'Status', render: (row: AmadeusUser) => {
       const s = ((row as {status?: string}).status ?? 'active').toLowerCase()
-      const map: Record<string, string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', inactive:'bg-slate-100 text-slate-500 border-slate-200', suspended:'bg-amber-50 text-amber-700 border-amber-200', resigned:'bg-red-50 text-red-600 border-red-200' }
+      const map: Record<string, string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', inactive:'bg-slate-100 text-slate-500 border-slate-200', resigned:'bg-red-50 text-red-600 border-red-200' }
       return <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${map[s] ?? map.active}`}>{s}</span>
     }},
     { key: 'user_id', label: 'Linked User', render: (row: AmadeusUser) => { const u = row.users as User; return u ? <div><p className="text-sm text-slate-700 font-medium">{u.first_name} {u.last_name}</p><p className="text-xs text-slate-400">{u.email_address}</p></div> : <span className="text-slate-300 text-xs">-</span> } },
@@ -411,7 +403,6 @@ export default function AmadeusUsersPage() {
             { label: 'Total Users', value: records.length, color: D.accent, soft: D.accentSoft, icon: <><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></> },
             { label: 'Active', value: activeCount, color: D.success, soft: D.successSoft, icon: <polyline points="20 6 9 17 4 12"/> },
             { label: 'Inactive', value: inactiveCount, color: D.warning, soft: D.warningSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></> },
-            { label: 'Suspended', value: suspendedCount, color: D.danger, soft: D.dangerSoft, icon: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></> },
             { label: 'OTA Users', value: otaCount, color: D.cyan, soft: D.cyanSoft, icon: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></> },
           ].map((s, i) => (
             <div key={i} style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px'}}>
@@ -440,7 +431,6 @@ export default function AmadeusUsersPage() {
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
-            <option value="suspended">Suspended</option>
           </select>
           <select value={filterOTA} onChange={e => setFilterOTA(e.target.value)}
             style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'130px'}}>
@@ -462,7 +452,6 @@ export default function AmadeusUsersPage() {
               const u = row.users as {first_name?:string;last_name?:string;email_address?:string}
               const sval = ((row as {status?:string}).status ?? 'active').toLowerCase()
               const statusStyle = sval === 'active' ? { soft: D.successSoft, color: D.success }
-                : sval === 'suspended' ? { soft: D.dangerSoft, color: D.danger }
                 : { soft: D.warningSoft, color: D.warning }
               const pccAssigned = getPccAssigned(row.oid)
               return (
@@ -637,7 +626,6 @@ export default function AmadeusUsersPage() {
             <select value={(form as {status?: string}).status ?? 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inpDark({cursor:'pointer'})}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
             </select>
           </div>
 
