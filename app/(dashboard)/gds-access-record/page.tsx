@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import { useAppContext } from '@/lib/context/AppContext'
-import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality, GDSFeature } from '@/types'
+import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality } from '@/types'
 
 // Modal styling stays light (shared Modal component not touched this session)
 const T = {
@@ -113,7 +113,6 @@ export default function GDSAccessRecordPage() {
   const [orgList, setOrgList] = useState<Organisation[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
   const [funcList, setFuncList] = useState<GDSFunctionality[]>([])
-  const [allFeatures, setAllFeatures] = useState<GDSFeature[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -135,29 +134,10 @@ export default function GDSAccessRecordPage() {
   const [loginPopupData, setLoginPopupData] = useState<{sabre: {id:number;epr:string;email:string|null;pcc:string|null;status:string}[];amadeus:{id:number;login:string;sign_on_id:string|null;oid:string|null;status:string;users?:{email_address:string|null}|null}[];travelport:{id:number;sign_on_id:string|null;cid:string|null;pcc:string|null;status:string}[]}>({ sabre:[], amadeus:[], travelport:[] })
   const [loginPopupLoading, setLoginPopupLoading] = useState(false)
 
-  // GDS Feature detail popup
-  const [featurePopup, setFeaturePopup] = useState<PCCList | null>(null)
-  const [featurePopupOpen, setFeaturePopupOpen] = useState(false)
-  const [profileFeatureIds, setProfileFeatureIds] = useState<Set<number>>(new Set())
-  const [featureToggling, setFeatureToggling] = useState(false)
-  const [tierModalFeature, setTierModalFeature] = useState<{label:string; tiers:{sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]} | null>(null)
-
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<number|"all">(25)
   const PAGE_SIZE = pageSize
-
-  // Bulk edit
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  // Full row data for every ID ever selected, kept around so the bulk-edit
-  // modal can still show/act on selections made on a page that's no longer
-  // loaded (selection now spans server-side pages, not one big in-memory list).
-  const [selectedRowMap, setSelectedRowMap] = useState<Map<number, PCCList>>(new Map())
-  const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulkFeatureIds, setBulkFeatureIds] = useState<Set<number>>(new Set())
-  const [bulkMode, setBulkMode] = useState<'add' | 'remove'>('add')
-  const [bulkSaving, setBulkSaving] = useState(false)
-  const [bulkResult, setBulkResult] = useState<string | null>(null)
 
   // Import
   const [importOpen, setImportOpen] = useState(false)
@@ -172,21 +152,17 @@ export default function GDSAccessRecordPage() {
   useEffect(() => { fetchReferenceData() }, [])
 
   async function fetchReferenceData() {
-    const [{ data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: featData }, { data: cycleData }, { data: pccFuncOptData }] = await Promise.all([
+    const [{ data: gdsData }, { data: orgData }, { data: otaData }, { data: funcData }, { data: pccFuncOptData }] = await Promise.all([
       supabase.from('gds').select('*').order('name'),
       supabase.from('organisation').select('*').order('organisation'),
-      supabase.from('ota_client').select('id, company_name').order('company_name'),
+      supabase.from('pcc_name').select('id, company_name').order('company_name'),
       supabase.from('gds_functionality').select('id, name, gds_id').order('name'),
-      supabase.from('gds_features').select('*, pricing_tiers').order('label'),
-      supabase.from('billing_cycles').select('value, label').order('sort_order'),
       supabase.from('pcc_functionality_options').select('id, name').order('sort_order'),
     ])
     setGdsList(gdsData ?? [])
     setOrgList(orgData ?? [])
     setOtaClients(otaData ?? [])
     setFuncList(funcData ?? [])
-    setAllFeatures(featData ?? [])
-    setBillingCycles(cycleData ?? [])
     setPccFunctionalityOptions(pccFuncOptData ?? [])
   }
 
@@ -208,8 +184,7 @@ export default function GDSAccessRecordPage() {
     *, gds:gds_id(id, name),
     organisation:org_id(id, organisation, iata),
     ota_client:ota_client_id(id, company_name),
-    gds_functionality:functionality_id(id, name, gds_id),
-    pcc_features(feature_id, gds_features:feature_id(id, key, label, cost, currency, billing_cycle))
+    gds_functionality:functionality_id(id, name, gds_id)
   `
 
   // Looks up matching PCC ids + total count via the search_pcc_access_records()
@@ -311,32 +286,7 @@ export default function GDSAccessRecordPage() {
     setLoginPopupLoading(false)
   }
 
-  //  GDS FEATURE POPUP 
-  function openFeaturePopup(row: PCCList) {
-    setFeaturePopup(row)
-    // Use pcc_features (direct PCC assignments)  independent of any profile
-    const existing = new Set(((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).map(pf => pf.feature_id))
-    setProfileFeatureIds(existing)
-    setFeaturePopupOpen(true)
-  }
-
-  async function toggleProfileFeature(featureId: number) {
-    if (!featurePopup || !isAdmin) return
-    setFeatureToggling(true)
-    const has = profileFeatureIds.has(featureId)
-    if (has) {
-      await supabase.from('pcc_features').delete()
-        .eq('pcc_list_id', featurePopup.id).eq('feature_id', featureId)
-      setProfileFeatureIds(prev => { const s = new Set(prev); s.delete(featureId); return s })
-    } else {
-      await supabase.from('pcc_features').insert({ pcc_list_id: featurePopup.id, feature_id: featureId })
-      setProfileFeatureIds(prev => new Set([...prev, featureId]))
-    }
-    setFeatureToggling(false)
-    fetchRecords()
-  }
-
-  //  EXPORT  — exports every record matching the current search/filters,
+  //  EXPORT — exports every record matching the current search/filters,
   // not just the page currently on screen, so it needs its own fetch.
   const [exporting, setExporting] = useState(false)
   async function handleExport() {
@@ -348,13 +298,6 @@ export default function GDSAccessRecordPage() {
       const org       = r.organisation as Organisation
       const ota       = r.ota_client as OTAClient
       const func      = r.gds_functionality as GDSFunctionality
-      const pccFeats  = (r as PCCList & {pcc_features?: {gds_features?: {label?:string;cost?:number;currency?:string;billing_cycle?:string}}[]}).pcc_features ?? []
-      const featNames = pccFeats.map(pf => pf.gds_features?.label ?? '').filter(Boolean).join(', ')
-      const featCosts = pccFeats.map(pf => {
-        const f = pf.gds_features
-        if (!f) return ''
-        return f.cost ? `${f.currency ?? ''} ${f.cost} ${cycleLabel(f.billing_cycle)}`.trim() : ''
-      }).filter(Boolean).join(', ')
       return {
         'No.':                  i + 1,
         'GDS':                  gdsName,
@@ -365,8 +308,6 @@ export default function GDSAccessRecordPage() {
         'OTA Client':           ota?.company_name ?? '',
         'GDS Functionality':    func?.name ?? '',
         'PCC Functionality':    (r as PCCList & {pcc_functionality?: string}).pcc_functionality ?? '',
-        'Enabled Features':     featNames,
-        'Feature Costs':        featCosts,
         'Remarks':              r.remarks ? r.remarks.split('\n').map(l => chunkText(l.trim(), 50).join('\n')).join('\n') : '',
         'Modified By':          (r as PCCList & {modified_by?: string}).modified_by ?? '',
         'Modified Date':        (r as PCCList & {modified_at?: string}).modified_at
@@ -386,8 +327,6 @@ export default function GDSAccessRecordPage() {
       { wch: 25 },  // OTA Client
       { wch: 25 },  // GDS Functionality
       { wch: 20 },  // PCC Functionality
-      { wch: 40 },  // Enabled Features
-      { wch: 40 },  // Feature Costs
       { wch: 30 },  // Remarks
       { wch: 25 },  // Modified By
       { wch: 14 },  // Modified Date
@@ -464,61 +403,9 @@ export default function GDSAccessRecordPage() {
   const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(totalCount / effectiveSize))
   const paginated = records
 
-  // Bulk selection helpers
-  const allFilteredIds = paginated.map(r => r.id)
-  const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id))
-  const someSelected = allFilteredIds.some(id => selectedIds.has(id)) && !allSelected
-
-  function toggleSelectAll() {
-    if (allSelected) {
-      setSelectedIds(prev => { const s = new Set(prev); allFilteredIds.forEach(id => s.delete(id)); return s })
-    } else {
-      setSelectedIds(prev => new Set([...prev, ...allFilteredIds]))
-      setSelectedRowMap(prev => { const m = new Map(prev); paginated.forEach(r => m.set(r.id, r)); return m })
-    }
-  }
-
-  function toggleSelect(id: number) {
-    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
-    setSelectedRowMap(prev => {
-      const row = paginated.find(r => r.id === id)
-      if (!row) return prev
-      const m = new Map(prev); m.set(id, row); return m
-    })
-  }
-
-  function openBulk() {
-    setBulkFeatureIds(new Set())
-    setBulkMode('add')
-    setBulkResult(null)
-    setBulkOpen(true)
-  }
-
-  async function handleBulkApply() {
-    if (selectedIds.size === 0 || bulkFeatureIds.size === 0) return
-    setBulkSaving(true); setBulkResult(null)
-    let done = 0
-    for (const pccId of selectedIds) {
-      for (const featId of bulkFeatureIds) {
-        if (bulkMode === 'add') {
-          await supabase.from('pcc_features')
-            .upsert({ pcc_list_id: pccId, feature_id: featId }, { onConflict: 'pcc_list_id,feature_id' })
-        } else {
-          await supabase.from('pcc_features')
-            .delete().eq('pcc_list_id', pccId).eq('feature_id', featId)
-        }
-      }
-      done++
-    }
-    setBulkSaving(false)
-    setBulkResult(`${bulkMode === 'add' ? 'Added' : 'Removed'} ${bulkFeatureIds.size} feature${bulkFeatureIds.size !== 1 ? 's' : ''} across ${done} PCC${done !== 1 ? 's' : ''}.`)
-    fetchRecords()
-  }
-
   const validRows   = importRows.filter(r => r._errors.length === 0)
   const invalidRows = importRows.filter(r => r._errors.length > 0)
 
-  const [billingCycles, setBillingCycles] = useState<{value:string;label:string}[]>([])
   const [pccFunctionalityOptions, setPccFunctionalityOptions] = useState<{id:number;name:string}[]>([])
   const [addingFunctionality, setAddingFunctionality] = useState(false)
   const [newFunctionalityName, setNewFunctionalityName] = useState('')
@@ -529,25 +416,6 @@ export default function GDSAccessRecordPage() {
   const [addingOta, setAddingOta] = useState(false)
   const [newOtaName, setNewOtaName] = useState('')
   const [savingNewOta, setSavingNewOta] = useState(false)
-
-  // Look up the proper unit-of-measure label from the billing_cycles table.
-  // Falls back to a prettified version of the raw code for legacy values that were
-  // never registered there (e.g. old free-typed codes like "transactionmonth").
-  function cycleLabel(raw?: string): string {
-    if (!raw) return ''
-    const match = billingCycles.find(c => c.value === raw)
-    if (match) return match.label
-    return raw
-      .replace(/_/g, ' ')                          // snake_case -> spaced
-      .replace(/([a-z])([A-Z])/g, '$1 $2')          // camelCase -> spaced
-      .replace(/(\d)([a-z])/gi, '$1 $2')            // 100monthly -> 100 monthly
-      .replace(/\b(oid)\b/gi, 'OID')                // known acronym
-      .replace(/\b(transaction)(month|year)\b/gi, '$1 / $2')  // transactionmonth -> transaction / month
-      .split(' ')
-      .map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
-      .join(' ')
-      .replace(/Oid/g, 'OID')
-  }
 
   async function addPccFunctionalityOption(name: string): Promise<string | null> {
     const trimmed = name.trim()
@@ -573,7 +441,7 @@ export default function GDSAccessRecordPage() {
     const trimmed = name.trim()
     if (!trimmed) return null
     setSavingNewOta(true)
-    const { data, error: e } = await supabase.from('ota_client')
+    const { data, error: e } = await supabase.from('pcc_name')
       .insert({ company_name: trimmed })
       .select('id, company_name').single()
     setSavingNewOta(false)
@@ -593,22 +461,13 @@ export default function GDSAccessRecordPage() {
     const trimmed = otaRenameValue.trim()
     if (!trimmed) return
     setSavingOtaRename(true)
-    const { error: e } = await supabase.from('ota_client').update({ company_name: trimmed }).eq('id', form.ota_client_id)
+    const { error: e } = await supabase.from('pcc_name').update({ company_name: trimmed }).eq('id', form.ota_client_id)
     setSavingOtaRename(false)
     if (e) { alert(`Could not rename OTA client: ${e.message}`); return }
     setOtaClients(prev => prev.map(o => o.id === form.ota_client_id ? { ...o, company_name: trimmed } : o))
     setRenamingOta(false)
     fetchRecords()
   }
-
-  // Features for popup  only those matching the PCC's GDS
-  const popupGdsId = featurePopup ? featurePopup.gds_id : null
-  const availableFeatures = allFeatures.filter(f => f.gds_id === popupGdsId)
-
-  const popupFunc = featurePopup?.gds_functionality as GDSFunctionality | undefined
-  const popupGds = featurePopup?.gds as GDS | undefined
-  const popupOrg = featurePopup?.organisation as Organisation | undefined
-  const popupOta = featurePopup?.ota_client as OTAClient | undefined
 
   // Split text into chunks of at most maxLen characters, breaking at word boundaries
   // where possible so a single continuous line never exceeds maxLen characters
@@ -637,29 +496,8 @@ export default function GDSAccessRecordPage() {
     return lines
   }
 
-  function fmtCost(cost: number, currency: string, cycle: string) {
-    if (!cost) return null
-    const amt = new Intl.NumberFormat('en-MY', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cost)
-    const suffixes: Record<string, string> = { monthly: '/mo', yearly: '/yr', per_user: '/user', per_transaction: '/txn', one_time: '' }
-    return `${amt}${suffixes[cycle] ?? ''}`
-  }
-
-  //  COLUMNS 
+  //  COLUMNS
   const columns = [
-    // 0. Checkbox
-    {
-      key: '_select', label: '', width: '44px',
-      width: '48px',
-      render: (row: PCCList) => isAdmin ? (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(row.id)}
-          onChange={() => toggleSelect(row.id)}
-          onClick={e => e.stopPropagation()}
-          style={{ width: '16px', height: '16px', accentColor: D.accent, cursor: 'pointer' }}
-        />
-      ) : null
-    },
     // 1. Organisation
     {
       key: 'organisation', label: 'Organisation', width: '220px',
@@ -712,28 +550,6 @@ export default function GDSAccessRecordPage() {
           : <span style={{color:D.fgDim}}>—</span>
       }
     },
-    // 6. Features  clickable badge that opens popup
-    {
-      key: 'functionality_id', label: 'Features', width: '150px',
-      render: (row: PCCList) => {
-        const func = row.gds_functionality as GDSFunctionality
-        const directCount = ((row as unknown as {pcc_features?: {feature_id: number}[]}).pcc_features ?? []).length
-        return (
-          <button onClick={() => openFeaturePopup(row)}
-            style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',padding:0}}>
-            <span style={{fontSize:'14px',fontWeight:600,color: directCount > 0 ? D.fg : D.fgDim,textTransform:'uppercase',letterSpacing:'0.02em'}}>
-              {func ? func.name : directCount > 0 ? 'Assigned' : 'Unassigned'}
-            </span>
-            <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'50%',
-              fontSize:'11px',fontWeight:700,
-              color: directCount > 0 ? D.accent : D.fgDim,
-              background: directCount > 0 ? D.accentSoft : 'rgba(139,148,158,0.10)'}}>
-              {directCount}
-            </span>
-          </button>
-        )
-      }
-    },
     // 7. Remarks
     {
       key: 'remarks', label: 'Remarks', width: '430px',
@@ -776,13 +592,6 @@ export default function GDSAccessRecordPage() {
             <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>PCC assignments and configuration details across organisations</p>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
-            {isAdmin && selectedIds.size > 0 && (
-              <button onClick={openBulk}
-                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.purpleSoft, border:`1px solid ${D.purple}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.purple, cursor:'pointer'}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Bulk Edit ({selectedIds.size})
-              </button>
-            )}
             {isAdmin && (
               <button onClick={handleExport} disabled={totalCount === 0 || exporting}
                 style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.card, border:`1px solid ${D.border}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer', opacity:(totalCount===0||exporting)?0.4:1}}
@@ -868,29 +677,9 @@ export default function GDSAccessRecordPage() {
           </div>
         </div>
 
-        {/* Select all + records count bar (single row) */}
+        {/* Records count bar (single row) */}
         {!loading && totalCount > 0 && (
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', flexWrap:'wrap', gap:'12px'}}>
-            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-              {isAdmin && (
-                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'14px', color:D.fgMuted}}>
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={el => { if (el) el.indeterminate = someSelected }}
-                    onChange={toggleSelectAll}
-                    style={{width:'16px', height:'16px', cursor:'pointer', accentColor:D.accent}}
-                  />
-                  Select all
-                </label>
-              )}
-              {isAdmin && selectedIds.size > 0 && (
-                <button onClick={() => { setSelectedIds(new Set()); setSelectedRowMap(new Map()) }}
-                  style={{fontSize:'13px', color:D.fgDim, background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0}}>
-                  Clear ({selectedIds.size} selected)
-                </button>
-              )}
-            </div>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', marginBottom:'12px', flexWrap:'wrap', gap:'12px'}}>
             <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
               <span style={{fontSize:'14px', color:D.fgMuted}}>
                 {pageSize === 'all'
@@ -914,11 +703,11 @@ export default function GDSAccessRecordPage() {
           <div style={{padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'15px'}}>Loading</div>
         ) : (
           <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
-              <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1470px', tableLayout:'fixed'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1300px', tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     {columns.map(col => (
-                      <th key={col.key} style={{padding: ['pcc_functionality','functionality_id','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:D.card, width: col.width, position:'sticky', top:0, zIndex:2}}>{col.label}</th>
+                      <th key={col.key} style={{padding: ['pcc_functionality','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'left', borderBottom:`1px solid ${D.border}`, background:D.card, width: col.width, position:'sticky', top:0, zIndex:2}}>{col.label}</th>
                     ))}
                     {isAdmin && (
                       <th style={{padding:'12px 16px', fontSize:'14px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign:'right', borderBottom:`1px solid ${D.border}`, background:D.card, position:'sticky', top:0, zIndex:2}}>Actions</th>
@@ -934,7 +723,7 @@ export default function GDSAccessRecordPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         {columns.map(col => (
-                          <td key={col.key} style={{padding: ['pcc_functionality','functionality_id','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', verticalAlign:'middle'}}>{col.render(row as PCCList)}</td>
+                          <td key={col.key} style={{padding: ['pcc_functionality','remarks'].includes(col.key) ? '12px 16px 12px 28px' : '12px 16px', verticalAlign:'middle'}}>{col.render(row as PCCList)}</td>
                         ))}
                         {isAdmin && (
                           <td style={{padding:'12px 16px', textAlign:'right'}}>
@@ -1075,7 +864,7 @@ export default function GDSAccessRecordPage() {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-medium text-slate-700">OTA Client</label>
+              <label className="block text-sm font-medium text-slate-700">PCC Name</label>
               {!renamingOta && !addingOta && (
                 <div className="flex items-center gap-3">
                   <button
@@ -1199,147 +988,6 @@ export default function GDSAccessRecordPage() {
         </div>
       </Modal>
 
-      {/*  GDS Feature Detail Popup  */}
-      <Modal
-        open={featurePopupOpen}
-        onClose={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }}
-        title="GDS Feature Details"
-        size="lg"
-      >
-        {featurePopup && (
-          <div className="space-y-5">
-
-            {/* PCC Details section */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">PCC Details</p>
-              <div className="grid grid-cols-2 gap-y-3 gap-x-6">
-                <div>
-                  <p className="text-xs text-slate-400">PCC Code</p>
-                  <p className="font-mono font-bold text-slate-800 bg-slate-200 px-2 py-0.5 rounded text-sm inline-block mt-0.5">{featurePopup.pcc}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">GDS</p>
-                  {popupGds && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border mt-0.5 inline-block ${GDS_COLORS[popupGds.name] ?? 'bg-slate-100 text-slate-600'}`}>{popupGds.name}</span>}
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Status</p>
-                  {featurePopup.status && <span className={`text-xs font-medium px-2.5 py-1 rounded-full border mt-0.5 inline-block ${STATUS_COLORS[featurePopup.status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>{featurePopup.status}</span>}
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Organisation</p>
-                  <p className="text-sm text-slate-700 font-medium mt-0.5">{popupOrg?.organisation ?? <span className="text-slate-300"></span>}</p>
-                  {popupOrg?.iata && <p className="text-xs text-slate-400 font-mono">{popupOrg.iata}</p>}
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">OTA Client</p>
-                  {popupOta
-                    ? <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full mt-0.5 inline-block">{popupOta.company_name}</span>
-                    : <p className="text-sm text-slate-300 mt-0.5"></p>}
-                </div>
-
-              </div>
-            </div>
-
-            {/* Features section */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-slate-700">
-                  Features
-                  <span className="ml-2 text-xs font-normal text-slate-400">
-                    {profileFeatureIds.size} of {availableFeatures.length} enabled
-                  </span>
-                </p>
-
-              </div>
-
-              {availableFeatures.length === 0 ? (
-                <p className="text-sm text-slate-400 italic text-center py-4">
-                  No features defined for {popupGds?.name ?? 'this GDS'} yet. Add them in GDS Functionality.
-                </p>
-              ) : isAdmin ? (
-                // Admin/Manager: show all features with toggle buttons
-                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
-                  {availableFeatures.map((f, i) => {
-                    const enabled = profileFeatureIds.has(f.id)
-                    const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
-                    return (
-                      <div key={f.id} className={`flex items-center justify-between px-4 py-3 ${i < availableFeatures.length - 1 ? 'border-b border-slate-100' : ''} ${enabled ? 'bg-white' : 'bg-slate-50/50'}`}>
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${enabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                            {enabled ? '' : ''}
-                          </span>
-                          <div>
-                            <p className={`text-sm ${enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{f.label}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
-                              {f.billing_cycle && costStr && <span className="text-xs text-slate-300"></span>}
-                              {f.billing_cycle && <p className="text-xs text-slate-400">{cycleLabel(f.billing_cycle as string)}</p>}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(f as {pricing_tiers?: unknown[]}).pricing_tiers && (f as {pricing_tiers?: unknown[]}).pricing_tiers!.length > 0 && (
-                            <button
-                              onClick={() => setTierModalFeature({label: f.label, tiers: (f as {pricing_tiers: {sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]}).pricing_tiers})}
-                              className="text-xs px-3 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                            >
-                               Tiers
-                            </button>
-                          )}
-                        <button
-                          onClick={() => toggleProfileFeature(f.id)}
-                          disabled={featureToggling}
-                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                            enabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {enabled ? ' Remove' : '+ Add'}
-                        </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                // Viewer: show only enabled features as clean list
-                (() => {
-                  const enabledFeatures = availableFeatures.filter(f => profileFeatureIds.has(f.id))
-                  return enabledFeatures.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic text-center py-4">No features assigned to this PCC.</p>
-                  ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      {enabledFeatures.map((f, i) => {
-                        const costStr = fmtCost(f.cost, f.currency, f.billing_cycle as string)
-                        return (
-                          <div key={f.id} className={`flex items-center gap-3 px-4 py-3 ${i < enabledFeatures.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex-shrink-0"></span>
-                            <div>
-                              <p className="text-sm text-slate-800 font-medium">{f.label}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                {costStr && <p className="text-xs text-slate-400">{costStr}</p>}
-                                {(f as {pricing_tiers?: unknown[]}).pricing_tiers && (f as {pricing_tiers?: unknown[]}).pricing_tiers!.length > 0 && (
-                                  <button onClick={() => setTierModalFeature({label: f.label, tiers: (f as {pricing_tiers: {sort_order:number;tier:string;price:number;currency:string;unit:string;billing:string}[]}).pricing_tiers})} className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium"> Tiers</button>
-                                )}
-                                {f.billing_cycle && <span className="text-xs text-slate-300"></span>}
-                                {f.billing_cycle && <p className="text-xs text-slate-400">{cycleLabel(f.billing_cycle as string)}</p>}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })()
-              )}
-            </div>
-
-            <div className="flex justify-end">
-              <button onClick={() => { setFeaturePopupOpen(false); setFeaturePopup(null) }} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors">Close</button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
       {/*  PCC Name Login Popup  */}
       <Modal
         open={loginPopupOpen}
@@ -1437,110 +1085,6 @@ export default function GDSAccessRecordPage() {
         )}
       </Modal>
 
-      {/*  Bulk Edit Modal  */}
-      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`Bulk Edit GDS Features  ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''} selected`} size="md">
-        <div className="space-y-4">
-          {bulkResult ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-              <p className="text-sm text-emerald-700 font-medium"> {bulkResult}</p>
-            </div>
-          ) : (
-            <>
-              {/* Mode toggle */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Action</label>
-                <div className="flex gap-2">
-                  {(['add', 'remove'] as const).map(m => (
-                    <button key={m} onClick={() => setBulkMode(m)}
-                      className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors border ${
-                        bulkMode === m
-                          ? m === 'add' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-red-500 text-white border-red-500'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}>
-                      {m === 'add' ? '+ Add features to all selected' : ' Remove features from all selected'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Selected PCCs summary */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                <p className="text-xs font-medium text-slate-500 mb-2">Applying to {selectedIds.size} PCC{selectedIds.size !== 1 ? 's' : ''}:</p>
-                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
-                  {Array.from(selectedRowMap.values()).filter(r => selectedIds.has(r.id)).map(r => (
-                    <span key={r.id} className="font-mono text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{r.pcc}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Feature selection  grouped by GDS */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Select features to {bulkMode} <span className="text-slate-400 font-normal">(click to toggle)</span>
-                </label>
-                {(() => {
-                  // Get unique GDS IDs from selected PCCs
-                  const selectedPCCs = Array.from(selectedRowMap.values()).filter(r => selectedIds.has(r.id))
-                  const gdsIds = [...new Set(selectedPCCs.map(r => r.gds_id))]
-                  const relevantFeatures = allFeatures.filter(f => gdsIds.includes(f.gds_id ?? 0))
-
-                  if (relevantFeatures.length === 0) return (
-                    <p className="text-sm text-slate-400 italic py-4 text-center">No features available for the selected PCCs' GDS platforms.</p>
-                  )
-
-                  const grouped = gdsList
-                    .filter(g => gdsIds.includes(g.id))
-                    .map(g => ({ gds: g, features: relevantFeatures.filter(f => f.gds_id === g.id) }))
-                    .filter(g => g.features.length > 0)
-
-                  return (
-                    <div className="space-y-3 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3">
-                      {grouped.map(({ gds, features }) => (
-                        <div key={gds.id}>
-                          <p className={`text-xs font-semibold mb-1.5 px-2 py-1 rounded-full inline-block border ${GDS_COLORS[gds.name] ?? 'bg-slate-100 text-slate-600'}`}>{gds.name}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {features.map(f => {
-                              const selected = bulkFeatureIds.has(f.id)
-                              return (
-                                <button key={f.id}
-                                  onClick={() => setBulkFeatureIds(prev => { const s = new Set(prev); s.has(f.id) ? s.delete(f.id) : s.add(f.id); return s })}
-                                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                                    selected ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                                  }`}>
-                                  {f.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {bulkFeatureIds.size > 0 && (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-xs text-indigo-700">
-                  {bulkMode === 'add' ? 'Will add' : 'Will remove'} <strong>{bulkFeatureIds.size} feature{bulkFeatureIds.size !== 1 ? 's' : ''}</strong> on <strong>{selectedIds.size} PCC{selectedIds.size !== 1 ? 's' : ''}</strong> ({selectedIds.size * bulkFeatureIds.size} total operations)
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setBulkOpen(false)} className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-              {bulkResult ? 'Close' : 'Cancel'}
-            </button>
-            {!bulkResult && (
-              <button onClick={handleBulkApply} disabled={bulkSaving || bulkFeatureIds.size === 0}
-                className={`flex-1 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-50 transition-colors ${bulkMode === 'add' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'}`}>
-                {bulkSaving ? 'Applying' : `${bulkMode === 'add' ? 'Add' : 'Remove'} to ${selectedIds.size} PCC${selectedIds.size !== 1 ? 's' : ''}`}
-              </button>
-            )}
-          </div>
-        </div>
-      </Modal>
-
       {/*  Import Modal  */}
       <Modal open={importOpen} onClose={closeImport} title="Import GDS Access Record" size="lg">
         <div className="space-y-4">
@@ -1590,37 +1134,6 @@ export default function GDSAccessRecordPage() {
           </div>
         </div>
       </Modal>
-      {/* ── Pricing Tiers Modal ── */}
-      {tierModalFeature && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-          <div style={{background:'white',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'560px',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
-              <div>
-                <h3 style={{fontSize:'16px',fontWeight:700,color:'#1E293B',margin:0}}>{tierModalFeature.label}</h3>
-                <p style={{fontSize:'13px',color:'#64748B',marginTop:'2px'}}>Transaction Tier Pricing</p>
-              </div>
-              <button onClick={() => setTierModalFeature(null)} style={{background:'none',border:'none',fontSize:'20px',cursor:'pointer',color:'#94A3B8',lineHeight:1}}>×</button>
-            </div>
-            <div style={{border:'1px solid #E2E8F0',borderRadius:'10px',overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',background:'#F0FDF4',borderBottom:'2px solid #6EE7B7',padding:'10px 14px'}}>
-                {['Contracted Price Item','Currency','Market Price'].map(h => (
-                  <div key={h} style={{fontSize:'11px',fontWeight:800,color:'#065F46',textTransform:'uppercase',letterSpacing:'0.06em'}}>{h}</div>
-                ))}
-              </div>
-              {tierModalFeature.tiers.sort((a,b) => a.sort_order - b.sort_order).map((pt, i) => (
-                <div key={i} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',padding:'10px 14px',borderBottom: i < tierModalFeature.tiers.length-1 ? '1px solid #F1F5F9' : 'none',background: i%2===0 ? 'white' : '#F8FAFC'}}>
-                  <span style={{fontSize:'14px',color:'#1E293B'}}>{pt.tier}</span>
-                  <span style={{fontSize:'14px',color:'#64748B'}}>{pt.currency}</span>
-                  <span style={{fontSize:'14px',fontWeight:600,color:'#10B981'}}>{pt.price === 0 ? '0.00' : pt.price.toLocaleString('en-MY', {minimumFractionDigits:2})}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px'}}>
-              <button onClick={() => setTierModalFeature(null)} style={{padding:'8px 20px',fontSize:'13px',fontWeight:600,border:'1px solid #E2E8F0',borderRadius:'8px',background:'white',color:'#64748B',cursor:'pointer'}}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -24,6 +24,7 @@ const ICONS = {
   queue: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
   webservice: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
   contract: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></>,
+  pricing: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
   chevron: <polyline points="6 9 12 15 18 9" />,
 }
 function Ic({ path, w = 15, color }: { path: React.ReactNode; w?: number; color?: string }) {
@@ -77,14 +78,22 @@ const GROUPS: NavGroup[] = [
     items: [{ label: 'Contract', href: '/contract', module: 'contract', icon: <Ic path={ICONS.contract} color="#d29922" /> }],
   },
   {
+    key: 'pricing', label: 'Pricing', color: '#d29922', soft: 'rgba(210,153,34,0.10)', glow: 'rgba(210,153,34,0.06)', border: 'rgba(210,153,34,0.20)',
+    desc: 'Product pricing across GDS platforms',
+    icon: <Ic path={ICONS.pricing} color="#d29922" />,
+    items: [
+      { label: 'Sabre', href: '/pricing/sabre', module: 'pricing', icon: <Ic path={ICONS.pricing} color="#f78166" /> },
+      { label: 'Amadeus', href: '/pricing/amadeus', module: 'pricing', icon: <Ic path={ICONS.pricing} color="#a371f7" /> },
+      { label: 'Travelport', href: '/pricing/travelport', module: 'pricing', icon: <Ic path={ICONS.pricing} color="#58a6ff" /> },
+    ],
+  },
+  {
     key: 'system', label: 'System', color: '#f78166', soft: 'rgba(247,129,102,0.10)', glow: 'rgba(247,129,102,0.06)', border: 'rgba(247,129,102,0.20)',
     desc: 'Reports & administration',
     items: [
       { label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} color="#d29922" /> },
       { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} color="#a371f7" /> },
       { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
-      { label: 'GDS Features', href: '/gds-features', module: 'gds_functionality', icon: <Ic path={ICONS.features} color="#d29922" /> },
-      { label: 'Billing Cycles', href: '/billing-cycles', module: 'billing_cycles', icon: <Ic path={ICONS.billing} color="#3fb950" /> },
       { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
       { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} color="#db61a2" /> },
     ],

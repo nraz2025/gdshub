@@ -34,7 +34,27 @@ interface ImportRow {
   error?: string
 }
 
+interface CredAttachment {
+  id: number
+  file_name: string
+  file_path: string
+  file_size: number | null
+}
+
+interface CompanyCredRow {
+  id: number
+  company_name: string
+  application_name: string | null
+  client_id: string | null
+  client_secret_prod: string | null
+  client_secret_cert: string | null
+  notes: string | null
+  sabre_company_credential_attachments?: CredAttachment[]
+  created_at: string
+}
+
 const EMPTY = { pcc: '', company_name: '', agent_id: '', password: '', notes: '', source: '' }
+const EMPTY_CRED = { company_name: '', application_name: '', client_id: '', client_secret_prod: '', client_secret_cert: '', notes: '' }
 
 const GDS_NAME = 'Sabre'
 
@@ -97,6 +117,8 @@ function AutocompleteInput({ value, onChange, options, placeholder }: { value: s
 
 export default function WebServiceSabrePage() {
   const supabase = createClient()
+  const [activeTab, setActiveTab] = useState<'pcc' | 'company'>('pcc')
+
   const [records, setRecords] = useState<WebServiceRow[]>([])
   const [pccOptions, setPccOptions] = useState<string[]>([])
   const [gdsId, setGdsId] = useState<number | null>(null)
@@ -125,16 +147,33 @@ export default function WebServiceSabrePage() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null)
 
+  // ---- Company Credentials tab state ----
+  const [credRecords, setCredRecords] = useState<CompanyCredRow[]>([])
+  const [credLoading, setCredLoading] = useState(true)
+  const [credSearch, setCredSearch] = useState('')
+  const [credModalOpen, setCredModalOpen] = useState(false)
+  const [editingCred, setEditingCred] = useState<CompanyCredRow | null>(null)
+  const [credForm, setCredForm] = useState(EMPTY_CRED)
+  const [credSaving, setCredSaving] = useState(false)
+  const [credError, setCredError] = useState('')
+  const [revealedProdIds, setRevealedProdIds] = useState<Set<number>>(new Set())
+  const [revealedCertIds, setRevealedCertIds] = useState<Set<number>>(new Set())
+
+  const credAttachInputRef = useRef<HTMLInputElement>(null)
+  const [newCredAttachFiles, setNewCredAttachFiles] = useState<File[]>([])
+  const [credAttachError, setCredAttachError] = useState('')
+  const [removeCredAttachmentIds, setRemoveCredAttachmentIds] = useState<Set<number>>(new Set())
+
   useEffect(() => { fetchAll() }, [])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setModalOpen(false) }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { setModalOpen(false); setCredModalOpen(false) } }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
   async function fetchAll() {
-    setLoading(true)
+    setLoading(true); setCredLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -143,17 +182,19 @@ export default function WebServiceSabrePage() {
     const { data: gds } = await supabase.from('gds').select('id').eq('name', GDS_NAME).maybeSingle()
     const thisGdsId = gds?.id ?? null
     setGdsId(thisGdsId)
-    const [{ data: ws }, { data: pcc }] = await Promise.all([
+    const [{ data: ws }, { data: pcc }, { data: creds }] = await Promise.all([
       thisGdsId
         ? supabase.from('web_service').select('*, web_service_attachments(id, file_name, file_path, file_size)').eq('gds_id', thisGdsId).order('pcc').order('company_name')
         : Promise.resolve({ data: [] as WebServiceRow[] }),
       thisGdsId
         ? supabase.from('pcc_list').select('pcc').eq('gds_id', thisGdsId)
         : Promise.resolve({ data: [] as { pcc: string }[] }),
+      supabase.from('sabre_company_credentials').select('*, sabre_company_credential_attachments(id, file_name, file_path, file_size)').order('company_name'),
     ])
     setRecords(ws ?? [])
     setPccOptions(Array.from(new Set((pcc ?? []).map(p => p.pcc))).sort())
-    setLoading(false)
+    setCredRecords(creds ?? [])
+    setLoading(false); setCredLoading(false)
   }
 
   function openAdd() { setEditing(null); setForm({ ...EMPTY, password: generateWsPassword() }); setError(''); resetAttachmentState(); setModalOpen(true) }
@@ -164,6 +205,7 @@ export default function WebServiceSabrePage() {
   }
 
   function resetAttachmentState() { setNewAttachFiles([]); setAttachError(''); setRemoveAttachmentIds(new Set()) }
+  function resetCredAttachmentState() { setNewCredAttachFiles([]); setCredAttachError(''); setRemoveCredAttachmentIds(new Set()) }
 
   function handlePickAttachments(files: FileList) {
     setAttachError('')
@@ -177,16 +219,26 @@ export default function WebServiceSabrePage() {
     if (picked.length) setNewAttachFiles(prev => [...prev, ...picked])
   }
 
-  function removeNewAttachment(index: number) {
-    setNewAttachFiles(prev => prev.filter((_, i) => i !== index))
+  function handlePickCredAttachments(files: FileList) {
+    setCredAttachError('')
+    const picked: File[] = []
+    for (const f of Array.from(files)) {
+      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!ATTACH_ALLOWED_EXT.includes(ext)) { setCredAttachError('Only .eml, .msg, .png, .jpg, .pdf, .xlsx, .csv, .doc/.docx files are allowed.'); continue }
+      if (f.size > ATTACH_MAX_SIZE) { setCredAttachError('Each file must be under 20MB.'); continue }
+      picked.push(f)
+    }
+    if (picked.length) setNewCredAttachFiles(prev => [...prev, ...picked])
   }
 
+  function removeNewAttachment(index: number) { setNewAttachFiles(prev => prev.filter((_, i) => i !== index)) }
+  function removeNewCredAttachment(index: number) { setNewCredAttachFiles(prev => prev.filter((_, i) => i !== index)) }
+
   function toggleRemoveExistingAttachment(id: number) {
-    setRemoveAttachmentIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setRemoveAttachmentIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+  function toggleRemoveExistingCredAttachment(id: number) {
+    setRemoveCredAttachmentIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
 
   async function handleSave() {
@@ -248,11 +300,84 @@ export default function WebServiceSabrePage() {
   }
 
   function toggleReveal(id: number) {
-    setRevealedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
+    setRevealedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
+  // ---- Company Credentials handlers ----
+  function openAddCred() { setEditingCred(null); setCredForm(EMPTY_CRED); setCredError(''); resetCredAttachmentState(); setCredModalOpen(true) }
+  function openEditCred(row: CompanyCredRow) {
+    setEditingCred(row)
+    setCredForm({
+      company_name: row.company_name, application_name: row.application_name ?? '',
+      client_id: row.client_id ?? '', client_secret_prod: row.client_secret_prod ?? '',
+      client_secret_cert: row.client_secret_cert ?? '', notes: row.notes ?? '',
     })
+    setCredError(''); resetCredAttachmentState(); setCredModalOpen(true)
+  }
+
+  async function handleSaveCred() {
+    if (!credForm.company_name.trim()) { setCredError('Company name is required.'); return }
+    setCredSaving(true); setCredError('')
+
+    const payload = {
+      gds_id: gdsId,
+      company_name: credForm.company_name.trim(),
+      application_name: credForm.application_name.trim() || null,
+      client_id: credForm.client_id.trim() || null,
+      client_secret_prod: credForm.client_secret_prod.trim() || null,
+      client_secret_cert: credForm.client_secret_cert.trim() || null,
+      notes: credForm.notes.trim() || null,
+      modified_at: new Date().toISOString(),
+    }
+    let credId = editingCred?.id ?? null
+    if (editingCred) {
+      const { error: e } = await supabase.from('sabre_company_credentials').update(payload).eq('id', editingCred.id)
+      if (e) { setCredError(e.message); setCredSaving(false); return }
+    } else {
+      const { data: inserted, error: e } = await supabase.from('sabre_company_credentials').insert(payload).select('id').single()
+      if (e) { setCredError(e.message); setCredSaving(false); return }
+      credId = inserted?.id ?? null
+    }
+
+    if (removeCredAttachmentIds.size > 0 && editingCred?.sabre_company_credential_attachments) {
+      const toRemove = editingCred.sabre_company_credential_attachments.filter(a => removeCredAttachmentIds.has(a.id))
+      if (toRemove.length) {
+        await supabase.storage.from(ATTACH_BUCKET).remove(toRemove.map(a => a.file_path))
+        await supabase.from('sabre_company_credential_attachments').delete().in('id', toRemove.map(a => a.id))
+      }
+    }
+    if (newCredAttachFiles.length > 0 && credId) {
+      const safeCompany = credForm.company_name.trim().replace(/[^a-zA-Z0-9-_]/g, '_')
+      for (const f of newCredAttachFiles) {
+        const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `sabre-company-credentials/${safeCompany}/${Date.now()}_${safeName}`
+        const { error: uploadErr } = await supabase.storage.from(ATTACH_BUCKET).upload(path, f)
+        if (uploadErr) { setCredError(`Attachment upload failed: ${uploadErr.message}`); setCredSaving(false); fetchAll(); return }
+        await supabase.from('sabre_company_credential_attachments').insert({ sabre_company_credential_id: credId, file_name: f.name, file_path: path, file_size: f.size })
+      }
+    }
+
+    setCredSaving(false); setCredModalOpen(false); resetCredAttachmentState(); fetchAll()
+  }
+
+  async function handleCredAttachmentDownload(att: CredAttachment) {
+    const { data } = await supabase.storage.from(ATTACH_BUCKET).createSignedUrl(att.file_path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  async function handleDeleteCred(row: CompanyCredRow) {
+    if (!confirm(`Delete company credentials for ${row.company_name}${row.application_name ? ` (${row.application_name})` : ''}? This cannot be undone.`)) return
+    await supabase.from('sabre_company_credentials').delete().eq('id', row.id)
+    const paths = (row.sabre_company_credential_attachments ?? []).map(a => a.file_path)
+    if (paths.length) await supabase.storage.from(ATTACH_BUCKET).remove(paths)
+    fetchAll()
+  }
+
+  function toggleRevealProd(id: number) {
+    setRevealedProdIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+  function toggleRevealCert(id: number) {
+    setRevealedCertIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
 
   function handleExport() {
@@ -331,6 +456,14 @@ export default function WebServiceSabrePage() {
     return matchPcc && matchSearch
   })
 
+  const filteredCreds = credRecords.filter(r => {
+    const term = credSearch.toLowerCase()
+    return !term
+      || r.company_name.toLowerCase().includes(term)
+      || (r.application_name ?? '').toLowerCase().includes(term)
+      || (r.client_id ?? '').toLowerCase().includes(term)
+  })
+
   const inpDark = (extra?: object) => ({ padding:'9px 12px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', width:'100%', boxSizing:'border-box' as const, ...extra })
   const lblDark = { fontSize:'12px', fontWeight:700, color:D.fgMuted, textTransform:'uppercase' as const, letterSpacing:'0.05em', marginBottom:'6px', display:'block' as const }
 
@@ -339,137 +472,285 @@ export default function WebServiceSabrePage() {
       <div style={{padding:'32px 28px 40px'}}>
 
         {/* Header */}
-        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'22px'}}>
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'16px', marginBottom:'18px'}}>
           <div>
             <h1 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'26px', fontWeight:700, letterSpacing:'-0.5px', color:D.fg, margin:0}}>{GDS_NAME} Web Service List</h1>
-            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Web service credentials by PCC / OID — {GDS_NAME}</p>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'5px'}}>Web service credentials — per PCC, or company-wide</p>
           </div>
-          <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
-            <button onClick={handleExport} disabled={filtered.length === 0}
-              style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor: filtered.length === 0 ? 'default' : 'pointer', opacity: filtered.length === 0 ? 0.5 : 1}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export
-            </button>
-            {isAdmin && (
-              <>
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} style={{display:'none'}} />
-                <button onClick={() => fileInputRef.current?.click()}
-                  style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer'}}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Import
-                </button>
-                <button onClick={openAdd}
-                  style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add Web Service
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-
-        {/* Filters */}
-        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
-          <div style={{position:'relative', flex:'1 1 240px'}}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search PCC, Agent ID, or company..." value={search} onChange={e => setSearch(e.target.value)}
-              style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box'}} />
-          </div>
-          <select value={filterPcc} onChange={e => setFilterPcc(e.target.value)}
-            style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'140px'}}>
-            <option value="all">All PCC / OID</option>
-            {Array.from(new Set(records.map(r => r.pcc))).sort().map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-
-        {/* Table */}
-        {loading ? (
-          <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>
-            {search || filterPcc !== 'all' ? 'No web services match your filters.' : 'No web services configured yet.'}
-          </div>
-        ) : (
-          <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
-            <table style={{width:'100%', borderCollapse:'collapse', minWidth:'900px'}}>
-              <thead>
-                <tr>
-                  {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Attachment', 'Actions'].map((h, i, arr) => (
-                    <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === arr.length - 1 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row, i) => {
-                  const revealed = revealedIds.has(row.id)
-                  return (
-                    <tr key={row.id} style={{borderBottom: i < filtered.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
-                      onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{padding:'12px 16px', fontFamily:'monospace', fontWeight:600, color:D.fg, fontSize:'14px'}}>{row.pcc}</td>
-                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted}}>{row.company_name ?? <span style={{color:D.fgDim}}>—</span>}</td>
-                      <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.agent_id}</td>
-                      <td style={{padding:'12px 16px'}}>
-                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                          <span style={{fontFamily:'monospace', fontSize:'13px', color:D.accent, fontWeight:600}}>
-                            {revealed ? row.password : '•'.repeat(Math.min(row.password.length, 10))}
-                          </span>
-                          <button onClick={() => toggleReveal(row.id)}
-                            style={{background:'none', border:'none', color:D.fgDim, cursor:'pointer', padding:'2px', display:'flex'}}
-                            title={revealed ? 'Hide' : 'Show'}>
-                            {revealed ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                            ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                      <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted, whiteSpace:'pre-wrap', maxWidth:'220px'}}>{row.notes ?? <span style={{color:D.fgDim}}>—</span>}</td>
-                      <td style={{padding:'12px 16px'}}>
-                        {row.web_service_attachments && row.web_service_attachments.length > 0 ? (
-                          <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
-                            {row.web_service_attachments.map(att => (
-                              <button key={att.id} onClick={() => handleAttachmentDownload(att)} title={att.file_name}
-                                style={{display:'flex', alignItems:'center', gap:'6px', background:'none', border:'none', color:D.accent, cursor:'pointer', padding:0, fontSize:'13px', fontWeight:600, maxWidth:'160px'}}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                                <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
-                              </button>
-                            ))}
-                          </div>
-                        ) : <span style={{color:D.fgDim}}>—</span>}
-                      </td>
-                      <td style={{padding:'12px 16px'}}>
-                        {isAdmin && (
-                          <div style={{display:'flex', gap:'6px', justifyContent:'flex-end'}}>
-                            <button onClick={() => openEdit(row)}
-                              style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
-                              onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
-                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
-                              Edit
-                            </button>
-                            <button onClick={() => handleDelete(row)}
-                              style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
-                              onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
-                              onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div style={{padding:'12px 16px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', fontSize:'13px', color:D.fgDim}}>
-              {filtered.length} of {records.length} web service{records.length !== 1 ? 's' : ''}
+          {activeTab === 'pcc' ? (
+            <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+              <button onClick={handleExport} disabled={filtered.length === 0}
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor: filtered.length === 0 ? 'default' : 'pointer', opacity: filtered.length === 0 ? 0.5 : 1}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
+              {isAdmin && (
+                <>
+                  <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFilePick} style={{display:'none'}} />
+                  <button onClick={() => fileInputRef.current?.click()}
+                    style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 15px', background:'transparent', border:`1px solid ${D.borderLight}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:D.fgMuted, cursor:'pointer'}}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Import
+                  </button>
+                  <button onClick={openAdd}
+                    style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Web Service
+                  </button>
+                </>
+              )}
             </div>
-          </div>
+          ) : (
+            isAdmin && (
+              <button onClick={openAddCred}
+                style={{display:'flex', alignItems:'center', gap:'7px', padding:'9px 17px', background:D.purple, border:`1px solid ${D.purple}`, borderRadius:'8px', fontSize:'14px', fontWeight:600, color:'#fff', cursor:'pointer'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Company Credential
+              </button>
+            )
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:'flex', gap:'4px', marginBottom:'20px', background:D.card, border:`1px solid ${D.border}`, padding:'4px', borderRadius:'10px', width:'fit-content'}}>
+          {([['pcc', 'Per PCC'], ['company', 'Company Credentials']] as const).map(([tab, label]) => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{
+                padding:'9px 18px', borderRadius:'8px', fontSize:'14px', fontWeight:600, border:'none', cursor:'pointer',
+                background: activeTab === tab ? (tab === 'pcc' ? D.accent : D.purple) : 'transparent',
+                color: activeTab === tab ? '#fff' : D.fgMuted,
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ============================== PER PCC TAB ============================== */}
+        {activeTab === 'pcc' && (
+          <>
+            {/* Filters */}
+            <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
+              <div style={{position:'relative', flex:'1 1 240px'}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Search PCC, Agent ID, or company..." value={search} onChange={e => setSearch(e.target.value)}
+                  style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box'}} />
+              </div>
+              <select value={filterPcc} onChange={e => setFilterPcc(e.target.value)}
+                style={{padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, cursor:'pointer', outline:'none', minWidth:'140px'}}>
+                <option value="all">All PCC / OID</option>
+                {Array.from(new Set(records.map(r => r.pcc))).sort().map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+
+            {/* Table */}
+            {loading ? (
+              <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div>
+            ) : filtered.length === 0 ? (
+              <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>
+                {search || filterPcc !== 'all' ? 'No web services match your filters.' : 'No web services configured yet.'}
+              </div>
+            ) : (
+              <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
+                <table style={{width:'100%', borderCollapse:'collapse', minWidth:'900px'}}>
+                  <thead>
+                    <tr>
+                      {['PCC / OID', 'Company', 'Agent ID / WS', 'Password', 'Notes', 'Attachment', 'Actions'].map((h, i, arr) => (
+                        <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === arr.length - 1 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((row, i) => {
+                      const revealed = revealedIds.has(row.id)
+                      return (
+                        <tr key={row.id} style={{borderBottom: i < filtered.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                          onMouseEnter={e => (e.currentTarget.style.background = D.accentSoft)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <td style={{padding:'12px 16px', fontFamily:'monospace', fontWeight:600, color:D.fg, fontSize:'14px'}}>{row.pcc}</td>
+                          <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted}}>{row.company_name ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                          <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.agent_id}</td>
+                          <td style={{padding:'12px 16px'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                              <span style={{fontFamily:'monospace', fontSize:'13px', color:D.accent, fontWeight:600}}>
+                                {revealed ? row.password : '•'.repeat(Math.min(row.password.length, 10))}
+                              </span>
+                              <button onClick={() => toggleReveal(row.id)}
+                                style={{background:'none', border:'none', color:D.fgDim, cursor:'pointer', padding:'2px', display:'flex'}}
+                                title={revealed ? 'Hide' : 'Show'}>
+                                {revealed ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                ) : (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted, whiteSpace:'pre-wrap', maxWidth:'220px'}}>{row.notes ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                          <td style={{padding:'12px 16px'}}>
+                            {row.web_service_attachments && row.web_service_attachments.length > 0 ? (
+                              <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                {row.web_service_attachments.map(att => (
+                                  <button key={att.id} onClick={() => handleAttachmentDownload(att)} title={att.file_name}
+                                    style={{display:'flex', alignItems:'center', gap:'6px', background:'none', border:'none', color:D.accent, cursor:'pointer', padding:0, fontSize:'13px', fontWeight:600, maxWidth:'160px'}}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                    <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : <span style={{color:D.fgDim}}>—</span>}
+                          </td>
+                          <td style={{padding:'12px 16px'}}>
+                            {isAdmin && (
+                              <div style={{display:'flex', gap:'6px', justifyContent:'flex-end'}}>
+                                <button onClick={() => openEdit(row)}
+                                  style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                  onMouseOver={e => { e.currentTarget.style.background=D.accentSoft; e.currentTarget.style.borderColor=D.accent; e.currentTarget.style.color=D.accent }}
+                                  onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                  Edit
+                                </button>
+                                <button onClick={() => handleDelete(row)}
+                                  style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                  onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                                  onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div style={{padding:'12px 16px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', fontSize:'13px', color:D.fgDim}}>
+                  {filtered.length} of {records.length} web service{records.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Add/Edit Modal */}
+        {/* ============================== COMPANY CREDENTIALS TAB ============================== */}
+        {activeTab === 'company' && (
+          <>
+            <p style={{fontSize:'13px', color:D.fgMuted, marginTop:'-6px', marginBottom:'16px'}}>
+              These credentials apply to every PCC under the company — not tied to a single PCC/OID.
+            </p>
+
+            {/* Filter */}
+            <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'18px', flexWrap:'wrap'}}>
+              <div style={{position:'relative', flex:'1 1 240px'}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'13px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Search company, application, or Client ID..." value={credSearch} onChange={e => setCredSearch(e.target.value)}
+                  style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.card, color:D.fg, outline:'none', boxSizing:'border-box'}} />
+              </div>
+            </div>
+
+            {/* Table */}
+            {credLoading ? (
+              <div style={{textAlign:'center', padding:'60px', color:D.fgMuted, fontSize:'14px'}}>Loading...</div>
+            ) : filteredCreds.length === 0 ? (
+              <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'60px', textAlign:'center', color:D.fgMuted, fontSize:'14px'}}>
+                {credSearch ? 'No company credentials match your search.' : 'No company-wide credentials configured yet.'}
+              </div>
+            ) : (
+              <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', overflow:'auto', maxHeight:'75vh'}}>
+                <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1040px'}}>
+                  <thead>
+                    <tr>
+                      {['Company', 'Application', 'Client ID', 'Client Secret (PROD)', 'Client Secret (CERT)', 'Attachment', 'Actions'].map((h, i, arr) => (
+                        <th key={h} style={{padding:'12px 16px', fontSize:'13px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:D.fgDim, textAlign: i === arr.length - 1 ? 'right' : 'left', borderBottom:`1px solid ${D.border}`, background:D.card, whiteSpace:'nowrap', position:'sticky', top:0, zIndex:2}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCreds.map((row, i) => {
+                      const prodRevealed = revealedProdIds.has(row.id)
+                      const certRevealed = revealedCertIds.has(row.id)
+                      return (
+                        <tr key={row.id} style={{borderBottom: i < filteredCreds.length - 1 ? `1px solid ${D.border}` : 'none', transition:'background 0.15s'}}
+                          onMouseEnter={e => (e.currentTarget.style.background = D.purpleSoft)}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <td style={{padding:'12px 16px', fontWeight:600, color:D.fg, fontSize:'14px'}}>{row.company_name}</td>
+                          <td style={{padding:'12px 16px', fontSize:'13px', color:D.fgMuted}}>{row.application_name ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                          <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:'13px', color:D.fgMuted}}>{row.client_id ?? <span style={{color:D.fgDim}}>—</span>}</td>
+                          <td style={{padding:'12px 16px'}}>
+                            {row.client_secret_prod ? (
+                              <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                <span style={{fontFamily:'monospace', fontSize:'13px', color:D.purple, fontWeight:600}}>
+                                  {prodRevealed ? row.client_secret_prod : '•'.repeat(Math.min(row.client_secret_prod.length, 10))}
+                                </span>
+                                <button onClick={() => toggleRevealProd(row.id)} style={{background:'none', border:'none', color:D.fgDim, cursor:'pointer', padding:'2px', display:'flex'}} title={prodRevealed ? 'Hide' : 'Show'}>
+                                  {prodRevealed ? (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                  ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  )}
+                                </button>
+                              </div>
+                            ) : <span style={{color:D.fgDim}}>—</span>}
+                          </td>
+                          <td style={{padding:'12px 16px'}}>
+                            {row.client_secret_cert ? (
+                              <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                <span style={{fontFamily:'monospace', fontSize:'13px', color:D.purple, fontWeight:600}}>
+                                  {certRevealed ? row.client_secret_cert : '•'.repeat(Math.min(row.client_secret_cert.length, 10))}
+                                </span>
+                                <button onClick={() => toggleRevealCert(row.id)} style={{background:'none', border:'none', color:D.fgDim, cursor:'pointer', padding:'2px', display:'flex'}} title={certRevealed ? 'Hide' : 'Show'}>
+                                  {certRevealed ? (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                  ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  )}
+                                </button>
+                              </div>
+                            ) : <span style={{color:D.fgDim}}>—</span>}
+                          </td>
+                          <td style={{padding:'12px 16px'}}>
+                            {row.sabre_company_credential_attachments && row.sabre_company_credential_attachments.length > 0 ? (
+                              <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                {row.sabre_company_credential_attachments.map(att => (
+                                  <button key={att.id} onClick={() => handleCredAttachmentDownload(att)} title={att.file_name}
+                                    style={{display:'flex', alignItems:'center', gap:'6px', background:'none', border:'none', color:D.purple, cursor:'pointer', padding:0, fontSize:'13px', fontWeight:600, maxWidth:'160px'}}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                    <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : <span style={{color:D.fgDim}}>—</span>}
+                          </td>
+                          <td style={{padding:'12px 16px'}}>
+                            {isAdmin && (
+                              <div style={{display:'flex', gap:'6px', justifyContent:'flex-end'}}>
+                                <button onClick={() => openEditCred(row)}
+                                  style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                  onMouseOver={e => { e.currentTarget.style.background=D.purpleSoft; e.currentTarget.style.borderColor=D.purple; e.currentTarget.style.color=D.purple }}
+                                  onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                  Edit
+                                </button>
+                                <button onClick={() => handleDeleteCred(row)}
+                                  style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
+                                  onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
+                                  onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div style={{padding:'12px 16px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', fontSize:'13px', color:D.fgDim}}>
+                  {filteredCreds.length} of {credRecords.length} compan{credRecords.length !== 1 ? 'ies' : 'y'}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Add/Edit Modal — Per PCC */}
         {modalOpen && (
           <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
             onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
@@ -572,6 +853,106 @@ export default function WebServiceSabrePage() {
               <button onClick={() => setModalOpen(false)} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'8px', color:D.fgMuted, cursor:'pointer'}}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{padding:'9px 20px', fontSize:'14px', fontWeight:600, background:D.accent, border:`1px solid ${D.accent}`, borderRadius:'8px', color:'#fff', cursor:'pointer', opacity:saving?0.6:1}}>
                 {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Web Service'}
+              </button>
+            </div>
+          </div>
+          </div>
+        )}
+
+        {/* Add/Edit Modal — Company Credentials */}
+        {credModalOpen && (
+          <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px'}}
+            onClick={e => { if (e.target === e.currentTarget) setCredModalOpen(false) }}>
+          <div style={{width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto', background:D.card, border:`1px solid ${D.purple}`, borderRadius:'14px', padding:'22px', boxShadow:`0 20px 60px rgba(0,0,0,0.4), 0 0 0 3px ${D.purpleSoft}`}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'18px'}}>
+              <h2 style={{fontFamily:"'Space Grotesk', sans-serif", fontSize:'17px', fontWeight:700, color:D.fg, margin:0}}>{editingCred ? 'Edit Company Credential' : 'Add Company Credential'}</h2>
+              <button onClick={() => setCredModalOpen(false)} style={{background:'none', border:'none', color:D.fgDim, fontSize:'18px', cursor:'pointer'}}>✕</button>
+            </div>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>Company Name <span style={{color:D.danger}}>*</span></label>
+              <input type="text" value={credForm.company_name} onChange={e => setCredForm(f => ({ ...f, company_name: e.target.value }))} placeholder="e.g. PETER STUYVESANT TRAVEL SDN BHD" style={inpDark()} />
+            </div>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>Application Name</label>
+              <input type="text" value={credForm.application_name} onChange={e => setCredForm(f => ({ ...f, application_name: e.target.value }))} placeholder="e.g. TRIPSHERE" style={{...inpDark(), fontFamily:'monospace'}} />
+            </div>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={lblDark}>Client ID</label>
+              <input type="text" value={credForm.client_id} onChange={e => setCredForm(f => ({ ...f, client_id: e.target.value }))} style={{...inpDark(), fontFamily:'monospace'}} />
+            </div>
+
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+              <div>
+                <label style={lblDark}>Client Secret (PROD)</label>
+                <input type="text" value={credForm.client_secret_prod} onChange={e => setCredForm(f => ({ ...f, client_secret_prod: e.target.value }))} style={{...inpDark(), fontFamily:'monospace'}} />
+              </div>
+              <div>
+                <label style={lblDark}>Client Secret (CERT)</label>
+                <input type="text" value={credForm.client_secret_cert} onChange={e => setCredForm(f => ({ ...f, client_secret_cert: e.target.value }))} style={{...inpDark(), fontFamily:'monospace'}} />
+              </div>
+            </div>
+
+            <div style={{marginBottom:'14px'}}>
+              <label style={{fontSize:'13px', fontWeight:600, color:D.purple, textTransform:'none' as const, letterSpacing:'normal', marginBottom:'6px', display:'block' as const}}>Attachments (.eml, .msg, .png, .jpg, .pdf, .xlsx, .csv)</label>
+              <input ref={credAttachInputRef} type="file" accept={ATTACH_ACCEPT} multiple style={{display:'none'}}
+                onChange={e => { if (e.target.files && e.target.files.length) handlePickCredAttachments(e.target.files); e.target.value = '' }} />
+              <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                <button type="button" onClick={() => credAttachInputRef.current?.click()}
+                  style={{padding:'6px 14px', fontSize:'13px', fontWeight:500, fontFamily:'inherit', border:'1px solid #a8a8a8', borderRadius:'4px', background:'linear-gradient(to bottom, #f8f8f8, #e8e8e8)', color:'#1a1a1a', cursor:'pointer', boxShadow:'0 1px 1px rgba(0,0,0,0.1)'}}
+                  onMouseOver={e => { e.currentTarget.style.background='linear-gradient(to bottom, #ffffff, #f0f0f0)' }}
+                  onMouseOut={e => { e.currentTarget.style.background='linear-gradient(to bottom, #f8f8f8, #e8e8e8)' }}>
+                  Choose Files
+                </button>
+                <span style={{fontSize:'13px', color:D.fgDim}}>
+                  {newCredAttachFiles.length > 0 ? `${newCredAttachFiles.length} file${newCredAttachFiles.length > 1 ? 's' : ''} selected` : 'No file chosen'}
+                </span>
+              </div>
+
+              {((editingCred?.sabre_company_credential_attachments && editingCred.sabre_company_credential_attachments.length > 0) || newCredAttachFiles.length > 0) && (
+                <div style={{display:'flex', flexWrap:'wrap', gap:'6px', marginTop:'10px'}}>
+                  {editingCred?.sabre_company_credential_attachments?.map(att => {
+                    const marked = removeCredAttachmentIds.has(att.id)
+                    return (
+                      <span key={`existing-${att.id}`} title={att.file_name}
+                        style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'5px 6px 5px 10px', fontSize:'12px', border:`1px solid ${D.border}`, borderRadius:'999px', background:D.bg, color: marked ? D.fgDim : D.purple, textDecoration: marked ? 'line-through' : 'none', maxWidth:'220px'}}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{att.file_name}</span>
+                        <button type="button" onClick={() => toggleRemoveExistingCredAttachment(att.id)} title={marked ? 'Keep this attachment' : 'Remove this attachment'}
+                          style={{background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, fontSize:'13px', lineHeight:1, flexShrink:0}}>
+                          {marked ? '↺' : '✕'}
+                        </button>
+                      </span>
+                    )
+                  })}
+                  {newCredAttachFiles.map((f, i) => (
+                    <span key={`new-${i}`} title={f.name}
+                      style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'5px 6px 5px 10px', fontSize:'12px', border:`1px solid ${D.border}`, borderRadius:'999px', background:D.bg, color:D.fg, maxWidth:'220px'}}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{f.name}</span>
+                      <button type="button" onClick={() => removeNewCredAttachment(i)} title="Remove this file"
+                        style={{background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, fontSize:'13px', lineHeight:1, flexShrink:0}}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {credAttachError && <p style={{fontSize:'11px', color:D.danger, marginTop:'6px'}}>{credAttachError}</p>}
+              <p style={{fontSize:'11px', color:D.fgDim, marginTop:'6px'}}>Up to 20MB each. You can attach more than one file — e.g. the confirmation email.</p>
+            </div>
+
+            <div style={{marginBottom:'18px'}}>
+              <label style={lblDark}>Notes</label>
+              <textarea value={credForm.notes} onChange={e => setCredForm(f => ({ ...f, notes: e.target.value }))} placeholder="Type any notes here — as much as you need" rows={4}
+                style={inpDark({ resize:'vertical' as const, fontFamily:'inherit', lineHeight:1.5 })} />
+            </div>
+
+            {credError && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{credError}</p>}
+            <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+              <button onClick={() => setCredModalOpen(false)} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'8px', color:D.fgMuted, cursor:'pointer'}}>Cancel</button>
+              <button onClick={handleSaveCred} disabled={credSaving} style={{padding:'9px 20px', fontSize:'14px', fontWeight:600, background:D.purple, border:`1px solid ${D.purple}`, borderRadius:'8px', color:'#fff', cursor:'pointer', opacity:credSaving?0.6:1}}>
+                {credSaving ? 'Saving...' : editingCred ? 'Save Changes' : 'Add Company Credential'}
               </button>
             </div>
           </div>

@@ -62,12 +62,7 @@ export default function TravelportUsersPage() {
   const [records, setRecords] = useState<TravelportUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
   const [otaClients, setOtaClients] = useState<OTAClient[]>([])
-<<<<<<< Updated upstream
   const [pccList, setPccList] = useState<{pcc:string; ota_client?: {company_name?:string} | null}[]>([])
-=======
-  const [pccList, setPccList] = useState<{pcc:string; ota_client_id?: number | null; ota_client?: {company_name?:string} | null}[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
->>>>>>> Stashed changes
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('active')
@@ -92,15 +87,15 @@ export default function TravelportUsersPage() {
     const [{ data: tpData }, { data: usersData }, { data: otaData }, { data: pccData }] = await Promise.all([
       supabase.from('travelport_user').select('*, users:user_id(id, first_name, last_name, email_address), ota_client:ota_client_id(id, company_name)').order('sign_on_id'),
       supabase.from('users').select('id, first_name, last_name, email_address').order('first_name'),
-      supabase.from('ota_client').select('id, company_name').order('company_name'),
+      supabase.from('pcc_name').select('id, company_name').order('company_name'),
       tpGds?.id
-        ? supabase.from('pcc_list').select('pcc, ota_client_id, ota_client:ota_client_id(company_name)').eq('gds_id', tpGds.id).order('pcc')
+        ? supabase.from('pcc_list').select('pcc, ota_client:ota_client_id(company_name)').eq('gds_id', tpGds.id).order('pcc')
         : Promise.resolve({ data: [] as {pcc:string; ota_client?: {company_name?:string} | null}[] }),
     ])
     setRecords(tpData ?? [])
     setUsersList(usersData ?? [])
     setOtaClients(otaData ?? [])
-    setPccList((pccData as unknown as {pcc:string; ota_client_id?: number | null; ota_client?: {company_name?:string} | null}[]) ?? [])
+    setPccList((pccData as unknown as {pcc:string; ota_client?: {company_name?:string} | null}[]) ?? [])
     setLoading(false)
   }
 
@@ -461,36 +456,14 @@ export default function TravelportUsersPage() {
           </div>
 
           {/* 3. GTID + PCC */}
-<<<<<<< Updated upstream
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
             <div><label style={lblDark}>GTID</label>
               <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" style={{...inpDark(), fontFamily:'monospace', textTransform:'uppercase'}} /></div>
             <div><label style={lblDark}>PCC</label>
               <select value={form.pcc} onChange={e => setForm(f => ({ ...f, pcc: e.target.value }))} style={{...inpDark({cursor:'pointer'}), fontFamily:'monospace', textTransform:'uppercase'}}>
-=======
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">GTID</label>
-              <input type="text" value={form.gtid} onChange={e => setForm(f => ({ ...f, gtid: e.target.value.toUpperCase() }))} placeholder="e.g. GT456" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 font-mono uppercase" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1.5">PCC</label>
-              <select value={form.pcc} onChange={e => {
-                  const newPcc = e.target.value
-                  const match = pccList.find(p => p.pcc === newPcc)
-                  setForm(f => ({ ...f, pcc: newPcc, ota_client_id: match?.ota_client_id ?? '' }))
-                }} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white font-mono uppercase">
->>>>>>> Stashed changes
                 <option value="">- Select PCC -</option>
                 {[...new Set(pccList.map(p => p.pcc))].sort().map(pcc => <option key={pcc} value={pcc}>{pcc}</option>)}
-              </select>
-              {form.pcc && (
-                (() => {
-                  const match = pccList.find(p => p.pcc === form.pcc)
-                  const clientName = (match?.ota_client as {company_name?: string} | null | undefined)?.company_name
-                  return clientName
-                    ? <p className="text-xs text-emerald-600 mt-1 font-medium">✓ Links to OTA Client: {clientName}</p>
-                    : <p className="text-xs text-amber-600 mt-1">⚠ No OTA Client linked in GDS Access Record for this PCC.</p>
-                })()
-              )}
-            </div>
+              </select></div>
           </div>
 
           {/* 4. Status */}
