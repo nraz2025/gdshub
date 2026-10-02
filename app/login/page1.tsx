@@ -34,7 +34,7 @@ export default function LoginPage() {
     setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError(error.message); setLoading(false) }
-    else { router.push('/gds-access-record'); router.refresh() }
+    else { router.push('/dashboard'); router.refresh() }
   }
 
   // ── SIGN UP ───────────────────────────────────────────────────

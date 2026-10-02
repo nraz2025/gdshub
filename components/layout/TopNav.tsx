@@ -174,12 +174,12 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
 
           {/* Nav links — desktop */}
           <div className="hidden lg:flex" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '6px 2px', flex: 1, minWidth: 0, padding: '6px 0' }}>
-            {visibleGroups.map((g, gi) => {
+            {visibleGroups.map((g) => {
               const isActiveGroup = activeGroup?.key === g.key
               const isSingle = g.items.length === 1 && !g.items[0].subItems
               return (
                 <div key={g.key} style={{ display: 'flex', alignItems: 'center' }}>
-                  {gi > 0 && <div style={{ width: '1px', height: '20px', background: T.border, margin: '0 6px', flexShrink: 0 }} />}
+                  <div style={{ width: '1px', height: '20px', background: T.border, margin: '0 6px', flexShrink: 0 }} />
                   {isSingle ? (
                     <Link href={g.items[0].href}
                       style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 13px', fontSize: '14px', fontWeight: 600,

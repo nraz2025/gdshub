@@ -119,6 +119,7 @@ export default function GDSAccessRecordPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPccFunc, setFilterPccFunc] = useState('')
+  const [filterOrg, setFilterOrg] = useState('')
 
   // Add/Edit modal
   const [modalOpen, setModalOpen] = useState(false)
@@ -178,7 +179,7 @@ export default function GDSAccessRecordPage() {
 
   // The actual paginated, server-filtered fetch — reruns whenever the page,
   // page size, settled search term, or either dropdown filter changes.
-  useEffect(() => { fetchRecords() }, [currentPage, pageSize, debouncedSearch, filterStatus, filterPccFunc])
+  useEffect(() => { fetchRecords() }, [currentPage, pageSize, debouncedSearch, filterStatus, filterPccFunc, filterOrg])
 
   const PCC_JOIN_SELECT = `
     *, gds:gds_id(id, name),
@@ -195,6 +196,7 @@ export default function GDSAccessRecordPage() {
       p_search: debouncedSearch.trim(),
       p_status: filterStatus,
       p_pcc_func: filterPccFunc,
+      p_org: filterOrg,
       p_limit: limit,
       p_offset: offset,
     })
@@ -623,7 +625,7 @@ export default function GDSAccessRecordPage() {
 
         {/* Filters */}
         <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'16px', marginBottom:'18px'}}>
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr auto', alignItems:'flex-end', gap:'12px', width:'100%'}}>
+          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr auto', alignItems:'flex-end', gap:'12px', width:'100%'}}>
 
             {/* Unified search — Organisation, PCC, PCC Name, GDS */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
@@ -636,6 +638,18 @@ export default function GDSAccessRecordPage() {
                   onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
                   onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }} />
               </div>
+            </div>
+
+            {/* Organisation */}
+            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Organisation</label>
+              <select value={filterOrg} onChange={e => { setFilterOrg(e.target.value); setCurrentPage(1) }}
+                style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
+                onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
+                onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
+                <option value="">All</option>
+                {orgList.map(o => <option key={o.id} value={o.organisation}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>)}
+              </select>
             </div>
 
             {/* PCC Functionality */}
@@ -665,7 +679,7 @@ export default function GDSAccessRecordPage() {
             {/* Reset button */}
             <div style={{display:'flex', alignItems:'flex-end'}}>
               <button
-                onClick={() => { setSearch(''); setDebouncedSearch(''); setFilterStatus('all'); setFilterPccFunc(''); setCurrentPage(1) }}
+                onClick={() => { setSearch(''); setDebouncedSearch(''); setFilterStatus('all'); setFilterPccFunc(''); setFilterOrg(''); setCurrentPage(1) }}
                 title="Reset filters"
                 style={{display:'flex', alignItems:'center', justifyContent:'center', width:'38px', height:'38px', background:D.bg, color:D.fgMuted, border:`1px solid ${D.border}`, borderRadius:'8px', cursor:'pointer', flexShrink:0}}
                 onMouseOver={e => { e.currentTarget.style.color=D.accent; e.currentTarget.style.borderColor=D.accent }}
