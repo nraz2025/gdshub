@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
-import type { GDS } from '@/types'
+import type { GDS, PCCList, Organisation } from '@/types'
 
 const EMPTY: Partial<GDS> = { name: '' }
 
@@ -26,19 +26,27 @@ const GDS_STYLE: Record<string, { color: string; soft: string; gradient: string 
   Travelport: { color: '#58a6ff', soft: 'rgba(88,166,255,0.10)',  gradient: 'linear-gradient(135deg,#58a6ff,#388bfd)' },
 }
 const DEFAULT_STYLE = { color: '#a371f7', soft: 'rgba(163,113,247,0.10)', gradient: 'linear-gradient(135deg,#a371f7,#8b5cf6)' }
+const GDS_COLORS: Record<string, string> = {
+  Amadeus:    'bg-purple-50 text-purple-700 border-purple-200',
+  Sabre:      'bg-sky-50 text-sky-700 border-sky-200',
+  Travelport: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
 
 export default function GDSPage() {
   const supabase = createClient()
   const [records, setRecords] = useState<GDS[]>([])
+  const [pccList, setPccList] = useState<PCCList[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [pccOpen, setPccOpen] = useState(false)
+  const [selectedGds, setSelectedGds] = useState<GDS | null>(null)
   const [form, setForm] = useState<Partial<GDS>>(EMPTY)
   const [editing, setEditing] = useState<GDS | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [sortCol, setSortCol] = useState<'name' | 'created' | null>(null)
+  const [sortCol, setSortCol] = useState<'name' | 'pccs' | 'created' | null>(null)
   const [sortDir, setSortDir] = useState<1 | -1>(1)
 
   useEffect(() => { fetchAll() }, [])
@@ -50,14 +58,26 @@ export default function GDSPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setIsAdmin(profile?.role === 'admin')
     }
-    const { data } = await supabase.from('gds').select('*').order('name')
+    const [{ data }, { data: pccData }] = await Promise.all([
+      supabase.from('gds').select('*').order('name'),
+      supabase.from('pcc_list').select('id, pcc, gds_id, org_id, status, organisation:org_id(id, organisation)').order('pcc'),
+    ])
     setRecords(data ?? [])
+    setPccList(pccData ?? [])
     setLoading(false)
   }
+
+  // Every PCC/OID record (pcc_list row) tied to this GDS — the same shape
+  // as Organisation's linkedPCCs, just keyed by gds_id instead of org_id.
+  const linkedPCCs = (gdsId: number) => pccList.filter(p => {
+    const rawId = (p as {gds_id?: number | null}).gds_id
+    return rawId === gdsId
+  })
 
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true) }
   function openEdit(row: GDS) { setEditing(row); setForm({ name: row.name }); setError(''); setModalOpen(true) }
   function openDelete(row: GDS) { setEditing(row); setDeleteOpen(true) }
+  function openPCCs(row: GDS) { setSelectedGds(row); setPccOpen(true) }
 
   async function handleSave() {
     if (!form.name) { setError('GDS name is required.'); return }
@@ -85,12 +105,16 @@ export default function GDSPage() {
   }
   const sorted = [...records].sort((a, b) => {
     if (!sortCol) return 0
-    const av = sortCol === 'name' ? a.name.toLowerCase() : a.created_at
-    const bv = sortCol === 'name' ? b.name.toLowerCase() : b.created_at
+    let av: string | number = '', bv: string | number = ''
+    if (sortCol === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase() }
+    if (sortCol === 'pccs') { av = linkedPCCs(a.id).length; bv = linkedPCCs(b.id).length }
+    if (sortCol === 'created') { av = a.created_at; bv = b.created_at }
     if (av < bv) return -1 * sortDir
     if (av > bv) return 1 * sortDir
     return 0
   })
+
+  const selectedPCCs = selectedGds ? linkedPCCs(selectedGds.id) : []
 
   return (
     <div style={{fontFamily:"'DM Sans', Inter, system-ui, sans-serif", background:T.bg, minHeight:'100vh', color:T.text}}>
@@ -125,7 +149,7 @@ export default function GDSPage() {
             <table style={{width:'100%', borderCollapse:'collapse'}}>
               <thead>
                 <tr>
-                  {[{key:'name' as const, label:'GDS Name'}, {key:null, label:'Type'}, {key:null, label:'Status'}, {key:'created' as const, label:'Created'}].map((col, i) => (
+                  {[{key:'name' as const, label:'GDS Name'}, {key:null, label:'Type'}, {key:'pccs' as const, label:'PCC/OID'}, {key:null, label:'Status'}, {key:'created' as const, label:'Created'}].map((col, i) => (
                     <th key={i} onClick={() => col.key && toggleSort(col.key)}
                       style={{padding:'14px 18px', fontSize:'15px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.7px', color: sortCol===col.key ? T.accent : T.textDim, textAlign:'left', borderBottom:`1px solid ${T.border}`, background:'rgba(0,0,0,0.15)', cursor: col.key ? 'pointer' : 'default', whiteSpace:'nowrap'}}>
                       {col.label} {col.key && <span style={{marginLeft:'5px', fontSize:'10px', opacity: sortCol===col.key ? 1 : 0.4}}>{sortCol===col.key ? (sortDir===1?'↑':'↓') : '↕'}</span>}
@@ -137,6 +161,7 @@ export default function GDSPage() {
               <tbody>
                 {sorted.map((row, i) => {
                   const style = GDS_STYLE[row.name] ?? DEFAULT_STYLE
+                  const pccCount = linkedPCCs(row.id).length
                   return (
                     <tr key={row.id} style={{borderBottom: i < sorted.length - 1 ? `1px solid ${T.border}` : 'none', transition:'background 0.15s'}}
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(88,166,255,0.04)')}
@@ -152,6 +177,14 @@ export default function GDSPage() {
                       </td>
                       <td style={{padding:'16px 18px'}}>
                         <span style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'4px 10px', borderRadius:'6px', fontSize:'14px', fontWeight:600, background:style.soft, color:style.color}}>{row.name}</span>
+                      </td>
+                      <td style={{padding:'16px 18px'}}>
+                        {pccCount > 0
+                          ? <button onClick={() => openPCCs(row)}
+                              style={{display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:'28px', height:'26px', padding:'0 8px', borderRadius:'6px', fontSize:'15px', fontWeight:700, fontFamily:"'Space Grotesk', sans-serif", background:T.successSoft, color:T.success, border:'none', cursor:'pointer'}}>
+                              {pccCount}
+                            </button>
+                          : <span style={{fontSize:'15px', color:T.textDim}}>0</span>}
                       </td>
                       <td style={{padding:'16px 18px'}}>
                         <span style={{display:'inline-flex', alignItems:'center', gap:'7px', padding:'5px 12px', borderRadius:'20px', fontSize:'14px', fontWeight:600, background:T.successSoft, color:T.success}}>
@@ -232,6 +265,43 @@ export default function GDSPage() {
             <button onClick={handleDelete} disabled={saving} className="flex-1 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded font-semibold disabled:opacity-50">
               {saving ? 'Deleting...' : 'Delete'}
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Linked PCC/OID Modal ── */}
+      <Modal open={pccOpen} onClose={() => setPccOpen(false)} title={`PCC/OID - ${selectedGds?.name}`} size="md">
+        <div className="space-y-3">
+          {selectedPCCs.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-4">No PCC/OID records linked to this GDS.</p>
+          ) : (
+            <div className="border border-slate-200 rounded overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-semibold text-slate-500" style={{fontSize:'17px'}}>PCC / OID</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-slate-500" style={{fontSize:'17px'}}>Organisation</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-slate-500" style={{fontSize:'17px'}}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPCCs.map((pcc, i) => {
+                    const orgName = (pcc.organisation as Organisation)?.organisation ?? ''
+                    const gdsName = selectedGds?.name ?? ''
+                    return (
+                      <tr key={pcc.id} className={i < selectedPCCs.length - 1 ? 'border-b border-slate-50' : ''}>
+                        <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5" style={{fontSize:'17px', borderRadius:'6px', display:'inline-block', width:'110px', textAlign:'center'}}>{pcc.pcc}</span></td>
+                        <td className="px-4 py-2.5"><span className="text-slate-600" style={{fontSize:'17px'}}>{orgName || '—'}</span></td>
+                        <td className="px-4 py-2.5">{gdsName && <span className={`font-medium px-2.5 py-1 border ${GDS_COLORS[gdsName] ?? 'bg-slate-100 text-slate-600'}`} style={{fontSize:'15px', borderRadius:'6px', display:'inline-block'}}>{pcc.status}</span>}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex justify-end pt-1">
+            <button onClick={() => setPccOpen(false)} className="px-6 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-medium">Close</button>
           </div>
         </div>
       </Modal>

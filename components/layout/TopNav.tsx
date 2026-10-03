@@ -129,6 +129,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
   }, [])
 
   function canAccess(module: string) {
+    if (role === 'super_admin') return true
     if (Object.keys(permMap).length > 0) return permMap[module]?.can_access === true
     if (isAdmin) return true
     if (role === 'manager') return !['users', 'admin_panel'].includes(module)
@@ -258,7 +259,10 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
 
           {/* Right section */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '14px', flexShrink: 0 }}>
-            {isAdmin && (
+            {role === 'super_admin' && (
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#e3b341', background: 'rgba(227,179,65,0.10)', border: '1px solid rgba(227,179,65,0.30)', padding: '3px 9px', borderRadius: '20px' }}>Super Admin</span>
+            )}
+            {isAdmin && role !== 'super_admin' && (
               <span style={{ fontSize: '11px', fontWeight: 600, color: '#d29922', background: 'rgba(210,153,34,0.10)', border: '1px solid rgba(210,153,34,0.30)', padding: '3px 9px', borderRadius: '20px' }}>Admin</span>
             )}
             <span className="hidden sm:block" style={{ fontSize: '13px', color: T.fgMuted }}>{user.email}</span>
