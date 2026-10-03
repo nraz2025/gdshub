@@ -94,7 +94,6 @@ const GROUPS: NavGroup[] = [
       { label: 'Organisation', href: '/organisation', module: 'organisation', icon: <Ic path={ICONS.building} color="#d29922" /> },
       { label: 'Users List', href: '/users', module: 'users', icon: <Ic path={ICONS.users} color="#a371f7" /> },
       { label: 'GDS List', href: '/gds', module: 'gds', icon: <Ic path={ICONS.gds} color="#58a6ff" /> },
-      { label: 'PCC Group', href: '/pcc-group', module: 'client', icon: <Ic path={ICONS.group} color="#f78166" /> },
       { label: 'Admin Panel', href: '/admin', module: 'admin_panel', icon: <Ic path={ICONS.admin} color="#db61a2" /> },
     ],
   },
