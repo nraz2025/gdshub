@@ -11,9 +11,9 @@ import { createContext, useContext } from 'react'
 export interface AppContextValue {
   userId: string | null
   userEmail: string | null
-  role: string          // 'admin' | 'manager' | 'user'
-  isAdmin: boolean       // role === 'admin'
-  canManage: boolean     // role === 'admin' || role === 'manager' (the broader "can see admin-ish controls" check several pages use)
+  role: string          // 'super_admin' | 'admin' | 'manager' | 'user'
+  isAdmin: boolean       // role === 'admin' || role === 'super_admin'
+  canManage: boolean     // role === 'admin' || 'manager' || 'super_admin' (the broader "can see admin-ish controls" check several pages use)
   permMap: Record<string, { can_access: boolean; can_edit: boolean }>
 }
 

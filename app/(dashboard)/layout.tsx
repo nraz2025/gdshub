@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single()
 
   const role = (profile?.role as string) ?? 'user'
-  const isAdmin = role === 'admin'
+  const isAdmin = role === 'admin' || role === 'super_admin'
 
   const { data: perms } = await supabase
     .from('role_permissions')
@@ -42,7 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       userEmail: user.email ?? null,
       role,
       isAdmin,
-      canManage: role === 'admin' || role === 'manager',
+      canManage: role === 'admin' || role === 'manager' || role === 'super_admin',
       permMap,
     }}>
       <div style={{ minHeight: '100vh', background: '#0e1117' }}>

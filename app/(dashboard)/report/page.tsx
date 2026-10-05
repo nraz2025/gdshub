@@ -100,7 +100,7 @@ export default function ReportingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setIsAdmin(p?.role === 'admin')
+        setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
       }
       await loadTemplates()
       setLoading(false)

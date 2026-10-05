@@ -56,7 +56,7 @@ export default function GDSPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
+      setIsAdmin(['admin', 'super_admin'].includes(profile?.role ?? ''))
     }
     const [{ data }, { data: pccData }] = await Promise.all([
       supabase.from('gds').select('*').order('name'),
