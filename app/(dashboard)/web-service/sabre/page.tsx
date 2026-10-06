@@ -177,7 +177,7 @@ export default function WebServiceSabrePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(p?.role === 'admin')
+      setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
     }
     const { data: gds } = await supabase.from('gds').select('id').eq('name', GDS_NAME).maybeSingle()
     const thisGdsId = gds?.id ?? null

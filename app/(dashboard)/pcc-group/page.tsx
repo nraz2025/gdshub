@@ -94,7 +94,7 @@ export default function OTAClientPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(profile?.role === 'admin')
+      setIsAdmin(['admin', 'super_admin'].includes(profile?.role ?? ''))
     }
     const [{ data }, { data: groupsData }] = await Promise.all([
       supabase.from('ota_client').select('*, client_group:client_group_id(id, name)').order('company_name'),

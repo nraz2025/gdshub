@@ -86,7 +86,7 @@ export default function SabreQueueManagementPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(p?.role === 'admin')
+      setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
     }
     const { data: g } = await supabase.from('gds').select('id').eq('name', GDS_NAME).single()
     const thisGdsId = g?.id ?? null
