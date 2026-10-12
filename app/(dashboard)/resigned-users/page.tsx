@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
+import { usePerm } from '@/lib/context/AppContext'
 
 const T = {
   primary:    '#10B981',
@@ -91,7 +92,7 @@ const GDS_COLORS: Record<string, { bg: string; color: string; border: string }> 
 export default function ResignedUsersPage() {
   const supabase = createClient()
 
-  const [isAdmin, setIsAdmin]     = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('resigned_users')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [loading, setLoading]     = useState(true)
   const [records, setRecords]     = useState<ResignedUser[]>([])
   const [selected, setSelected]   = useState<ResignedUser | null>(null)
@@ -114,10 +115,6 @@ export default function ResignedUsersPage() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
-      }
       await load()
       setLoading(false)
     }

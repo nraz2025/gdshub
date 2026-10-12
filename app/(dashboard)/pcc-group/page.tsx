@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { OTAClient } from '@/types'
+import { usePerm } from '@/lib/context/AppContext'
 
 const T = {
   primary:    '#10B981',
@@ -62,7 +63,7 @@ export default function OTAClientPage() {
   const [newGroupName, setNewGroupName] = useState('')
   const [savingGroup, setSavingGroup] = useState(false)
 
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('client')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -92,10 +93,6 @@ export default function OTAClientPage() {
   async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(['admin', 'super_admin'].includes(profile?.role ?? ''))
-    }
     const [{ data }, { data: groupsData }] = await Promise.all([
       supabase.from('ota_client').select('*, client_group:client_group_id(id, name)').order('company_name'),
       supabase.from('client_group').select('id, name').order('name'),
@@ -341,12 +338,14 @@ export default function OTAClientPage() {
                     onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.color='#64748b';e.currentTarget.style.boxShadow='none'}}>
                     Edit
                   </button>
+                  {canDelete && (
                   <button onClick={()=>openDelete(row)}
                     style={{padding:'6px 14px',fontSize:'15px',fontWeight:500,color:'#ef4444',background:'#ffffff',border:'1px solid #fecaca',borderRadius:'8px',cursor:'pointer',transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)'}}
                     onMouseOver={e=>{e.currentTarget.style.background='#fef2f2';e.currentTarget.style.borderColor='#ef4444'}}
                     onMouseOut={e=>{e.currentTarget.style.background='#ffffff';e.currentTarget.style.borderColor='#fecaca'}}>
                     Delete
                   </button>
+                  )}
                 </>)}
               </div>
             </div>

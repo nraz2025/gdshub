@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
-import { useAppContext } from '@/lib/context/AppContext'
+import { usePerm } from '@/lib/context/AppContext'
 
 interface VendorContract {
   id: number
@@ -77,7 +77,7 @@ const EMPTY_FORM = {
 
 export default function ContractPage() {
   const supabase = createClient()
-  const { canManage: isAdmin, isAdmin: canEdit } = useAppContext()   // isAdmin = can view (admin or manager), canEdit = can upload/delete (admin only)
+  const { canEdit, canDelete } = usePerm('contract')   // Access Matrix: Edit tick = add/import/edit, Delete tick = delete
   const [records, setRecords] = useState<VendorContract[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -387,7 +387,7 @@ export default function ContractPage() {
                                       Edit
                                     </button>
                                   )}
-                                  {canEdit && (
+                                  {canDelete && (
                                     <button onClick={() => handleDelete(r)}
                                       style={{ fontSize: '12.5px', fontWeight: 600, color: D.fgMuted, background: 'transparent', border: `1px solid ${D.border}`, borderRadius: '6px', cursor: 'pointer', padding: '5px 10px' }}
                                       onMouseOver={e => { e.currentTarget.style.background = D.dangerSoft; e.currentTarget.style.borderColor = D.danger; e.currentTarget.style.color = D.danger }}

@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const isPublic = PUBLIC_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'))
 
   if (pathname === '/') {
-    return NextResponse.redirect(new URL(user ? '/dashboard' : '/login', request.url))
+    return NextResponse.redirect(new URL(user ? '/gds-access-record' : '/login', request.url))
   }
 
   if (!user && !isPublic) {
@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/gds-access-record', request.url))
   }
 
   return supabaseResponse

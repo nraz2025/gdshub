@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import type { GDS, PCCList, Organisation } from '@/types'
+import { usePerm } from '@/lib/context/AppContext'
 
 const EMPTY: Partial<GDS> = { name: '' }
 
@@ -36,7 +37,7 @@ export default function GDSPage() {
   const supabase = createClient()
   const [records, setRecords] = useState<GDS[]>([])
   const [pccList, setPccList] = useState<PCCList[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('gds')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -54,10 +55,6 @@ export default function GDSPage() {
   async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(['admin', 'super_admin'].includes(profile?.role ?? ''))
-    }
     const [{ data }, { data: pccData }] = await Promise.all([
       supabase.from('gds').select('*').order('name'),
       supabase.from('pcc_list').select('id, pcc, gds_id, org_id, status, organisation:org_id(id, organisation)').order('pcc'),
@@ -208,6 +205,7 @@ export default function GDSPage() {
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                               Edit
                             </button>
+                            {canDelete && (
                             <button onClick={() => openDelete(row)}
                               style={{padding:'6px 12px', fontSize:'14px', fontWeight:600, border:`1px solid ${T.border}`, borderRadius:'6px', background:'transparent', color:T.textMid, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px'}}
                               onMouseOver={e => { e.currentTarget.style.background=T.dangerSoft; e.currentTarget.style.borderColor=T.danger; e.currentTarget.style.color=T.danger }}
@@ -215,6 +213,7 @@ export default function GDSPage() {
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                               Delete
                             </button>
+                            )}
                           </div>
                         )}
                       </td>

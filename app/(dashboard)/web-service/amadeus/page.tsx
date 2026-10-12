@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
+import { usePerm } from '@/lib/context/AppContext'
 
 interface Attachment {
   id: number
@@ -104,7 +105,7 @@ export default function WebServiceAmadeusPage() {
   const [records, setRecords] = useState<WebServiceRow[]>([])
   const [pccOptions, setPccOptions] = useState<string[]>([])
   const [gdsId, setGdsId] = useState<number | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('web_service')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<WebServiceRow | null>(null)
@@ -140,10 +141,6 @@ export default function WebServiceAmadeusPage() {
   async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
-    }
     const { data: gds } = await supabase.from('gds').select('id').eq('name', GDS_NAME).maybeSingle()
     const thisGdsId = gds?.id ?? null
     setGdsId(thisGdsId)
@@ -468,12 +465,14 @@ export default function WebServiceAmadeusPage() {
                               onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                               Edit
                             </button>
+                            {canDelete && (
                             <button onClick={() => handleDelete(row)}
                               style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
                               onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                               onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                               Delete
                             </button>
+                            )}
                           </div>
                         )}
                       </td>

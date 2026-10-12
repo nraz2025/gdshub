@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
-import { useAppContext } from '@/lib/context/AppContext'
+import { usePerm } from '@/lib/context/AppContext'
 import type { PCCList, GDS, Organisation, OTAClient, GDSFunctionality } from '@/types'
 
 // Modal styling stays light (shared Modal component not touched this session)
@@ -105,7 +105,7 @@ interface ImportRow {
 
 export default function GDSAccessRecordPage() {
   const supabase = createClient()
-  const { canManage: isAdmin } = useAppContext()
+  const { canEdit: isAdmin, canDelete } = usePerm('gds_info')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [records, setRecords] = useState<PCCList[]>([])
@@ -748,12 +748,14 @@ export default function GDSAccessRecordPage() {
                                 onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                                 Edit
                               </button>
+                              {canDelete && (
                               <button onClick={() => openDelete(row as PCCList)}
                                 style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
                                 onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                                 onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                                 Delete
                               </button>
+                              )}
                             </div>
                           </td>
                         )}

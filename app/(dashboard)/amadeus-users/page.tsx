@@ -7,7 +7,7 @@ import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { AmadeusUser, User, OTAClient } from '@/types'
 import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
-import { useAppContext } from '@/lib/context/AppContext'
+import { usePerm } from '@/lib/context/AppContext'
 
 
 const T = {
@@ -75,7 +75,7 @@ interface ImportRow {
 
 export default function AmadeusUsersPage() {
   const supabase = createClient()
-  const { isAdmin } = useAppContext()
+  const { canEdit: isAdmin, canDelete } = usePerm('amadeus_users')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<AmadeusUser[]>([])
   const [usersList, setUsersList] = useState<User[]>([])
@@ -492,12 +492,14 @@ export default function AmadeusUsersPage() {
                         onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Edit
                       </button>
+                      {canDelete && (
                       <button onClick={()=>openDelete(row)}
                         style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
                         onMouseOver={e=>{ e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                         onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Delete
                       </button>
+                      )}
                     </>)}
                   </div>
                 </div>

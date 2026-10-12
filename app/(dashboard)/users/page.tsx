@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
-import { useAppContext } from '@/lib/context/AppContext'
+import { useAppContext, usePerm } from '@/lib/context/AppContext'
 import type { User } from '@/types'
 
 const EMPTY: Partial<User> = { first_name: '', last_name: '', email_address: '', ota_client: false, status: 'Active' }
@@ -81,7 +81,8 @@ function Avatar({ name, size = 36 }: { name: string; size?: number }) {
 
 export default function UsersPage() {
   const supabase = createClient()
-  const { isAdmin, userEmail: currentUserEmail } = useAppContext()
+  const { userEmail: currentUserEmail } = useAppContext()
+  const { canEdit: isAdmin, canDelete } = usePerm('users')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -404,12 +405,14 @@ export default function UsersPage() {
                         onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Edit
                       </button>
+                      {canDelete && (
                       <button onClick={() => openDelete(u)}
                         style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
                         onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                         onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Delete
                       </button>
+                      )}
                     </>)}
                   </div>
                 </div>

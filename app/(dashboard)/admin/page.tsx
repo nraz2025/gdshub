@@ -51,8 +51,10 @@ const ALL_MODULES = [
   { key: 'gds',               label: 'GDS'               },
   { key: 'gds_info',          label: 'GDS Access Record' },
   { key: 'queue_management',  label: 'Queue Management'  },
+  { key: 'web_service',       label: 'Web Service'       },
   { key: 'client',            label: 'PCC Group'         },
   { key: 'pricing',           label: 'Pricing'           },
+  { key: 'contract',          label: 'Contract'          },
   { key: 'users',             label: 'Users'             },
   { key: 'sabre_users',       label: 'Sabre Users'       },
   { key: 'amadeus_users',     label: 'Amadeus Users'     },
@@ -83,7 +85,7 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (me?.role !== 'admin' && me?.role !== 'super_admin') { window.location.href = '/dashboard'; return }
+      if (me?.role !== 'admin' && me?.role !== 'super_admin') { window.location.href = '/gds-access-record'; return }
       setCurrentUserId(user.id)
       fetchAll()
       fetchPermissions()
@@ -132,6 +134,9 @@ export default function AdminPage() {
     const updates: Partial<Permission> = { [field]: value }
     if (field === 'can_access' && !value) { updates.can_edit = false; updates.can_delete = false }
     if ((field === 'can_edit' || field === 'can_delete') && value) updates.can_access = true
+    // Delete needs Edit: granting Delete also grants Edit; removing Edit also removes Delete
+    if (field === 'can_delete' && value) updates.can_edit = true
+    if (field === 'can_edit' && !value) updates.can_delete = false
 
     await supabase.from('role_permissions')
       .upsert({ role, module, ...updates }, { onConflict: 'role,module' })
@@ -401,7 +406,7 @@ export default function AdminPage() {
           <div style={{padding:'12px 20px', borderTop:`1px solid ${D.border}`, background:'rgba(0,0,0,0.1)', display:'flex', flexWrap:'wrap', alignItems:'center', gap:'24px', fontSize:'16px', color:D.fgDim}}>
             <span style={{display:'flex', alignItems:'center', gap:'8px'}}><span style={{width:'22px', height:'22px', background:D.successSoft, color:D.success, borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'16px'}}>✓</span> Enabled</span>
             <span style={{display:'flex', alignItems:'center', gap:'8px'}}><span style={{width:'22px', height:'22px', background:'rgba(139,148,158,0.10)', color:D.fgDim, borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'16px'}}>✕</span> Disabled</span>
-            <span>View = can see the module · Edit = can add/edit records · Delete = can remove records · All = quick toggle for all three</span>
+            <span>View = can see the module · Edit = can add/import/edit records · Delete = can remove records (needs Edit) · All = quick toggle for all three</span>
           </div>
         </div>
       )}

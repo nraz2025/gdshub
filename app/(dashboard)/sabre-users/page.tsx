@@ -7,7 +7,7 @@ import Modal from '@/components/shared/Modal'
 import { getAuditFields } from '@/lib/audit'
 import type { SabreUser, User, OTAClient } from '@/types'
 import { syncUserToTable, syncUserStatus } from '@/lib/syncUser'
-import { useAppContext } from '@/lib/context/AppContext'
+import { useAppContext, usePerm } from '@/lib/context/AppContext'
 
 
 const T = {
@@ -80,7 +80,8 @@ interface ImportRow {
 
 export default function SabreUsersPage() {
   const supabase = createClient()
-  const { isAdmin, userEmail } = useAppContext()
+  const { userEmail } = useAppContext()
+  const { canEdit: isAdmin, canDelete } = usePerm('sabre_users')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [records, setRecords] = useState<SabreUser[]>([])
   const [resignedUsers, setResignedUsers] = useState<{id:string;full_name:string|null;initial:string|null;email:string|null;sabre_epr:string|null;sabre_pcc:string|null;pcc:string|null;ota_client:string|null;cta:string|null;pta:string|null;minicom:string|null;date_created_in_gds:string|null;date_resigned:string|null}[]>([])
@@ -629,12 +630,14 @@ export default function SabreUsersPage() {
                         onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Edit
                       </button>
+                      {canDelete && (
                       <button onClick={()=>openDelete(row)}
                         style={{padding:'6px 14px', fontSize:'13px', fontWeight:600, color:D.fgMuted, background:'transparent', border:`1px solid ${D.border}`, borderRadius:'6px', cursor:'pointer'}}
                         onMouseOver={e=>{ e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                         onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                         Delete
                       </button>
+                      )}
                     </>)}
                   </div>
                 </div>
@@ -670,11 +673,13 @@ export default function SabreUsersPage() {
                   <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:700, color:D.success, background:D.successSoft, padding:'2px 7px', borderRadius:'6px'}}>{row.pta??'—'}</span></div>
                   <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}><span style={{fontFamily:'monospace', fontSize:'13px', fontWeight:700, color:D.success, background:D.successSoft, padding:'2px 7px', borderRadius:'6px'}}>{row.minicom??'—'}</span></div>
                   <div style={{padding:'12px 14px', display:'flex', alignItems:'center'}}>
+                    {canDelete && (
                     <button onClick={() => deleteLicense(row.id)} disabled={deletingLicenseId === row.id}
                       style={{display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', fontSize:'12px', fontWeight:600, color:D.danger, background:D.dangerSoft, border:`1px solid ${D.danger}`, borderRadius:'6px', cursor:'pointer', opacity:deletingLicenseId===row.id?0.6:1}}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                       {deletingLicenseId === row.id ? 'Deleting' : 'Delete'}
                     </button>
+                    )}
                   </div>
                 </div>
               ))}

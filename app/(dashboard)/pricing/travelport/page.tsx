@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
-import { useAppContext } from '@/lib/context/AppContext'
+import { usePerm } from '@/lib/context/AppContext'
 
 const GDS_NAME = 'Travelport'
 
@@ -70,7 +70,7 @@ function priceItemRank(item: string | null): number {
 
 export default function PricingTravelportPage() {
   const supabase = createClient()
-  const { canManage: isAdmin, isAdmin: canEdit } = useAppContext()   // isAdmin = can view (admin or manager), canEdit = can add/edit/delete (admin only)
+  const { canEdit, canDelete } = usePerm('pricing')   // Access Matrix: Edit tick = add/import/edit, Delete tick = delete
 
   const [gdsId, setGdsId] = useState<number | null>(null)
   const [records, setRecords] = useState<PricingItem[]>([])
@@ -300,12 +300,14 @@ export default function PricingTravelportPage() {
                                 onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                                 Edit
                               </button>
+                              {canDelete && (
                               <button onClick={() => openDelete(r)}
                                 style={{padding:'6px 12px', fontSize:'13px', fontWeight:600, border:`1px solid ${D.border}`, borderRadius:'6px', background:'transparent', color:D.fgMuted, cursor:'pointer'}}
                                 onMouseOver={e => { e.currentTarget.style.background=D.dangerSoft; e.currentTarget.style.borderColor=D.danger; e.currentTarget.style.color=D.danger }}
                                 onMouseOut={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor=D.border; e.currentTarget.style.color=D.fgMuted }}>
                                 Delete
                               </button>
+                              )}
                             </div>
                           )}
                         </td>

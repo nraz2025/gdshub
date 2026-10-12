@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as XLSX from 'xlsx'
+import { usePerm } from '@/lib/context/AppContext'
 
 const T = {
   primary:    '#10B981',
@@ -64,7 +65,7 @@ export default function ReportingPage() {
   const supabase = createClient()
 
   const [loading, setLoading]   = useState(true)
-  const [isAdmin, setIsAdmin]   = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('reporting')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [gdsList, setGdsList]   = useState<GDS[]>([])
   const [orgList, setOrgList]   = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
@@ -98,10 +99,6 @@ export default function ReportingPage() {
       const { data: oc } = await supabase.from('ota_client').select('company_name').order('company_name')
       setOrgList(Array.from(new Set((oc ?? []).map(o => o.company_name).filter(Boolean))) as string[])
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
-      }
       await loadTemplates()
       setLoading(false)
     }
@@ -384,7 +381,7 @@ export default function ReportingPage() {
           <option value="">— Choose a saved template —</option>
           {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-        {selectedTemplateId !== '' && isAdmin && (
+        {selectedTemplateId !== '' && canDelete && (
           <button onClick={() => deleteTemplate(selectedTemplateId as number)}
             style={{fontSize:'14px', color:D.danger, background:'transparent', border:`1px solid ${D.danger}`, borderRadius:'6px', padding:'6px 12px', cursor:'pointer'}}>
             Delete Template

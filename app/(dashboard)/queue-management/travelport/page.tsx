@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePerm } from '@/lib/context/AppContext'
 
 const GDS_NAME = 'Travelport'
 const ACCENT = '#58a6ff'
@@ -39,7 +40,7 @@ export default function TravelportQueueManagementPage() {
   const supabase = createClient()
   const [records, setRecords] = useState<QueueRow[]>([])
   const [gdsId, setGdsId] = useState<number | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { canEdit: isAdmin, canDelete } = usePerm('queue_management')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
   const [loading, setLoading] = useState(true)
   const [selectedPccs, setSelectedPccs] = useState<Set<string>>(new Set())
   const [queueSearch, setQueueSearch] = useState('')
@@ -84,10 +85,6 @@ export default function TravelportQueueManagementPage() {
   async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setIsAdmin(['admin', 'super_admin'].includes(p?.role ?? ''))
-    }
     const { data: g } = await supabase.from('gds').select('id').eq('name', GDS_NAME).single()
     const thisGdsId = g?.id ?? null
     setGdsId(thisGdsId)
@@ -510,7 +507,7 @@ export default function TravelportQueueManagementPage() {
 
             {error && <p style={{fontSize:'13px', color:D.danger, marginBottom:'12px'}}>{error}</p>}
             <div style={{display:'flex', gap:'10px', justifyContent:'space-between'}}>
-              {editing && cellFor(editing.pcc, editing.queue_number) ? (
+              {canDelete && editing && cellFor(editing.pcc, editing.queue_number) ? (
                 <button onClick={handleDeleteCell} style={{padding:'9px 18px', fontSize:'14px', fontWeight:600, background:D.dangerSoft, border:`1px solid ${D.danger}`, borderRadius:'8px', color:D.danger, cursor:'pointer'}}>Delete</button>
               ) : <span />}
               <div style={{display:'flex', gap:'10px'}}>

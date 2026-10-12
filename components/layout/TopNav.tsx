@@ -165,7 +165,7 @@ export default function TopNav({ user, isAdmin, role, permMap }: TopNavProps) {
         <div style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 0', minHeight: '84px' }}>
 
           {/* Brand */}
-          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '11px', marginRight: '32px', flexShrink: 0, textDecoration: 'none' }}>
+          <Link href="/gds-access-record" style={{ display: 'flex', alignItems: 'center', gap: '11px', marginRight: '32px', flexShrink: 0, textDecoration: 'none' }}>
             <div style={{ width: '46px', height: '46px', borderRadius: '11px', background: activeColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px', fontWeight: 700, color: '#fff', transition: 'background 0.4s' }}>G</div>
             <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '23px', fontWeight: 700, color: T.fg, letterSpacing: '-0.3px' }}>
               GDS<span style={{ color: activeColor, transition: 'color 0.4s' }}>Hub</span>

@@ -28,12 +28,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: perms } = await supabase
     .from('role_permissions')
-    .select('module, can_access, can_edit')
+    .select('module, can_access, can_edit, can_delete')
     .eq('role', role)
 
-  const permMap: Record<string, { can_access: boolean; can_edit: boolean }> = {}
+  const permMap: Record<string, { can_access: boolean; can_edit: boolean; can_delete: boolean }> = {}
   for (const p of perms ?? []) {
-    permMap[p.module] = { can_access: p.can_access, can_edit: p.can_edit }
+    permMap[p.module] = { can_access: p.can_access, can_edit: p.can_edit, can_delete: p.can_delete ?? false }
   }
 
   return (

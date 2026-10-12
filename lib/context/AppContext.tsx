@@ -14,7 +14,7 @@ export interface AppContextValue {
   role: string          // 'super_admin' | 'admin' | 'manager' | 'user'
   isAdmin: boolean       // role === 'admin' || role === 'super_admin'
   canManage: boolean     // role === 'admin' || 'manager' || 'super_admin' (the broader "can see admin-ish controls" check several pages use)
-  permMap: Record<string, { can_access: boolean; can_edit: boolean }>
+  permMap: Record<string, { can_access: boolean; can_edit: boolean; can_delete: boolean }>
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -32,4 +32,16 @@ export function useAppContext(): AppContextValue {
     throw new Error('useAppContext() must be used inside the (dashboard) layout — AppProvider is missing.')
   }
   return ctx
+}
+
+// Per-module permissions from the Access Matrix (Admin Panel).
+//   canView   = View tick   -> can open / see the module
+//   canEdit   = Edit tick   -> add / import / edit records
+//   canDelete = Delete tick -> remove records
+// Super Admin always has everything; all other roles follow role_permissions.
+export function usePerm(module: string) {
+  const { role, permMap } = useAppContext()
+  if (role === 'super_admin') return { canView: true, canEdit: true, canDelete: true }
+  const p = permMap[module]
+  return { canView: p?.can_access === true, canEdit: p?.can_edit === true, canDelete: p?.can_delete === true }
 }
