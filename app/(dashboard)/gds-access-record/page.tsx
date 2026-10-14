@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import Modal from '@/components/shared/Modal'
@@ -103,6 +103,12 @@ interface ImportRow {
   _row: number; _errors: string[]; _gds_id?: number
 }
 
+// Shared look for the filter fields on this page
+const fLabel: CSSProperties = { fontSize: '12px', fontWeight: 600, color: D.fgDim, textTransform: 'uppercase', letterSpacing: '0.05em' }
+const fInput: CSSProperties = { width: '100%', padding: '9px 14px', fontSize: '14px', border: `1.5px solid ${D.borderLight}`, borderRadius: '8px', background: D.bg, color: D.fg, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s, box-shadow 0.15s' }
+const fFocus = (e: FocusEvent<HTMLElement>) => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }
+const fBlur = (e: FocusEvent<HTMLElement>) => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }
+
 export default function GDSAccessRecordPage() {
   const supabase = createClient()
   const { canEdit: isAdmin, canDelete } = usePerm('gds_info')   // Access Matrix: isAdmin here = Edit tick (add/import/edit); canDelete = Delete tick
@@ -120,6 +126,11 @@ export default function GDSAccessRecordPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPccFunc, setFilterPccFunc] = useState('')
   const [filterOrg, setFilterOrg] = useState('')
+  const [filterGds, setFilterGds] = useState('')
+  const [filterPcc, setFilterPcc] = useState('')
+  const [filterPccName, setFilterPccName] = useState('')
+  const [debouncedPcc, setDebouncedPcc] = useState('')
+  const [debouncedPccName, setDebouncedPccName] = useState('')
 
   // Add/Edit modal
   const [modalOpen, setModalOpen] = useState(false)
@@ -177,9 +188,19 @@ export default function GDSAccessRecordPage() {
     return () => clearTimeout(t)
   }, [search])
 
+  // Same debounce for the PCC and PCC Name filter boxes.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedPcc(filterPcc)
+      setDebouncedPccName(filterPccName)
+      setCurrentPage(1)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [filterPcc, filterPccName])
+
   // The actual paginated, server-filtered fetch — reruns whenever the page,
   // page size, settled search term, or either dropdown filter changes.
-  useEffect(() => { fetchRecords() }, [currentPage, pageSize, debouncedSearch, filterStatus, filterPccFunc, filterOrg])
+  useEffect(() => { fetchRecords() }, [currentPage, pageSize, debouncedSearch, filterStatus, filterPccFunc, filterOrg, filterGds, debouncedPcc, debouncedPccName])
 
   const PCC_JOIN_SELECT = `
     *, gds:gds_id(id, name),
@@ -192,22 +213,100 @@ export default function GDSAccessRecordPage() {
   // RPC (see pcc_access_record_search.sql), then fetches the full joined row
   // data for just those ids, preserving the server's ordering.
   async function fetchMatchingRows(limit: number, offset: number): Promise<{ rows: PCCList[]; total: number }> {
-    const { data: idRows, error: idErr } = await supabase.rpc('search_pcc_access_records', {
-      p_search: debouncedSearch.trim(),
+    const searchTerm = debouncedSearch.trim()
+    const rpcArgs = {
+      p_search: '',   // Quick Search is functionality-only now, handled below
       p_status: filterStatus,
       p_pcc_func: filterPccFunc,
       p_org: filterOrg,
-      p_limit: limit,
-      p_offset: offset,
-    })
-    if (idErr) { console.error('search_pcc_access_records failed:', idErr.message); return { rows: [], total: 0 } }
-    const ids = (idRows ?? []).map((r: { id: number }) => r.id)
-    const total = idRows && idRows.length > 0 ? Number((idRows[0] as { total_count: number | string }).total_count) : 0
-    if (ids.length === 0) return { rows: [], total }
-    const { data: fullRows } = await supabase.from('pcc_list').select(PCC_JOIN_SELECT).in('id', ids)
-    const byId = new Map((fullRows ?? []).map(r => [r.id, r as unknown as PCCList]))
-    const ordered = ids.map((id: number) => byId.get(id)).filter(Boolean) as PCCList[]
-    return { rows: ordered, total }
+    }
+    const gdsPick = gdsList.find(g => String(g.id) === filterGds)
+    const pccTerm = debouncedPcc.trim()
+    const nameTerm = debouncedPccName.trim().toLowerCase()
+    const escLike = (v: string) => v.replace(/[%_\\]/g, m => '\\' + m)
+
+    // ── Fast path: no GDS / PCC / PCC Name filter and no Quick Search text —
+    //    the server does everything and returns just one page.
+    if (!gdsPick && !pccTerm && !nameTerm && !searchTerm) {
+      const { data: idRows, error: idErr } = await supabase.rpc('search_pcc_access_records', { ...rpcArgs, p_limit: limit, p_offset: offset })
+      if (idErr) { console.error('search_pcc_access_records failed:', idErr.message); return { rows: [], total: 0 } }
+      const ids = (idRows ?? []).map((r: { id: number }) => r.id)
+      const total = idRows && idRows.length > 0 ? Number((idRows[0] as { total_count: number | string }).total_count) : 0
+      if (ids.length === 0) return { rows: [], total }
+      const { data: fullRows } = await supabase.from('pcc_list').select(PCC_JOIN_SELECT).in('id', ids)
+      const byId = new Map((fullRows ?? []).map(r => [r.id, r as unknown as PCCList]))
+      const ordered = ids.map((id: number) => byId.get(id)).filter(Boolean) as PCCList[]
+      return { rows: ordered, total }
+    }
+
+    // ── Otherwise: build the full list of matching ids, then page it here.
+    // PCC Name → the ids of matching PCC Names
+    let nameIds: number[] | null = null
+    if (nameTerm) {
+      nameIds = otaClients.filter(o => o.company_name.toLowerCase().includes(nameTerm)).map(o => o.id)
+      if (nameIds.length === 0) return { rows: [], total: 0 }
+    }
+    // GDS / PCC / PCC Name filters, reused for both lookups below
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const applyColumnFilters = (q: any): any => {
+      let r = q
+      if (gdsPick) r = r.eq('gds_id', gdsPick.id)
+      if (pccTerm) r = r.ilike('pcc', `%${escLike(pccTerm)}%`)
+      if (nameIds) r = r.in('ota_client_id', nameIds)
+      return r
+    }
+
+    // (1) ids allowed by GDS / PCC / PCC Name (null = no restriction)
+    let allowed: Set<number> | null = null
+    if (gdsPick || pccTerm || nameIds) {
+      allowed = new Set<number>()
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await applyColumnFilters(supabase.from('pcc_list').select('id')).order('id').range(from, from + 999)
+        if (error) { console.error('pcc_list filter failed:', error.message); return { rows: [], total: 0 } }
+        ;(data ?? []).forEach((r: { id: number }) => allowed!.add(r.id))
+        if (!data || data.length < 1000) break
+      }
+      if (allowed.size === 0) return { rows: [], total: 0 }
+    }
+
+    // (2) Quick Search = Functionality only (GDS Functionality name or PCC Functionality text)
+    let funcMatch: Set<number> | null = null
+    if (searchTerm) {
+      funcMatch = new Set<number>()
+      const safe = searchTerm.replace(/[,()]/g, ' ').trim()
+      const funcIds = funcList.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase())).map(f => f.id)
+      const orParts = [`pcc_functionality.ilike.%${escLike(safe)}%`]
+      if (funcIds.length > 0) orParts.push(`functionality_id.in.(${funcIds.join(',')})`)
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await applyColumnFilters(supabase.from('pcc_list').select('id')).or(orParts.join(',')).order('id').range(from, from + 999)
+        if (error) { console.error('functionality search failed:', error.message); return { rows: [], total: 0 } }
+        ;(data ?? []).forEach((r: { id: number }) => funcMatch!.add(r.id))
+        if (!data || data.length < 1000) break
+      }
+      if (funcMatch.size === 0) return { rows: [], total: 0 }
+    }
+
+    // (3) the server's matches for Organisation / PCC Functionality / Status, in its order,
+    //     kept only if they also pass the filters above
+    const orderedIds: number[] = []
+    const seen = new Set<number>()
+    for (let from = 0; ; from += 1000) {
+      const { data: idRows, error: idErr } = await supabase.rpc('search_pcc_access_records', { ...rpcArgs, p_limit: 1000, p_offset: from })
+      if (idErr) { console.error('search_pcc_access_records failed:', idErr.message); return { rows: [], total: 0 } }
+      const batch = (idRows ?? []) as { id: number }[]
+      batch.forEach(r => { if ((!allowed || allowed.has(r.id)) && (!funcMatch || funcMatch.has(r.id)) && !seen.has(r.id)) { seen.add(r.id); orderedIds.push(r.id) } })
+      if (batch.length < 1000) break
+    }
+
+    const total = orderedIds.length
+    const pageIds = orderedIds.slice(offset, offset + limit)
+    if (pageIds.length === 0) return { rows: [], total }
+    const byId = new Map<number, PCCList>()
+    for (let i = 0; i < pageIds.length; i += 300) {
+      const { data: fullRows } = await supabase.from('pcc_list').select(PCC_JOIN_SELECT).in('id', pageIds.slice(i, i + 300))
+      ;(fullRows ?? []).forEach(r => byId.set(r.id, r as unknown as PCCList))
+    }
+    return { rows: pageIds.map(id => byId.get(id)).filter(Boolean) as PCCList[], total }
   }
 
   async function fetchRecords() {
@@ -624,41 +723,52 @@ export default function GDSAccessRecordPage() {
         </div>
 
         {/* Filters */}
-        <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'16px', marginBottom:'18px'}}>
-          <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr auto', alignItems:'flex-end', gap:'12px', width:'100%'}}>
+        <div style={{background:D.card, border:`1px solid ${D.border}`, borderRadius:'10px', padding:'16px', marginBottom:'18px', display:'flex', flexDirection:'column', gap:'14px'}}>
 
-            {/* Unified search — Organisation, PCC, PCC Name, GDS */}
-            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Search</label>
-              <div style={{position:'relative'}}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Search by organisation, PCC, PCC name, or GDS..."
-                  style={{width:'100%', padding:'9px 14px 9px 38px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s, box-shadow 0.15s'}}
-                  onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
-                  onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }} />
-              </div>
-            </div>
+          {/* Row 1 — separate filter fields */}
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', alignItems:'flex-end', gap:'12px', width:'100%'}}>
 
             {/* Organisation */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Organisation</label>
+              <label style={fLabel}>Organisation</label>
               <select value={filterOrg} onChange={e => { setFilterOrg(e.target.value); setCurrentPage(1) }}
-                style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
-                onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
-                onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
+                style={{...fInput, cursor:'pointer'}} onFocus={fFocus} onBlur={fBlur}>
                 <option value="">All</option>
                 {orgList.map(o => <option key={o.id} value={o.organisation}>{o.organisation}{o.iata ? ` (${o.iata})` : ''}</option>)}
               </select>
             </div>
 
+            {/* GDS */}
+            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+              <label style={fLabel}>GDS</label>
+              <select value={filterGds} onChange={e => { setFilterGds(e.target.value); setCurrentPage(1) }}
+                style={{...fInput, cursor:'pointer'}} onFocus={fFocus} onBlur={fBlur}>
+                <option value="">All</option>
+                {gdsList.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+              </select>
+            </div>
+
+            {/* PCC */}
+            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+              <label style={fLabel}>PCC</label>
+              <input type="text" value={filterPcc} onChange={e => setFilterPcc(e.target.value)}
+                placeholder="e.g. KULMY"
+                style={fInput} onFocus={fFocus} onBlur={fBlur} />
+            </div>
+
+            {/* PCC Name */}
+            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+              <label style={fLabel}>PCC Name</label>
+              <input type="text" value={filterPccName} onChange={e => setFilterPccName(e.target.value)}
+                placeholder="e.g. company name"
+                style={fInput} onFocus={fFocus} onBlur={fBlur} />
+            </div>
+
             {/* PCC Functionality */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>PCC Functionality</label>
+              <label style={fLabel}>PCC Functionality</label>
               <select value={filterPccFunc} onChange={e => { setFilterPccFunc(e.target.value); setCurrentPage(1) }}
-                style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
-                onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
-                onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
+                style={{...fInput, cursor:'pointer'}} onFocus={fFocus} onBlur={fBlur}>
                 <option value="">All</option>
                 {pccFunctionalityOptions.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
               </select>
@@ -666,29 +776,37 @@ export default function GDSAccessRecordPage() {
 
             {/* Status */}
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-              <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Status</label>
+              <label style={fLabel}>Status</label>
               <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
-                style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box', cursor:'pointer', transition:'border-color 0.15s, box-shadow 0.15s'}}
-                onFocus={e => { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.boxShadow = `0 0 0 3px ${D.accentSoft}` }}
-                onBlur={e => { e.currentTarget.style.borderColor = D.borderLight; e.currentTarget.style.boxShadow = 'none' }}>
+                style={{...fInput, cursor:'pointer'}} onFocus={fFocus} onBlur={fBlur}>
                 <option value="all">All Status</option>
                 {PCC_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
-            {/* Reset button */}
-            <div style={{display:'flex', alignItems:'flex-end'}}>
-              <button
-                onClick={() => { setSearch(''); setDebouncedSearch(''); setFilterStatus('all'); setFilterPccFunc(''); setFilterOrg(''); setCurrentPage(1) }}
-                title="Reset filters"
-                style={{display:'flex', alignItems:'center', justifyContent:'center', width:'38px', height:'38px', background:D.bg, color:D.fgMuted, border:`1px solid ${D.border}`, borderRadius:'8px', cursor:'pointer', flexShrink:0}}
-                onMouseOver={e => { e.currentTarget.style.color=D.accent; e.currentTarget.style.borderColor=D.accent }}
-                onMouseOut={e => { e.currentTarget.style.color=D.fgMuted; e.currentTarget.style.borderColor=D.border }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              </button>
-            </div>
-
           </div>
+
+          {/* Row 2 — Quick search (below the filters) + reset */}
+          <div style={{display:'flex', alignItems:'flex-end', gap:'12px', width:'100%'}}>
+            <div style={{display:'flex', flexDirection:'column', gap:'6px', flex:1}}>
+              <label style={fLabel}>Quick Search (Functionality)</label>
+              <div style={{position:'relative'}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={D.fgDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Quick search by functionality, e.g. Ticketing, Booking Only..."
+                  style={{...fInput, padding:'9px 14px 9px 38px'}} onFocus={fFocus} onBlur={fBlur} />
+              </div>
+            </div>
+            <button
+              onClick={() => { setSearch(''); setDebouncedSearch(''); setFilterStatus('all'); setFilterPccFunc(''); setFilterOrg(''); setFilterGds(''); setFilterPcc(''); setFilterPccName(''); setDebouncedPcc(''); setDebouncedPccName(''); setCurrentPage(1) }}
+              title="Reset filters"
+              style={{display:'flex', alignItems:'center', justifyContent:'center', width:'38px', height:'38px', background:D.bg, color:D.fgMuted, border:`1px solid ${D.border}`, borderRadius:'8px', cursor:'pointer', flexShrink:0}}
+              onMouseOver={e => { e.currentTarget.style.color=D.accent; e.currentTarget.style.borderColor=D.accent }}
+              onMouseOut={e => { e.currentTarget.style.color=D.fgMuted; e.currentTarget.style.borderColor=D.border }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+
         </div>
 
         {/* Records count bar (single row) */}
