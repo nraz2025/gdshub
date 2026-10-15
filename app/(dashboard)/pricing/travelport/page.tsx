@@ -165,7 +165,11 @@ export default function PricingTravelportPage() {
 
   const filtered = records.filter(r => {
     const term = search.toLowerCase()
-    const matchesSearch = !term || r.product.toLowerCase().includes(term) || (r.price_item ?? '').toLowerCase().includes(term)
+    // Multi-criteria search: ";" or "," = OR between groups, space = AND within a group.
+    // e.g. "api ; web service" -> items matching "api" OR containing both "web" and "service".
+    const haystack = `${r.product} ${r.price_item ?? ''}`.toLowerCase()
+    const orGroups = term.split(/[;,]/).map(g => g.trim()).filter(Boolean)
+    const matchesSearch = orGroups.length === 0 || orGroups.some(g => g.split(/\s+/).every(w => haystack.includes(w)))
     if (!matchesSearch) return false
     if (filterStatus === 'all') return true
     return r.status === filterStatus
@@ -209,7 +213,7 @@ export default function PricingTravelportPage() {
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
               <label style={{fontSize:'12px', fontWeight:600, color:D.fgDim, textTransform:'uppercase', letterSpacing:'0.05em'}}>Search</label>
               <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search by product or price item..."
+                placeholder="Search product or price item — ; or , = OR, space = AND (e.g. api ; web service)"
                 style={{width:'100%', padding:'9px 14px', fontSize:'14px', border:`1.5px solid ${D.borderLight}`, borderRadius:'8px', background:D.bg, color:D.fg, outline:'none', boxSizing:'border-box'}} />
             </div>
             <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
